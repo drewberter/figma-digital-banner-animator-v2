@@ -1,9 +1,11 @@
 import { useRef, useEffect, useState } from 'react';
 import { useAnimationContext } from '../context/AnimationContext';
-// Import Lottie
-import lottie from 'lottie-web';
+// Import our custom Lottie utility
+import { getLottie, initLottie, convertAnimationToLottie } from '../utils/lottieUtils';
+// Import default Lottie as fallback
+import lottieDefault from 'lottie-web';
 // Import icons
-import { HandIcon, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { HandIcon, ZoomIn, ZoomOut, Maximize, MonitorPlay } from 'lucide-react';
 
 const PreviewCanvas = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -13,9 +15,15 @@ const PreviewCanvas = () => {
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState(1);
 
+  // State for renderer selection
+  const [renderer, setRenderer] = useState<'svg' | 'canvas' | 'worker'>('svg');
+  
   // Initialize animation preview
   useEffect(() => {
-    // Simple default animation data
+    // Initialize Lottie with selected renderer
+    initLottie(renderer);
+    
+    // Get sample animation data (simple rectangle)
     const defaultAnimationData = {
       v: '5.7.4',
       fr: 30,
@@ -55,10 +63,13 @@ const PreviewCanvas = () => {
       canvasRef.current.innerHTML = '';
       
       try {
+        // Get the appropriate Lottie instance
+        const lottie = getLottie();
+        
         // Initialize Lottie animation
         animationRef.current = lottie.loadAnimation({
           container: canvasRef.current,
-          renderer: 'svg',
+          renderer: renderer,
           loop: true,
           autoplay: false,
           animationData: defaultAnimationData
@@ -77,7 +88,7 @@ const PreviewCanvas = () => {
         }
       }
     };
-  }, []);
+  }, [renderer]);
 
   // Update animation playback state
   useEffect(() => {
@@ -194,6 +205,26 @@ const PreviewCanvas = () => {
           onClick={handleResetView}
         >
           <Maximize size={16} />
+        </button>
+      </div>
+      
+      {/* Renderer Selection */}
+      <div className="absolute bottom-2 right-2 flex items-center space-x-1 bg-neutral-800 bg-opacity-80 rounded p-1">
+        <select 
+          className="text-xs bg-neutral-700 text-neutral-200 rounded p-1 border-none"
+          value={renderer}
+          onChange={(e) => setRenderer(e.target.value as any)}
+        >
+          <option value="svg">SVG Renderer</option>
+          <option value="canvas">Canvas Renderer</option>
+          <option value="worker">WebWorker (High Performance)</option>
+        </select>
+        <button 
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300" 
+          title="Preview Animation"
+          onClick={() => animationRef.current?.play()}
+        >
+          <MonitorPlay size={16} />
         </button>
       </div>
     </div>
