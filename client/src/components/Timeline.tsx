@@ -1,12 +1,25 @@
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, SkipBack, Clock } from 'lucide-react';
-import { useAnimationContext } from '../context/AnimationContext';
+import { mockLayers } from '../mock/animationData';
 
 const Timeline = () => {
-  const { currentTime, duration, setCurrentTime, isPlaying, togglePlayback, getSelectedLayer } = useAnimationContext();
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(5); // seconds
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>('layer-1-1');
   const timelineRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
+  
+  // Toggle playback
+  const togglePlayback = () => {
+    setIsPlaying(!isPlaying);
+  };
+  
+  // Get selected layer
+  const getSelectedLayer = () => {
+    return mockLayers['frame-1'].find(layer => layer.id === selectedLayerId) || null;
+  };
   
   // Generate time markers (every 0.5 seconds)
   const timeMarkers = [];

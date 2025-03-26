@@ -1,10 +1,19 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeftSquare, ChevronRightSquare, Clock, Zap, Palette } from 'lucide-react';
 import { AnimationType, EasingType } from '../types/animation';
-import { useAnimationContext } from '../context/AnimationContext';
+import { mockLayers } from '../mock/animationData';
 
 const PropertiesPanel = () => {
-  const { getSelectedLayer, updateLayerAnimation } = useAnimationContext();
+  const [selectedLayerId, setSelectedLayerId] = useState<string>('layer-1-1');
+  
+  // Mock functions to replace context
+  const getSelectedLayer = () => {
+    return mockLayers['frame-1'].find(layer => layer.id === selectedLayerId) || null;
+  };
+  
+  const updateLayerAnimation = (layerId: string, animation: any) => {
+    console.log('Update animation for layer', layerId, animation);
+  };
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   const [animation, setAnimation] = useState<{
@@ -157,7 +166,7 @@ const PropertiesPanel = () => {
             />
             <div className="flex justify-between text-xs text-neutral-500">
               <span>0</span>
-              <span className="text-neutral-300">{animation.opacity.toFixed(2)}</span>
+              <span className="text-neutral-300">{animation.opacity?.toFixed(2) || 0}</span>
               <span>1</span>
             </div>
           </div>
@@ -177,7 +186,7 @@ const PropertiesPanel = () => {
             />
             <div className="flex justify-between text-xs text-neutral-500">
               <span>0</span>
-              <span className="text-neutral-300">{animation.scale?.toFixed(2)}</span>
+              <span className="text-neutral-300">{animation.scale?.toFixed(2) || 1}</span>
               <span>2</span>
             </div>
           </div>
@@ -197,7 +206,7 @@ const PropertiesPanel = () => {
             />
             <div className="flex justify-between text-xs text-neutral-500">
               <span>0°</span>
-              <span className="text-neutral-300">{animation.rotation}°</span>
+              <span className="text-neutral-300">{animation.rotation || 0}°</span>
               <span>360°</span>
             </div>
           </div>

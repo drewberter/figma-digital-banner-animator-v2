@@ -54,11 +54,11 @@ const AppContent = () => {
 
 function App() {
   return (
-    <PluginProvider>
-      <AnimationProvider>
+    <AnimationProvider>
+      <PluginProvider>
         <AppContent />
-      </AnimationProvider>
-    </PluginProvider>
+      </PluginProvider>
+    </AnimationProvider>
   );
 }
 

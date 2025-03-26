@@ -1,17 +1,16 @@
-import { useRef, useEffect } from 'react';
-import { useAnimationContext } from '../context/AnimationContext';
+import { useRef, useState } from 'react';
 import { mockFrames } from '../mock/animationData';
 
 const PreviewCanvas = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const { currentTime, currentFrame } = useAnimationContext();
-  
-  // Set up canvas dimensions based on current frame
-  const frameWidth = currentFrame?.width || 300;
-  const frameHeight = currentFrame?.height || 250;
+  const [currentTime, setCurrentTime] = useState(0);
   
   // For demo purposes we'll just show a frame from our mock data
   const demoFrame = mockFrames[0]; // Using the first frame as demo
+  
+  // Set up canvas dimensions based on demo frame
+  const frameWidth = demoFrame?.width || 300;
+  const frameHeight = demoFrame?.height || 250;
 
   return (
     <div className="h-full bg-neutral-900 flex items-center justify-center overflow-hidden">
