@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+  }
+}
+
+.timeline-track {
+  height: 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.keyframe {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #0078D4;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.range-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #0078D4;
+  cursor: pointer;
+}
+
+.resize-handle {
+  cursor: col-resize;
+  width: 4px;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.resize-handle:hover {
+  background-color: #0078D4;
+}
+
+.timeline-ruler {
+  height: 20px;
+  position: relative;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ruler-tick {
+  position: absolute;
+  height: 8px;
+  width: 1px;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.ruler-tick-label {
+  position: absolute;
+  font-size: 9px;
+  bottom: 9px;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background-color: #FF8C00;
+  z-index: 10;
+}
+
+.playhead::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -5px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #FF8C00;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

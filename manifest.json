@@ -1,0 +1,39 @@
+{
+  "name": "Digital Ad Animator",
+  "id": "digital-ad-animator",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "index.html",
+  "capabilities": [
+    "inspect"
+  ],
+  "enableProposedApi": false,
+  "enablePrivatePluginApi": false,
+  "documentAccess": "dynamic-page",
+  "editorType": [
+    "figma"
+  ],
+  "permissions": [
+    "currentuser",
+    "activeusers",
+    "clipboard"
+  ],
+  "menu": [
+    {
+      "name": "Create Animated Banner",
+      "command": "create-banner"
+    },
+    {
+      "name": "Animation Presets",
+      "command": "show-presets"
+    },
+    {
+      "separator": true
+    },
+    {
+      "name": "Export...",
+      "command": "export"
+    }
+  ],
+  "build": "npm run build"
+}
