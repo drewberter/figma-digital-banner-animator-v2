@@ -1,5 +1,73 @@
 import { AnimationType, EasingType, AnimationLayer, AnimationFrame } from '../types/animation';
 
+// Define entrance, emphasis, and exit animation groups for reuse
+const entranceAnimations = {
+  fadeIn: {
+    type: AnimationType.Fade,
+    duration: 0.8,
+    easing: EasingType.EaseOut,
+    opacity: 1
+  },
+  scaleUp: {
+    type: AnimationType.Scale,
+    duration: 0.7,
+    easing: EasingType.EaseOut,
+    scale: 1.2
+  },
+  slideIn: {
+    type: AnimationType.Slide,
+    duration: 0.7,
+    easing: EasingType.EaseOut,
+    direction: 'right'
+  },
+  rotateIn: {
+    type: AnimationType.Rotate,
+    duration: 1.0,
+    easing: EasingType.EaseInOut,
+    rotation: 360
+  }
+};
+
+const emphasisAnimations = {
+  pulse: {
+    type: AnimationType.Pulse,
+    duration: 0.5,
+    easing: EasingType.EaseInOut
+  },
+  bounce: {
+    type: AnimationType.Bounce,
+    duration: 0.6,
+    easing: EasingType.Bounce
+  },
+  wiggle: {
+    type: AnimationType.Custom,
+    duration: 0.5,
+    easing: EasingType.EaseInOut,
+    customData: { type: 'wiggle', amplitude: 10 }
+  }
+};
+
+const exitAnimations = {
+  fadeOut: {
+    type: AnimationType.Fade,
+    duration: 0.6,
+    easing: EasingType.EaseIn,
+    opacity: 0
+  },
+  scaleDown: {
+    type: AnimationType.Scale,
+    duration: 0.5,
+    easing: EasingType.EaseIn,
+    scale: 0.5
+  },
+  slideOut: {
+    type: AnimationType.Slide,
+    duration: 0.6,
+    easing: EasingType.EaseIn,
+    direction: 'left'
+  }
+};
+
 // Mock animation frames data
 export const mockFrames: AnimationFrame[] = [
   {
@@ -43,11 +111,8 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
       locked: false,
       animations: [
         {
-          type: AnimationType.Fade,
-          startTime: 0,
-          duration: 1,
-          easing: EasingType.EaseInOut,
-          opacity: 1
+          ...entranceAnimations.fadeIn,
+          startTime: 0
         }
       ],
       keyframes: []
@@ -60,44 +125,58 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
       locked: false,
       animations: [
         {
-          type: AnimationType.Scale,
-          startTime: 0.2,
-          duration: 0.8,
-          easing: EasingType.EaseOut,
-          scale: 1.2
+          ...entranceAnimations.scaleUp,
+          startTime: 0.3
+        },
+        {
+          ...emphasisAnimations.pulse,
+          startTime: 2.5
         }
       ],
       keyframes: []
     },
     {
       id: 'layer-1-3',
-      name: 'Button',
-      type: 'button',
+      name: 'Subhead',
+      type: 'text',
       visible: true,
       locked: false,
       animations: [
         {
-          type: AnimationType.Bounce,
-          startTime: 1.0,
-          duration: 0.5,
-          easing: EasingType.Bounce
+          ...entranceAnimations.slideIn,
+          startTime: 0.6
         }
       ],
       keyframes: []
     },
     {
       id: 'layer-1-4',
+      name: 'CTA Button',
+      type: 'button',
+      visible: true,
+      locked: false,
+      animations: [
+        {
+          ...entranceAnimations.fadeIn,
+          startTime: 1.0
+        },
+        {
+          ...emphasisAnimations.bounce,
+          startTime: 2.0
+        }
+      ],
+      keyframes: []
+    },
+    {
+      id: 'layer-1-5',
       name: 'Logo',
       type: 'image',
       visible: true,
       locked: false,
       animations: [
         {
-          type: AnimationType.Rotate,
-          startTime: 0.5,
-          duration: 1.5,
-          easing: EasingType.EaseInOut,
-          rotation: 360
+          ...entranceAnimations.rotateIn,
+          startTime: 0.8
         }
       ],
       keyframes: []
@@ -112,42 +191,73 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
       locked: false,
       animations: [
         {
-          type: AnimationType.Fade,
-          startTime: 0,
-          duration: 0.8,
-          easing: EasingType.Linear,
-          opacity: 1
+          ...entranceAnimations.fadeIn,
+          startTime: 0
         }
       ],
       keyframes: []
     },
     {
       id: 'layer-2-2',
-      name: 'Text Content',
+      name: 'Headline',
       type: 'text',
       visible: true,
       locked: false,
       animations: [
         {
-          type: AnimationType.Slide,
-          startTime: 0.3,
-          duration: 0.7,
-          easing: EasingType.EaseOut
+          ...entranceAnimations.slideIn,
+          startTime: 0.2,
+          direction: 'left'
         }
       ],
       keyframes: []
     },
     {
       id: 'layer-2-3',
+      name: 'Tagline',
+      type: 'text',
+      visible: true,
+      locked: false,
+      animations: [
+        {
+          ...entranceAnimations.fadeIn,
+          startTime: 0.5
+        },
+        {
+          ...exitAnimations.fadeOut,
+          startTime: 3.0
+        }
+      ],
+      keyframes: []
+    },
+    {
+      id: 'layer-2-4',
       name: 'CTA Button',
       type: 'button',
       visible: true,
       locked: false,
       animations: [
         {
-          type: AnimationType.Pulse,
-          startTime: 1.2,
-          duration: 0.8,
+          ...entranceAnimations.scaleUp,
+          startTime: 0.8
+        },
+        {
+          ...emphasisAnimations.pulse,
+          startTime: 1.5
+        }
+      ],
+      keyframes: []
+    },
+    {
+      id: 'layer-2-5',
+      name: 'Logo',
+      type: 'image',
+      visible: true,
+      locked: false,
+      animations: [
+        {
+          ...entranceAnimations.fadeIn,
+          startTime: 0.3,
           easing: EasingType.EaseInOut
         }
       ],
@@ -163,28 +273,67 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
       locked: false,
       animations: [
         {
-          type: AnimationType.Fade,
-          startTime: 0,
-          duration: 0.5,
-          easing: EasingType.EaseIn,
-          opacity: 1
+          ...entranceAnimations.fadeIn,
+          startTime: 0
         }
       ],
       keyframes: []
     },
     {
       id: 'layer-3-2',
-      name: 'Text',
+      name: 'Headline', 
       type: 'text',
       visible: true,
       locked: false,
       animations: [
         {
-          type: AnimationType.Scale,
+          ...entranceAnimations.slideIn,
           startTime: 0.2,
-          duration: 0.5,
-          easing: EasingType.EaseOut,
-          scale: 1.1
+          direction: 'right'
+        },
+        {
+          ...exitAnimations.slideOut,
+          startTime: 3.5
+        }
+      ],
+      keyframes: []
+    },
+    {
+      id: 'layer-3-3',
+      name: 'Price Tag',
+      type: 'text',
+      visible: true,
+      locked: false,
+      animations: [
+        {
+          ...entranceAnimations.scaleUp,
+          startTime: 0.5
+        },
+        {
+          ...emphasisAnimations.pulse,
+          startTime: 1.2
+        }
+      ],
+      keyframes: []
+    },
+    {
+      id: 'layer-3-4',
+      name: 'CTA Button',
+      type: 'button',
+      visible: true,
+      locked: false,
+      animations: [
+        {
+          ...entranceAnimations.fadeIn,
+          startTime: 0.8
+        },
+        {
+          ...emphasisAnimations.bounce,
+          startTime: 1.5
+        },
+        {
+          ...exitAnimations.fadeOut,
+          startTime: 4.0
         }
       ],
       keyframes: []
@@ -199,79 +348,120 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
       locked: false,
       animations: [
         {
-          type: AnimationType.Fade,
-          startTime: 0,
-          duration: 0.7,
-          easing: EasingType.Linear,
-          opacity: 1
+          ...entranceAnimations.fadeIn,
+          startTime: 0
         }
       ],
       keyframes: []
     },
     {
       id: 'layer-4-2',
-      name: 'Headline',
+      name: 'Title',
       type: 'text',
       visible: true,
       locked: false,
       animations: [
         {
-          type: AnimationType.Fade,
+          ...entranceAnimations.slideIn,
           startTime: 0.3,
-          duration: 0.6,
-          easing: EasingType.EaseOut,
-          opacity: 1
+          direction: 'top'
         }
       ],
       keyframes: []
     },
     {
       id: 'layer-4-3',
-      name: 'Subheadline',
+      name: 'Description',
       type: 'text',
       visible: true,
       locked: false,
       animations: [
         {
-          type: AnimationType.Fade,
+          ...entranceAnimations.fadeIn,
           startTime: 0.6,
-          duration: 0.6,
-          easing: EasingType.EaseOut,
-          opacity: 1
+          duration: 0.5
+        },
+        {
+          ...exitAnimations.fadeOut,
+          startTime: 4.0
         }
       ],
       keyframes: []
     },
     {
       id: 'layer-4-4',
-      name: 'CTA Button',
-      type: 'button',
+      name: 'Feature 1',
+      type: 'text',
       visible: true,
       locked: false,
       animations: [
         {
-          type: AnimationType.Scale,
-          startTime: 0.9,
-          duration: 0.6,
-          easing: EasingType.EaseOut,
-          scale: 1.1
+          ...entranceAnimations.slideIn,
+          startTime: 0.8,
+          direction: 'left'
         }
       ],
       keyframes: []
     },
     {
       id: 'layer-4-5',
+      name: 'Feature 2',
+      type: 'text',
+      visible: true,
+      locked: false,
+      animations: [
+        {
+          ...entranceAnimations.slideIn,
+          startTime: 1.0,
+          direction: 'left'
+        }
+      ],
+      keyframes: []
+    },
+    {
+      id: 'layer-4-6',
+      name: 'Feature 3',
+      type: 'text',
+      visible: true,
+      locked: false,
+      animations: [
+        {
+          ...entranceAnimations.slideIn,
+          startTime: 1.2,
+          direction: 'left'
+        }
+      ],
+      keyframes: []
+    },
+    {
+      id: 'layer-4-7',
+      name: 'CTA Button',
+      type: 'button',
+      visible: true,
+      locked: false,
+      animations: [
+        {
+          ...entranceAnimations.scaleUp,
+          startTime: 1.5
+        },
+        {
+          ...emphasisAnimations.pulse,
+          startTime: 2.5
+        }
+      ],
+      keyframes: []
+    },
+    {
+      id: 'layer-4-8',
       name: 'Logo',
       type: 'image',
       visible: true,
       locked: false,
       animations: [
         {
-          type: AnimationType.Fade,
-          startTime: 1.2,
-          duration: 0.5,
-          easing: EasingType.EaseInOut,
-          opacity: 1
+          ...entranceAnimations.rotateIn,
+          startTime: 0.5,
+          duration: 1.0
         }
       ],
       keyframes: []
