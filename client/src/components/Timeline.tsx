@@ -1,25 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, SkipBack, Clock } from 'lucide-react';
+// import { useAnimationContext } from '../context/AnimationContext';
 import { mockLayers } from '../mock/animationData';
 
 const Timeline = () => {
+  // Local state instead of context
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(5); // seconds
   const [isPlaying, setIsPlaying] = useState(false);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const duration = 5; // Fixed duration for now
+  
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>('layer-1-1');
   const timelineRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   
-  // Toggle playback
-  const togglePlayback = () => {
-    setIsPlaying(!isPlaying);
-  };
-  
-  // Get selected layer
-  const getSelectedLayer = () => {
-    return mockLayers['frame-1'].find(layer => layer.id === selectedLayerId) || null;
-  };
+  // Get the layers for the current frame
+  const selectedFrameId = 'frame-1';
+  const frameLayers = mockLayers[selectedFrameId] || [];
   
   // Generate time markers (every 0.5 seconds)
   const timeMarkers = [];
@@ -89,9 +86,19 @@ const Timeline = () => {
     };
   }, [isDragging, setCurrentTime]);
   
-  // Get keyframes for the selected layer
+  // Get the currently selected layer from mock data
+  const getSelectedLayer = () => {
+    if (!selectedLayerId) return null;
+    return frameLayers.find(layer => layer.id === selectedLayerId) || null;
+  };
+  
   const selectedLayer = getSelectedLayer();
   const keyframes = selectedLayer?.keyframes || [];
+  
+  // Toggle playback
+  const togglePlayback = () => {
+    setIsPlaying(!isPlaying);
+  };
   
   return (
     <div className="h-full bg-[#111111] flex flex-col">
@@ -135,11 +142,18 @@ const Timeline = () => {
             Layers
           </div>
           
-          {selectedLayer && (
-            <div className="h-10 flex items-center px-2 rounded hover:bg-neutral-800 text-sm text-neutral-300">
-              {selectedLayer.name}
+          {/* Display all layers for the current frame */}
+          {frameLayers.map(layer => (
+            <div 
+              key={layer.id}
+              onClick={() => setSelectedLayerId(layer.id)}
+              className={`h-10 flex items-center px-2 rounded cursor-pointer 
+                ${selectedLayerId === layer.id ? 'bg-neutral-800' : 'hover:bg-neutral-700'} 
+                text-sm ${selectedLayerId === layer.id ? 'text-white' : 'text-neutral-300'}`}
+            >
+              {layer.name}
             </div>
-          )}
+          ))}
         </div>
         
         {/* Timeline area */}
@@ -185,7 +199,7 @@ const Timeline = () => {
             {selectedLayer && (
               <div className="h-10 relative">
                 {/* Animation blocks */}
-                {selectedLayer.animations.map((animation, index) => (
+                {selectedLayer.animations.map((animation: any, index: number) => (
                   <div 
                     key={index}
                     className="absolute h-6 top-2 rounded bg-[#2A5BFF] bg-opacity-70 border border-[#4A7CFF]"
@@ -201,7 +215,7 @@ const Timeline = () => {
                 ))}
                 
                 {/* Keyframes */}
-                {keyframes.map((keyframe, index) => (
+                {keyframes.map((keyframe: any, index: number) => (
                   <div 
                     key={index}
                     className="absolute w-3 h-3 top-3.5 -ml-1.5 rounded-sm bg-yellow-500 border border-yellow-600"

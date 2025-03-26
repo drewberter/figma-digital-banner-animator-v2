@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ChevronDown, ChevronRight, ChevronLeftSquare, ChevronRightSquare, Plus, Eye, EyeOff, Lock, Unlock, Square, CheckSquare, Image, Type, Box, Layout } from 'lucide-react';
 import { mockFrames, mockLayers } from '../mock/animationData';
 
@@ -11,20 +11,13 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [frameListExpanded, setFrameListExpanded] = useState(true);
   const [layerListExpanded, setLayerListExpanded] = useState(true);
-  const [selectedFrameId, setSelectedFrameId] = useState<string>('frame-1');
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
-  const [layers, setLayers] = useState(mockLayers[selectedFrameId] || []);
+  const [selectedFrameId, setSelectedFrameId] = useState('frame-1');
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(
+    mockLayers['frame-1']?.length > 0 ? mockLayers['frame-1'][0].id : null
+  );
   
-  // Update layers when selected frame changes
-  useEffect(() => {
-    setLayers(mockLayers[selectedFrameId] || []);
-    // Select the first layer of the frame
-    if (mockLayers[selectedFrameId]?.length > 0) {
-      setSelectedLayerId(mockLayers[selectedFrameId][0].id);
-    } else {
-      setSelectedLayerId(null);
-    }
-  }, [selectedFrameId]);
+  // Get the current layers for the selected frame
+  const currentLayers = mockLayers[selectedFrameId] || [];
   
   // Toggle sidebar collapsed state
   const toggleCollapsed = () => {
@@ -37,8 +30,9 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
     setSelectedFrameId(frameId);
     
     // Reset selected layer when changing frames
-    if (mockLayers[frameId]?.length > 0) {
-      setSelectedLayerId(mockLayers[frameId][0].id);
+    const frameLayers = mockLayers[frameId] || [];
+    if (frameLayers.length > 0) {
+      setSelectedLayerId(frameLayers[0].id);
     } else {
       setSelectedLayerId(null);
     }
@@ -58,25 +52,15 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
   // Toggle layer visibility
   const toggleLayerVisibility = (layerId: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    setLayers(prev => 
-      prev.map(layer => 
-        layer.id === layerId 
-          ? { ...layer, visible: !layer.visible } 
-          : layer
-      )
-    );
+    // This would be handled by context in a real implementation
+    console.log('Toggle visibility for layer:', layerId);
   };
   
   // Toggle layer lock
   const toggleLayerLock = (layerId: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    setLayers(prev => 
-      prev.map(layer => 
-        layer.id === layerId 
-          ? { ...layer, locked: !layer.locked } 
-          : layer
-      )
-    );
+    // This would be handled by context in a real implementation
+    console.log('Toggle lock for layer:', layerId);
   };
   
   // Get layer icon based on type
@@ -208,7 +192,7 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
         
         {layerListExpanded && (
           <div className="flex-1 overflow-y-auto">
-            {layers.map((layer) => (
+            {currentLayers.map((layer) => (
               <div 
                 key={layer.id}
                 className={`pl-4 pr-2 py-1 flex items-center cursor-pointer hover:bg-neutral-800 ${selectedLayerId === layer.id ? 'bg-neutral-800' : ''}`}

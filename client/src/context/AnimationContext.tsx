@@ -62,12 +62,18 @@ const defaultLayer: AnimationLayer = {
   keyframes: []
 };
 
+// Import mock data
+import { mockFrames, mockLayers } from '../mock/animationData';
+
 // Provider component
 export const AnimationProvider = ({ children }: { children: ReactNode }) => {
-  // State
-  const [layers, setLayers] = useState<AnimationLayer[]>([defaultLayer]);
-  const [frames, setFrames] = useState<AnimationFrame[]>([defaultFrame]);
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>('layer-1');
+  // Get initial layers for the first frame
+  const initialLayers = mockLayers['frame-1'] || [];
+  
+  // State - initialize with mock data
+  const [layers, setLayers] = useState<AnimationLayer[]>(initialLayers);
+  const [frames, setFrames] = useState<AnimationFrame[]>(mockFrames);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(initialLayers.length > 0 ? initialLayers[0].id : null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(5); // seconds
   const [isPlaying, setIsPlaying] = useState(false);
