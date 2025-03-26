@@ -1,0 +1,1236 @@
+# Figma Banner Animation Plugin Development Prompt
+
+## Project Overview
+Create a Figma plugin that allows users to create, preview, and export animated banners with Lottie web library. The plugin should include a timeline-based animation system, preview functionality, and export capabilities.
+
+## Core Functionality
+1. Selection of multiple artboards as animation frames
+2. Automatic frame registration when launched
+3. Creation of animation timelines for individual layers
+4. Animation type selection for different elements
+5. Control over animation delay and timing
+6. Implement a layer linking system for a Figma plugin that automatically links layers with the same name across different frames and synchronizes their animations, while allowing for individual overrides.
+7. Layer visibility toggling
+8. Copy/paste animation settings between layers and boards
+9. For GIF Export controls including:
+   - Frame disposal method options
+   - Frame count adjustment (optimized for 3-4 frames with 2.5s delay)
+   - Custom delay settings
+10. For HTML5 Ad Export: Create an intelligent system that analyzes selected Figma frames of different sizes and generates a single, optimized HTML5 ad that automatically adapts to container size while maintaining proper element positioning, scaling, and animations.
+
+
+## Digital Advertising Integration
+- Support for standard IAB ad sizes and Google Ads specifications
+- Generate responsive HTML5 ad output that adapts to different dimensions
+- Create a single responsive ad unit that functions across multiple size requirements
+- Include options for ad platform-specific requirements (Google Ads, Meta, etc.)
+- Generate ad-ready output that passes validation for major ad networks
+- Include click tag implementation for tracking
+- Support for fallback static images
+- Add ad-specific performance optimization (file size limits, animation limits)
+
+## GIF Export Quality
+- Implement high-quality GIF export comparable to Adobe Photoshop
+- Include dithering options (none, pattern, diffusion) to control artifact appearance
+- Support alpha channel transparency with configurable matte colors
+- Provide color banding reduction techniques
+- Allow for color depth selection (8-bit, 16-bit, 24-bit)
+- Include options for interlacing and optimized palette generation
+- Implement lossy GIF compression options with quality slider
+- Add metadata controls for optimization
+
+## Animation Presets Library
+- Include comprehensive preset libraries for:
+  - Entrance animations (fade in, slide in, zoom in, bounce in, etc.)
+  - Exit animations (fade out, slide out, zoom out, etc.)
+  - Emphasis animations (pulse, shake, flash, etc.)
+  - Path-based animations (follow path, circular, etc.)
+  - Text animations (character by character, word by word, etc.)
+- Allow users to save custom animations as reusable presets
+- Include categorization and search functionality for presets
+- Provide preview thumbnails for quick selection
+
+## Batch Layer Handling
+- Implement automatic batch animation for layers with identical names across frames
+- Add a toggle to enable/disable batch animation globally
+- Include per-layer override controls to exempt specific layers from batch operations
+- Provide visual indicators showing which layers are batch-linked
+- Add smart grouping of similarly named layers (e.g., "button-1", "button-2")
+- Include batch timing offset options for creating cascading effects
+- Allow batch modification of animation properties
+
+## Cross-Platform Compatibility
+- Ensure the plugin works seamlessly across Windows, macOS, and web versions of Figma
+- Implement responsive UI that adapts to different screen sizes and resolutions
+- Address any platform-specific export or performance considerations
+- Test thoroughly across all supported browsers and operating systems
+
+## Error Handling and Recovery
+- Include robust error handling for all operations
+- Implement auto-save functionality to prevent work loss
+- Add a recovery system for interrupted exports or plugin crashes
+- Provide detailed error messages that guide users toward solutions
+- Include a logging system for debugging complex issues
+
+## Collaboration Features
+- Support for team libraries of animation presets
+- Include commenting or annotation capabilities for animations
+- Ensure animations persist when files are shared between team members
+- Add version history for animation settings
+- Support for design system integration
+
+## Testing Strategy
+- Include unit tests for core animation functions
+- Add integration tests for the Figma API interactions
+- Implement UI testing for critical user flows
+- Provide performance benchmarking for large files
+- Include ad network compliance testing
+
+## Accessibility
+- Ensure the plugin interface meets WCAG accessibility standards
+- Include keyboard navigation for all features
+- Add screen reader support with proper ARIA attributes
+- Ensure sufficient color contrast throughout the interface
+- Provide accessibility checking for exported animations
+
+## Extensibility
+- Design a modular architecture that allows for future feature additions
+- Create an API for potential integration with other plugins
+- Document the codebase thoroughly for future maintenance
+- Structure for easy updates when Figma's API changes
+- Include plugin extension points for custom functionality
+
+## Analytics and Feedback
+- Add anonymous usage analytics to help prioritize future improvements
+- Include an in-plugin feedback mechanism
+- Provide error reporting capabilities
+- Add telemetry for identifying performance bottlenecks
+- Include A/B testing framework for UI improvements
+
+## Technical Architecture
+- Implement the plugin using React and TypeScript for a modern, maintainable codebase
+- Use Context API for state management with persistent storage
+- Ensure proper TypeScript typing throughout the codebase
+- Structure the code with clear separation of concerns (UI, animation logic, Figma API interactions)
+
+## UI/UX Design
+- Create a clean, minimal interface with intuitive controls
+- Include both light and dark mode support to match Figma's theme
+- Design the main interface with:
+  - A layers panel showing animated elements
+  - A timeline view for visualizing animations
+  - A properties panel for detailed animation settings
+  - A preview window for testing animations before export
+- Please provide wireframes or mockups of the primary interface
+- Ensure all UI elements follow Figma's design system for native feel
+
+## Animation Capabilities
+- Include these animation types:
+  - Fade (in/out)
+  - Slide (in multiple directions)
+  - Scale/zoom
+  - Rotate
+  - Bounce
+  - Pulse
+  - Blur
+- Provide multiple easing function options (linear, ease-in, ease-out, cubic-bezier custom)
+- Support for masking and clipping animations
+- Allow for sequencing animations with precise timing control
+
+## Export Options
+- Include quality/compression settings for optimizing file size
+- Provide color palette optimization controls (256 colors, 128, 64, etc.)
+- Allow batch export of multiple animations
+- Support for different size outputs (1x, 2x, custom dimensions)
+- Include options for loop count (infinite, single, custom number)
+
+## Advanced Features
+- Implement a visual timeline for managing complex multi-layer animations
+- Create keyboard shortcuts for all common operations
+- Add a real-time preview mode that shows animations at actual speed
+- Include animation presets that can be saved and reused
+- Add the ability to scrub through animation timelines
+
+## Performance Considerations
+- Optimize for handling large files with many layers (30+ layers)
+- Implement efficient memory management for complex animations
+- Add batch processing capabilities for heavy operations
+- Include progress indicators for time-consuming processes
+
+## Documentation
+- Provide detailed installation instructions
+- Include comprehensive user documentation explaining all features
+- Add inline help/tooltips for complex features
+- Create a quick-start guide for new users
+
+The plugin should maintain state between sessions, remembering all animation settings when closed or reopened. The overall user experience should be intuitive and straightforward, similar to the Bannerify plugin, making it accessible to both beginners and advanced users.
+
+## Core Technical Requirements
+
+### 1. Plugin Structure
+```typescript
+// manifest.json
+{
+  "name": "Digital Ad Animator",
+  "id": "ad-animator",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "index.html",
+  "capabilities": ["inspect"],
+  "enableProposedApi": false,
+  "enablePrivatePluginApi": false,
+  "build": "npm run build"
+}
+```
+
+### 2. Core Dependencies
+```json
+{
+  "dependencies": {
+    "lottie-web": "^5.12.2",
+    "gsap": "^3.12.0",
+    "vue": "^2.6.14",
+    "vuex": "^3.6.2"
+  }
+}
+```
+
+### 3. Key Components Structure
+
+#### A. Timeline System
+```typescript
+interface TimelineLayer {
+  id: string;
+  type: 'lottie' | 'image' | 'text' | 'video';
+  start: number;
+  end: number;
+  duration: number;
+  settings: LayerSettings;
+}
+
+interface LayerSettings {
+  media?: string;
+  loop?: boolean;
+  speed?: number;
+  opacity?: number;
+  transform?: TransformSettings;
+}
+
+interface TransformSettings {
+  scale?: number;
+  rotation?: number;
+  position?: { x: number; y: number };
+}
+```
+
+#### B. Preview System
+```typescript
+interface PreviewConfig {
+  width: number;
+  height: number;
+  fps: number;
+  backgroundColor: string;
+  quality: 'high' | 'medium' | 'low';
+}
+```
+
+### 4. Core Functionality Implementation
+
+#### A. Timeline Management
+```typescript
+class TimelineManager {
+  private layers: TimelineLayer[];
+  private currentTime: number;
+  private duration: number;
+  
+  constructor() {
+    this.layers = [];
+    this.currentTime = 0;
+    this.duration = 0;
+  }
+
+  addLayer(layer: TimelineLayer): void {
+    this.layers.push(layer);
+    this.updateDuration();
+  }
+
+  updateDuration(): void {
+    this.duration = Math.max(...this.layers.map(l => l.end));
+  }
+
+  seek(time: number): void {
+    this.currentTime = time;
+    this.updateLayers();
+  }
+
+  private updateLayers(): void {
+    this.layers.forEach(layer => {
+      if (this.currentTime >= layer.start && this.currentTime <= layer.end) {
+        this.updateLayerState(layer);
+      }
+    });
+  }
+}
+```
+
+#### B. Lottie Integration
+```typescript
+class LottieManager {
+  private players: Map<string, any>;
+  
+  constructor() {
+    this.players = new Map();
+  }
+
+  async loadAnimation(id: string, url: string): Promise<void> {
+    const animation = await lottie.loadAnimation({
+      container: document.getElementById(`lottie_${id}`),
+      renderer: 'canvas',
+      loop: true,
+      autoplay: false,
+      path: url
+    });
+    
+    this.players.set(id, animation);
+  }
+
+  updateAnimation(id: string, time: number): void {
+    const player = this.players.get(id);
+    if (player) {
+      const frame = Math.floor(time * player.frameRate);
+      player.goToAndStop(frame, true);
+    }
+  }
+}
+```
+
+#### C. Preview System
+```typescript
+class PreviewManager {
+  private canvas: HTMLCanvasElement;
+  private context: CanvasRenderingContext2D;
+  private config: PreviewConfig;
+  
+  constructor(config: PreviewConfig) {
+    this.config = config;
+    this.initializeCanvas();
+  }
+
+  private initializeCanvas(): void {
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = this.config.width;
+    this.canvas.height = this.config.height;
+    this.context = this.canvas.getContext('2d');
+  }
+
+  render(time: number): void {
+    this.context.clearRect(0, 0, this.config.width, this.config.height);
+    // Render all active layers
+  }
+}
+```
+
+### 5. UI Components
+
+#### A. Timeline Slider
+```typescript
+class TimelineSlider {
+  private container: HTMLElement;
+  private range: HTMLInputElement;
+  private preview: HTMLElement;
+  
+  constructor(container: HTMLElement) {
+    this.container = container;
+    this.initializeSlider();
+  }
+
+  private initializeSlider(): void {
+    this.range = document.createElement('input');
+    this.range.type = 'range';
+    this.range.min = '0';
+    this.range.max = '100';
+    this.range.step = '1';
+    
+    this.range.addEventListener('input', (e) => {
+      this.updatePreview(parseInt(e.target.value));
+    });
+  }
+
+  private updatePreview(value: number): void {
+    // Update preview based on slider value
+  }
+}
+```
+
+### 6. State Management
+```typescript
+interface PluginState {
+  layers: TimelineLayer[];
+  currentTime: number;
+  duration: number;
+  selectedLayer: string | null;
+  previewConfig: PreviewConfig;
+}
+
+const store = new Vuex.Store({
+  state: {
+    layers: [],
+    currentTime: 0,
+    duration: 0,
+    selectedLayer: null,
+    previewConfig: {
+      width: 300,
+      height: 250,
+      fps: 30,
+      backgroundColor: '#ffffff',
+      quality: 'high'
+    }
+  },
+  mutations: {
+    addLayer(state, layer: TimelineLayer) {
+      state.layers.push(layer);
+    },
+    updateTime(state, time: number) {
+      state.currentTime = time;
+    }
+  }
+});
+
+// Layer Linking System
+
+interface LinkedLayer {
+  id: string;
+  name: string;
+  frameId: string;
+  isLinked: boolean;
+  overrideSettings?: LayerSettings;
+}
+
+class LayerLinkingManager {
+  private linkedLayers: Map<string, LinkedLayer[]>;
+  private activeFrame: string;
+  private frames: Map<string, FigmaFrame>;
+
+  constructor() {
+    this.linkedLayers = new Map();
+    this.frames = new Map();
+  }
+
+  // Initialize frame tracking
+  async initializeFrames(): Promise<void> {
+    const selection = figma.currentPage.selection;
+    
+    // Filter for frames only
+    const frames = selection.filter(node => node.type === 'FRAME') as FrameNode[];
+    
+    // Store frame information
+    frames.forEach(frame => {
+      this.frames.set(frame.id, {
+        id: frame.id,
+        name: frame.name,
+        size: {
+          width: frame.width,
+          height: frame.height
+        },
+        layers: this.extractLayers(frame)
+      });
+    });
+
+    // Analyze layers for potential linking
+    this.analyzeLayersForLinking();
+  }
+
+  // Extract layers from a frame
+  private extractLayers(frame: FrameNode): Layer[] {
+    const layers: Layer[] = [];
+    
+    function traverse(node: SceneNode) {
+      if (node.type === 'GROUP' || node.type === 'FRAME') {
+        node.children.forEach(traverse);
+      } else {
+        layers.push({
+          id: node.id,
+          name: node.name,
+          type: node.type,
+          parentId: node.parent?.id
+        });
+      }
+    }
+
+    traverse(frame);
+    return layers;
+  }
+
+  // Analyze layers across frames for potential linking
+  private analyzeLayersForLinking(): void {
+    const layerNameMap = new Map<string, Layer[]>();
+
+    // Group layers by name across all frames
+    this.frames.forEach(frame => {
+      frame.layers.forEach(layer => {
+        if (!layerNameMap.has(layer.name)) {
+          layerNameMap.set(layer.name, []);
+        }
+        layerNameMap.get(layer.name)?.push({
+          ...layer,
+          frameId: frame.id
+        });
+      });
+    });
+
+    // Create linked layer groups
+    layerNameMap.forEach((layers, name) => {
+      if (layers.length > 1) {
+        this.createLinkedLayerGroup(name, layers);
+      }
+    });
+  }
+
+  // Create a linked layer group
+  private createLinkedLayerGroup(name: string, layers: Layer[]): void {
+    const linkedGroup: LinkedLayer[] = layers.map(layer => ({
+      id: layer.id,
+      name: layer.name,
+      frameId: layer.frameId,
+      isLinked: true
+    }));
+
+    this.linkedLayers.set(name, linkedGroup);
+  }
+
+  // Apply animation to linked layers
+  async applyAnimationToLinkedLayers(
+    layerName: string,
+    animation: AnimationSettings
+  ): Promise<void> {
+    const linkedGroup = this.linkedLayers.get(layerName);
+    if (!linkedGroup) return;
+
+    // Apply animation to all linked layers
+    for (const layer of linkedGroup) {
+      if (!layer.overrideSettings) {
+        await this.applyAnimationToLayer(layer.id, animation);
+      }
+    }
+  }
+
+  // Toggle layer linking
+  async toggleLayerLinking(layerId: string): Promise<void> {
+    const layer = this.findLinkedLayer(layerId);
+    if (!layer) return;
+
+    layer.isLinked = !layer.isLinked;
+    
+    // Update UI to reflect linking state
+    this.updateLayerLinkingUI(layerId, layer.isLinked);
+  }
+
+  // Override animation for specific layer
+  async overrideLayerAnimation(
+    layerId: string,
+    animation: AnimationSettings
+  ): Promise<void> {
+    const layer = this.findLinkedLayer(layerId);
+    if (!layer) return;
+
+    layer.overrideSettings = {
+      ...animation,
+      isOverridden: true
+    };
+
+    // Apply override animation
+    await this.applyAnimationToLayer(layerId, animation);
+  }
+
+  // UI Components for Layer Linking
+
+  private createLayerLinkingUI(): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'layer-linking';
+
+    // Add linking controls
+    const controls = document.createElement('div');
+    controls.className = 'layer-linking__controls';
+    
+    // Link toggle button
+    const linkToggle = document.createElement('button');
+    linkToggle.className = 'layer-linking__toggle';
+    linkToggle.innerHTML = `
+      <svg class="icon icon--link" viewBox="0 0 24 24">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+      </svg>
+    `;
+    
+    // Override toggle button
+    const overrideToggle = document.createElement('button');
+    overrideToggle.className = 'layer-linking__override';
+    overrideToggle.innerHTML = `
+      <svg class="icon icon--override" viewBox="0 0 24 24">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+      </svg>
+    `;
+
+    controls.appendChild(linkToggle);
+    controls.appendChild(overrideToggle);
+    container.appendChild(controls);
+
+    return container;
+  }
+
+  // Styles for Layer Linking UI
+  private styles = `
+    .layer-linking {
+      position: relative;
+      padding: 8px;
+      border-bottom: 1px solid var(--figma-color-border);
+    }
+
+    .layer-linking__controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .layer-linking__toggle,
+    .layer-linking__override {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--figma-color-border);
+      border-radius: 6px;
+      background: var(--figma-color-bg);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .layer-linking__toggle:hover,
+    .layer-linking__override:hover {
+      background: var(--figma-color-bg-hover);
+    }
+
+    .layer-linking__toggle.active {
+      background: var(--figma-color-bg-brand);
+      border-color: var(--figma-color-border-brand);
+    }
+
+    .layer-linking__override.active {
+      background: var(--figma-color-bg-warning);
+      border-color: var(--figma-color-border-warning);
+    }
+
+    .icon {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+  `;
+}
+
+// Integration with Layer Manager
+class LayerManager {
+  private linkingManager: LayerLinkingManager;
+
+  constructor() {
+    this.linkingManager = new LayerLinkingManager();
+  }
+
+  // Apply animation with linking consideration
+  async applyAnimation(layerId: string, animation: AnimationSettings): Promise<void> {
+    const layer = this.getLayer(layerId);
+    if (!layer) return;
+
+    // Check if layer is part of a linked group
+    const linkedLayer = this.linkingManager.findLinkedLayer(layerId);
+    
+    if (linkedLayer?.isLinked) {
+      // Apply to all linked layers
+      await this.linkingManager.applyAnimationToLinkedLayers(layer.name, animation);
+    } else {
+      // Apply to single layer
+      await this.applyAnimationToLayer(layerId, animation);
+    }
+  }
+
+  // Override animation for specific layer
+  async overrideAnimation(layerId: string, animation: AnimationSettings): Promise<void> {
+    await this.linkingManager.overrideLayerAnimation(layerId, animation);
+  }
+}
+
+// Usage Example
+const layerManager = new LayerManager();
+
+// Initialize frames and layer linking
+await layerManager.linkingManager.initializeFrames();
+
+// Apply animation to linked layers
+await layerManager.applyAnimation('layerId', {
+  type: 'fade',
+  duration: 1,
+  delay: 0,
+  easing: 'ease-in-out'
+});
+
+// Override animation for specific layer
+await layerManager.overrideAnimation('layerId', {
+  type: 'scale',
+  duration: 0.5,
+  delay: 0.2,
+  easing: 'ease-out'
+});
+
+### 7. Export System
+```typescript
+class ExportManager {
+  async exportToLottie(): Promise<string> {
+    // Convert timeline to Lottie JSON
+  }
+
+  async exportToHTML(): Promise<string> {
+    // Generate HTML with embedded Lottie
+  }
+
+  async exportToVideo(): Promise<Blob> {
+    // Record preview and export as video
+  }
+}
+
+
+### 1. Frame Analysis System
+```typescript
+interface FrameAnalysis {
+  id: string;
+  size: {
+    width: number;
+    height: number;
+  };
+  elements: ElementAnalysis[];
+  breakpoint: number; // Minimum width for this frame size
+}
+
+interface ElementAnalysis {
+  id: string;
+  name: string;
+  type: 'image' | 'text' | 'lottie' | 'video';
+  position: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  constraints: {
+    minWidth?: number;
+    maxWidth?: number;
+    aspectRatio?: number;
+    textScaling?: boolean;
+  };
+  animations: AnimationDefinition[];
+}
+```
+
+### 2. Responsive Rules Generator
+```typescript
+class ResponsiveRulesGenerator {
+  // Analyze frames and generate responsive rules
+  generateRules(frames: FrameAnalysis[]): ResponsiveRules {
+    // Sort frames by size
+    // Calculate breakpoints
+    // Generate responsive CSS
+    // Create scaling rules
+  }
+
+  // Generate responsive CSS
+  generateResponsiveCSS(rules: ResponsiveRules): string {
+    // Create media queries
+    // Generate scaling rules
+    // Handle text scaling
+  }
+
+  // Generate responsive JavaScript
+  generateResponsiveJS(rules: ResponsiveRules): string {
+    // Handle dynamic resizing
+    // Manage animations
+    // Handle asset loading
+  }
+}
+```
+
+### 3. Animation Adaptation System
+```typescript
+interface ResponsiveAnimation {
+  original: AnimationDefinition;
+  adaptations: {
+    [breakpoint: number]: {
+      scale?: number;
+      duration?: number;
+      delay?: number;
+      easing?: string;
+    }
+  };
+}
+
+class AnimationAdapter {
+  // Adapt animations for different sizes
+  adaptAnimation(
+    animation: AnimationDefinition,
+    frameSizes: FrameAnalysis[]
+  ): ResponsiveAnimation {
+    // Calculate scaling factors
+    // Adjust timing
+    // Modify properties
+  }
+}
+```
+
+## Implementation Guidelines
+
+### 1. Frame Analysis
+```typescript
+class FrameAnalyzer {
+  analyzeFrames(frames: FrameNode[]): FrameAnalysis[] {
+    return frames.map(frame => ({
+      id: frame.id,
+      size: {
+        width: frame.width,
+        height: frame.height
+      },
+      elements: this.analyzeElements(frame),
+      breakpoint: this.calculateBreakpoint(frame)
+    }));
+  }
+
+  private analyzeElements(frame: FrameNode): ElementAnalysis[] {
+    // Analyze each element's:
+    // - Position and size
+    // - Constraints
+    // - Animations
+    // - Relationships with other elements
+  }
+}
+```
+
+### 2. Responsive CSS Generation
+```typescript
+class ResponsiveCSSGenerator {
+  generateCSS(rules: ResponsiveRules): string {
+    return `
+      /* Base styles */
+      .ad-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      /* Responsive rules */
+      ${this.generateMediaQueries(rules)}
+
+      /* Element styles */
+      ${this.generateElementStyles(rules)}
+
+      /* Animation styles */
+      ${this.generateAnimationStyles(rules)}
+    `;
+  }
+
+  private generateMediaQueries(rules: ResponsiveRules): string {
+    // Generate media queries for each breakpoint
+    // Handle element scaling
+    // Manage text sizing
+  }
+}
+```
+
+### 3. Responsive JavaScript Generation
+```typescript
+class ResponsiveJSGenerator {
+  generateJS(rules: ResponsiveRules): string {
+    return `
+      // Responsive handling
+      class ResponsiveAd {
+        constructor() {
+          this.container = document.querySelector('.ad-container');
+          this.observer = new ResizeObserver(this.handleResize.bind(this));
+          this.observer.observe(this.container);
+        }
+
+        handleResize(entries) {
+          const { width, height } = entries[0].contentRect;
+          this.updateLayout(width, height);
+          this.updateAnimations(width, height);
+        }
+
+        updateLayout(width, height) {
+          // Update element positions and sizes
+        }
+
+        updateAnimations(width, height) {
+          // Update animation properties
+        }
+      }
+
+      // Initialize
+      new ResponsiveAd();
+    `;
+  }
+}
+```
+
+## Output Generation
+
+### 1. HTML Structure
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Responsive Ad</title>
+  <style>
+    /* Generated responsive CSS */
+  </style>
+</head>
+<body>
+  <div class="ad-container">
+    <!-- Generated responsive elements -->
+  </div>
+  <script>
+    // Generated responsive JavaScript
+  </script>
+</body>
+</html>
+```
+
+### 2. Optimization Features
+```typescript
+class AdOptimizer {
+  optimizeOutput(html: string): string {
+    return this.pipeline([
+      this.minifyCSS,
+      this.minifyJS,
+      this.optimizeAssets,
+      this.addAdNetworkCompliance
+    ])(html);
+  }
+
+  private addAdNetworkCompliance(html: string): string {
+    // Add required meta tags
+    // Add tracking pixels
+    // Add ad network specific attributes
+  }
+}
+```
+
+## Usage Example
+
+```typescript
+// Initialize the responsive builder
+const builder = new ResponsiveAdBuilder();
+
+// Analyze selected frames
+const frames = await builder.analyzeFrames(figma.currentPage.selection);
+
+// Generate responsive ad
+const ad = await builder.generateAd({
+  frames,
+  animations: animationBuilder.getAnimations(),
+  options: {
+    optimize: true,
+    adNetwork: 'doubleclick',
+    tracking: true
+  }
+});
+
+// Export the ad
+await builder.exportAd(ad, {
+  format: 'html',
+  minify: true
+});
+```
+
+Lottie Dependencies:
+<script src="https://static.hypermatic.com/libs/lottie.min.js"></script>
+<script src="https://static.hypermatic.com/libs/lottie_canvas.min.js"></script>
+<script src="https://static.hypermatic.com/libs/lottie_canvas_worker.min.js"></script>
+
+
+Lottie Integration in the Layer System:
+interface LayerSettings {
+  media?: string;  // URL to Lottie JSON file
+  loop?: boolean;
+  width?: number;
+  height?: number;
+  duration?: number;
+  delay?: number;
+}
+
+class LottieManager {
+  private players: Map<string, any>;
+  
+  constructor() {
+    this.players = new Map();
+  }
+
+  // Loading Lottie animations
+  async loadAnimation(id: string, url: string): Promise<void> {
+    const animation = await lottie.loadAnimation({
+      container: document.getElementById(`lottie_${id}`),
+      renderer: 'canvas',
+      loop: true,
+      autoplay: false,
+      path: url
+    });
+    
+    this.players.set(id, animation);
+  }
+
+  // Updating Lottie animations based on timeline
+  updateAnimation(id: string, time: number): void {
+    const player = this.players.get(id);
+    if (player) {
+      const frame = Math.floor(time * player.frameRate);
+      player.goToAndStop(frame, true);
+    }
+  }
+}
+
+Lottie Layer Detection:
+interface LayerSettings {
+  media?: string;  // URL to Lottie JSON file
+  loop?: boolean;
+  width?: number;
+  height?: number;
+  duration?: number;
+  delay?: number;
+}
+
+class LottieManager {
+  private players: Map<string, any>;
+  
+  constructor() {
+    this.players = new Map();
+  }
+
+  // Loading Lottie animations
+  async loadAnimation(id: string, url: string): Promise<void> {
+    const animation = await lottie.loadAnimation({
+      container: document.getElementById(`lottie_${id}`),
+      renderer: 'canvas',
+      loop: true,
+      autoplay: false,
+      path: url
+    });
+    
+    this.players.set(id, animation);
+  }
+
+  // Updating Lottie animations based on timeline
+  updateAnimation(id: string, time: number): void {
+    const player = this.players.get(id);
+    if (player) {
+      const frame = Math.floor(time * player.frameRate);
+      player.goToAndStop(frame, true);
+    }
+  }
+}
+
+Lottie Preview Integration:
+class PreviewManager {
+  renderLayer(layer: BaseLayer, time: number): void {
+    if (layer.type === 'lottie') {
+      this.renderLottieLayer(layer, time);
+    }
+    // ... other layer types
+  }
+
+  private renderLottieLayer(layer: BaseLayer, time: number): void {
+    const player = this.lottieManager.getPlayer(layer.id);
+    if (player) {
+      // Calculate frame based on time
+      const frame = Math.floor(time * player.frameRate);
+      player.goToAndStop(frame, true);
+      
+      // Apply transformations
+      this.context.save();
+      this.applyTransformations(layer.transform);
+      this.context.globalAlpha = layer.opacity;
+      
+      // Draw Lottie canvas
+      this.context.drawImage(
+        player.canvas,
+        0, 0,
+        layer.width,
+        layer.height
+      );
+      
+      this.context.restore();
+    }
+  }
+}
+
+Lottie File Handling:
+class FileManager {
+  async downloadLottieFileAsText(url: string): Promise<string> {
+    try {
+      const response = await fetch("https://proxy.hypermatic.com/" + url);
+      return response.ok ? await response.text() : "";
+    } catch (error) {
+      console.error("Error fetching Lottie file:", error);
+      return "";
+    }
+  }
+
+  async getLottieFileAnimations(html: string): Promise<{
+    updatedHtmlString: string;
+    lottieFiles: Array<{file: string; name: string}>;
+  }> {
+    return new Promise(async (resolve) => {
+      try {
+        const lottieRegex = /<lottie-player[^>]*\bsrc="([^"]+)"/g;
+        let match;
+        const lottieFiles = [];
+        let updatedHtml = html;
+
+        while ((match = lottieRegex.exec(html)) !== null) {
+          const url = match[1];
+          const fileName = url.split("/").pop();
+          const newSrc = `src="lottie/${fileName}"`;
+          
+          const fileContent = await this.downloadLottieFileAsText(url);
+          if (fileContent !== "") {
+            lottieFiles.push({
+              file: fileContent,
+              name: fileName
+            });
+            updatedHtml = updatedHtml.replace(`src="${url}"`, newSrc);
+          }
+        }
+
+        resolve({
+          updatedHtmlString: updatedHtml,
+          lottieFiles
+        });
+      } catch (error) {
+        resolve({
+          updatedHtmlString: html,
+          lottieFiles: []
+        });
+      }
+    });
+  }
+}
+Lottie Export Integration:
+class ExportManager {
+  async exportWithLottie(): Promise<void> {
+    // Handle Lottie file exports
+    // Optimize Lottie animations
+    // Include necessary Lottie dependencies
+  }
+}
+
+Key Features of Lottie Integration:
+Loading and Management:
+Loads Lottie animations from JSON files
+Manages multiple Lottie instances
+Handles animation playback control
+Timeline Integration:
+Synchronizes Lottie animations with the timeline
+Controls frame-by-frame playback
+Handles animation timing and delays
+Preview System:
+Renders Lottie animations in the preview
+Applies transformations and effects
+Handles canvas rendering
+File Handling:
+Downloads and processes Lottie files
+Manages Lottie file dependencies
+Handles file optimization
+Export System:
+Includes Lottie files in exports
+Optimizes Lottie animations
+Ensures proper dependencies
+Layer System:
+Detects Lottie layers
+Manages Lottie layer properties
+Handles layer interactions
+
+
+## Success Criteria for HTML5 Exports:
+
+1. Accurate element positioning across all frame sizes
+2. Proper scaling of elements and animations
+3. Optimized output for ad networks
+4. Smooth transitions between sizes
+5. Efficient asset loading
+6. Proper handling of text scaling
+7. Maintained aspect ratios
+8. Optimized performance
+
+## Additional Considerations for HTML5
+
+1. Asset optimization
+2. Loading performance
+3. Ad network compliance
+4. Browser compatibility
+5. Mobile optimization
+6. Animation performance
+7. Memory management
+8. Error handling
+
+
+
+## Implementation Guidelines
+
+1. Use Vue.js for UI components and state management
+2. Implement GSAP for complex animations and transitions
+3. Use Lottie-web for Lottie animation support
+4. Implement a canvas-based preview system
+5. Use Web Workers for heavy computations
+6. Implement proper error handling and loading states
+7. Use TypeScript for type safety
+8. Follow Figma plugin best practices
+
+## Key Features to Implement
+
+1. Timeline-based animation system
+2. Layer management (add, remove, reorder)
+3. Lottie file import and preview
+4. Real-time preview rendering
+5. Export to multiple formats
+6. Undo/Redo functionality
+7. Layer properties panel
+8. Keyboard shortcuts
+9. Auto-save functionality
+
+## Performance Considerations
+
+1. Use requestAnimationFrame for smooth animations
+2. Implement proper cleanup for Lottie instances
+3. Use Web Workers for heavy computations
+4. Implement proper memory management
+5. Optimize canvas rendering
+6. Use proper event debouncing
+7. Implement proper caching strategies
+
+## Testing Requirements
+
+1. Unit tests for core functionality
+2. Integration tests for plugin-Figma interaction
+3. Performance tests for animation playback
+4. Memory leak tests
+5. Cross-browser compatibility tests
+
+## HTML5 Testing Requirements
+
+1. Responsive behavior testing
+2. Animation consistency
+3. Performance testing
+4. Cross-browser testing
+5. Ad network validation
+6. Asset loading testing
+7. Memory usage testing
+8. Error scenario testing
+
+This prompt provides a comprehensive framework for building a similar plugin. The AI should follow this structure while implementing the specific features and optimizations needed for the plugin to function efficiently within Figma's environment.
