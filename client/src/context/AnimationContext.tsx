@@ -1,13 +1,5 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { 
-  AnimationLayer, 
-  AnimationFrame, 
-  Keyframe, 
-  Animation,
-  AnimationType,
-  EasingType
-} from '../types/animation';
-import { saveToClientStorage, loadFromClientStorage } from '../lib/figmaPlugin';
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { Animation, AnimationLayer, AnimationFrame, Keyframe } from '../types/animation';
 
 // Define the context type
 interface AnimationContextType {
@@ -47,365 +39,288 @@ interface AnimationContextType {
   loadAnimationState: () => void;
 }
 
-// Create the context with default values
-const AnimationContext = createContext<AnimationContextType>({
-  layers: [],
-  frames: [],
-  selectedLayerId: null,
-  currentFrame: null,
-  isPlaying: false,
-  currentTime: 0,
-  duration: 3,
-  
-  selectLayer: () => {},
-  getSelectedLayer: () => null,
-  addLayer: () => {},
-  removeLayer: () => {},
-  updateLayer: () => {},
-  toggleLayerVisibility: () => {},
-  toggleLayerLock: () => {},
-  
-  addFrame: () => {},
-  removeFrame: () => {},
-  selectFrame: () => {},
-  
-  updateLayerAnimation: () => {},
-  addKeyframe: () => {},
-  deleteKeyframe: () => {},
-  setCurrentTime: () => {},
-  
-  togglePlayback: () => {},
-  
-  saveAnimationState: () => {},
-  loadAnimationState: () => {}
-});
+// Create context with default values
+const AnimationContext = createContext<AnimationContextType | undefined>(undefined);
 
-// Create a provider component
+// Sample default frame
+const defaultFrame: AnimationFrame = {
+  id: 'frame-1',
+  name: 'Frame 1',
+  selected: true,
+  width: 300,
+  height: 250
+};
+
+// Sample default layer
+const defaultLayer: AnimationLayer = {
+  id: 'layer-1',
+  name: 'Background',
+  type: 'rectangle',
+  visible: true,
+  locked: false,
+  animations: [],
+  keyframes: []
+};
+
+// Provider component
 export const AnimationProvider = ({ children }: { children: ReactNode }) => {
-  const [layers, setLayers] = useState<AnimationLayer[]>([
-    // Default test layers
-    {
-      id: 'layer1',
-      name: 'Hero Banner',
-      type: 'image',
-      visible: true,
-      locked: false,
-      animations: [],
-      keyframes: []
-    },
-    {
-      id: 'layer2',
-      name: 'Main Heading',
-      type: 'text',
-      visible: true,
-      locked: false,
-      animations: [],
-      keyframes: []
-    },
-    {
-      id: 'layer3',
-      name: 'CTA Button',
-      type: 'shape',
-      visible: true,
-      locked: false,
-      animations: [
-        {
-          type: AnimationType.Slide,
-          startTime: 0.5,
-          duration: 1,
-          delay: 0.2,
-          easing: EasingType.EaseOut,
-          direction: 'right'
-        }
-      ],
-      keyframes: [
-        { time: 0.5, properties: {} },
-        { time: 1.5, properties: {} }
-      ]
-    },
-    {
-      id: 'layer4',
-      name: 'Background',
-      type: 'rectangle',
-      visible: true,
-      locked: false,
-      animations: [],
-      keyframes: []
-    },
-    {
-      id: 'layer5',
-      name: 'Product Image',
-      type: 'image',
-      visible: true,
-      locked: false,
-      animations: [],
-      keyframes: []
-    }
-  ]);
-  
-  const [frames, setFrames] = useState<AnimationFrame[]>([
-    // Default test frames
-    {
-      id: 'frame1',
-      name: 'Frame 1',
-      selected: true,
-      width: 300,
-      height: 250
-    },
-    {
-      id: 'frame2',
-      name: 'Frame 2',
-      selected: false,
-      width: 300,
-      height: 250
-    },
-    {
-      id: 'frame3',
-      name: 'Frame 3',
-      selected: false,
-      width: 300,
-      height: 250
-    }
-  ]);
-  
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>('layer3'); // Default to CTA Button
-  const [isPlaying, setIsPlaying] = useState(false);
+  // State
+  const [layers, setLayers] = useState<AnimationLayer[]>([defaultLayer]);
+  const [frames, setFrames] = useState<AnimationFrame[]>([defaultFrame]);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>('layer-1');
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(3.0); // Default animation duration in seconds
-  
-  // Auto-save timer
-  useEffect(() => {
-    const autosaveInterval = setInterval(() => {
-      saveAnimationState();
-    }, 60000); // Auto-save every minute
-    
-    return () => clearInterval(autosaveInterval);
-  }, []);
-  
-  // Layer management
+  const [duration, setDuration] = useState(5); // seconds
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Get current frame
+  const currentFrame = frames.find(frame => frame.selected) || null;
+
+  // Select a layer
   const selectLayer = useCallback((layerId: string) => {
     setSelectedLayerId(layerId);
   }, []);
-  
+
+  // Get currently selected layer
   const getSelectedLayer = useCallback(() => {
-    if (!selectedLayerId) return null;
     return layers.find(layer => layer.id === selectedLayerId) || null;
   }, [layers, selectedLayerId]);
-  
+
+  // Add a new layer
   const addLayer = useCallback((layer: AnimationLayer) => {
     setLayers(prev => [...prev, layer]);
+    setSelectedLayerId(layer.id);
   }, []);
-  
+
+  // Remove a layer
   const removeLayer = useCallback((layerId: string) => {
     setLayers(prev => prev.filter(layer => layer.id !== layerId));
-  }, []);
-  
+    if (selectedLayerId === layerId) {
+      setSelectedLayerId(layers.length > 1 ? layers[0].id : null);
+    }
+  }, [layers, selectedLayerId]);
+
+  // Update a layer
   const updateLayer = useCallback((layerId: string, updates: Partial<AnimationLayer>) => {
-    setLayers(prev => prev.map(layer => 
-      layer.id === layerId ? { ...layer, ...updates } : layer
-    ));
+    setLayers(prev => 
+      prev.map(layer => 
+        layer.id === layerId ? { ...layer, ...updates } : layer
+      )
+    );
   }, []);
-  
+
+  // Toggle layer visibility
   const toggleLayerVisibility = useCallback((layerId: string) => {
-    setLayers(prev => prev.map(layer => 
-      layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
-    ));
+    setLayers(prev => 
+      prev.map(layer => 
+        layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
+      )
+    );
   }, []);
-  
+
+  // Toggle layer lock
   const toggleLayerLock = useCallback((layerId: string) => {
-    setLayers(prev => prev.map(layer => 
-      layer.id === layerId ? { ...layer, locked: !layer.locked } : layer
-    ));
+    setLayers(prev => 
+      prev.map(layer => 
+        layer.id === layerId ? { ...layer, locked: !layer.locked } : layer
+      )
+    );
   }, []);
-  
-  // Frame management
+
+  // Add a new frame
   const addFrame = useCallback((frame: AnimationFrame) => {
-    setFrames(prev => [...prev, frame]);
-  }, []);
-  
+    // Deselect all existing frames
+    const updatedFrames = frames.map(f => ({ ...f, selected: false }));
+    // Add new frame with selected=true
+    setFrames([...updatedFrames, { ...frame, selected: true }]);
+  }, [frames]);
+
+  // Remove a frame
   const removeFrame = useCallback((frameId: string) => {
-    setFrames(prev => prev.filter(frame => frame.id !== frameId));
-  }, []);
-  
+    const frameToRemove = frames.find(f => f.id === frameId);
+    if (!frameToRemove) return;
+
+    const newFrames = frames.filter(f => f.id !== frameId);
+    
+    // If we're removing the selected frame, select another one
+    if (frameToRemove.selected && newFrames.length > 0) {
+      newFrames[0].selected = true;
+    }
+    
+    setFrames(newFrames);
+  }, [frames]);
+
+  // Select a frame
   const selectFrame = useCallback((frameId: string) => {
-    setFrames(prev => prev.map(frame => ({
-      ...frame,
-      selected: frame.id === frameId
-    })));
+    setFrames(prev => 
+      prev.map(frame => ({ 
+        ...frame, 
+        selected: frame.id === frameId 
+      }))
+    );
   }, []);
-  
-  // Get current frame
-  const currentFrame = frames.find(frame => frame.selected) || null;
-  
-  // Animation management
+
+  // Update layer animation
   const updateLayerAnimation = useCallback((layerId: string, animation: Animation) => {
-    setLayers(prev => prev.map(layer => {
-      if (layer.id === layerId) {
-        // If there are existing animations, update the first one, otherwise add a new one
-        const animations = layer.animations.length > 0 
-          ? layer.animations.map((anim, index) => index === 0 ? { ...anim, ...animation } : anim)
-          : [{ ...animation, startTime: 0 }];
+    setLayers(prev => 
+      prev.map(layer => {
+        if (layer.id !== layerId) return layer;
         
-        return { ...layer, animations };
-      }
-      return layer;
-    }));
-  }, []);
-  
-  const addKeyframe = useCallback((layerId: string, time: number) => {
-    setLayers(prev => prev.map(layer => {
-      if (layer.id === layerId) {
-        // Check if a keyframe already exists at this time
-        const existingKeyframeIndex = layer.keyframes.findIndex(kf => Math.abs(kf.time - time) < 0.1);
+        // Check if animation with same type exists
+        const existingIndex = layer.animations.findIndex(a => a.type === animation.type);
         
-        if (existingKeyframeIndex >= 0) {
-          return layer; // Keyframe already exists, don't add a duplicate
+        if (existingIndex >= 0) {
+          // Replace existing animation
+          const updatedAnimations = [...layer.animations];
+          updatedAnimations[existingIndex] = animation;
+          return { ...layer, animations: updatedAnimations };
+        } else {
+          // Add new animation
+          return { ...layer, animations: [...layer.animations, animation] };
         }
-        
-        const newKeyframes = [...layer.keyframes, { time, properties: {} }];
-        // Sort keyframes by time
-        newKeyframes.sort((a, b) => a.time - b.time);
-        
-        return { ...layer, keyframes: newKeyframes };
-      }
-      return layer;
-    }));
+      })
+    );
   }, []);
-  
+
+  // Add a keyframe
+  const addKeyframe = useCallback((layerId: string, time: number) => {
+    setLayers(prev => 
+      prev.map(layer => {
+        if (layer.id !== layerId) return layer;
+        
+        // Check if keyframe at this time already exists
+        const existingIndex = layer.keyframes.findIndex(k => k.time === time);
+        
+        if (existingIndex >= 0) {
+          // Don't duplicate keyframes
+          return layer;
+        } else {
+          // Add new keyframe
+          const newKeyframe: Keyframe = {
+            time,
+            properties: {} // To be filled with current properties
+          };
+          return { ...layer, keyframes: [...layer.keyframes, newKeyframe] };
+        }
+      })
+    );
+  }, []);
+
+  // Delete a keyframe
   const deleteKeyframe = useCallback((layerId: string, time: number) => {
-    setLayers(prev => prev.map(layer => {
-      if (layer.id === layerId) {
-        return {
-          ...layer,
-          keyframes: layer.keyframes.filter(kf => Math.abs(kf.time - time) >= 0.1)
+    setLayers(prev => 
+      prev.map(layer => {
+        if (layer.id !== layerId) return layer;
+        return { 
+          ...layer, 
+          keyframes: layer.keyframes.filter(k => k.time !== time) 
         };
-      }
-      return layer;
-    }));
+      })
+    );
   }, []);
-  
-  // Playback controls
+
+  // Toggle playback
   const togglePlayback = useCallback(() => {
     setIsPlaying(prev => !prev);
   }, []);
-  
-  // State persistence
-  const saveAnimationState = useCallback(() => {
-    const state = {
-      layers,
-      frames,
-      selectedLayerId,
-      currentTime,
-      duration
-    };
-    
-    saveToClientStorage('animationState', state);
-  }, [layers, frames, selectedLayerId, currentTime, duration]);
-  
-  const loadAnimationState = useCallback(() => {
-    loadFromClientStorage('animationState');
-  }, []);
-  
-  // Update duration based on keyframes
-  useEffect(() => {
-    let maxDuration = 3.0; // Default minimum duration
-    
-    // Check all layers for animations and keyframes
-    layers.forEach(layer => {
-      layer.animations.forEach(anim => {
-        const animEndTime = anim.startTime + anim.duration + (anim.delay || 0);
-        if (animEndTime > maxDuration) {
-          maxDuration = animEndTime;
-        }
-      });
-      
-      layer.keyframes.forEach(keyframe => {
-        if (keyframe.time > maxDuration) {
-          maxDuration = keyframe.time;
-        }
-      });
-    });
-    
-    // Add a bit of buffer
-    setDuration(maxDuration + 0.5);
-  }, [layers]);
 
-  // Run animation when playing
+  // Auto-advance time when playing
   useEffect(() => {
     if (!isPlaying) return;
     
-    let animationFrame: number;
-    let lastTimestamp: number;
-    
-    const animate = (timestamp: number) => {
-      if (!lastTimestamp) {
-        lastTimestamp = timestamp;
-        animationFrame = requestAnimationFrame(animate);
-        return;
-      }
-      
-      const deltaTime = (timestamp - lastTimestamp) / 1000; // Convert to seconds
-      lastTimestamp = timestamp;
-      
+    const interval = setInterval(() => {
       setCurrentTime(prev => {
-        const newTime = prev + deltaTime;
+        const newTime = prev + 1/30; // Advance by one frame at 30fps
         if (newTime >= duration) {
-          // Loop animation
+          // Loop back to start
           return 0;
         }
         return newTime;
       });
-      
-      animationFrame = requestAnimationFrame(animate);
-    };
+    }, 1000/30); // 30fps
     
-    animationFrame = requestAnimationFrame(animate);
-    
-    return () => {
-      cancelAnimationFrame(animationFrame);
-    };
+    return () => clearInterval(interval);
   }, [isPlaying, duration]);
 
-  return (
-    <AnimationContext.Provider 
-      value={{
+  // Save animation state to localStorage
+  const saveAnimationState = useCallback(() => {
+    try {
+      const state = {
         layers,
         frames,
         selectedLayerId,
-        currentFrame,
-        isPlaying,
-        currentTime,
-        duration,
-        
-        selectLayer,
-        getSelectedLayer,
-        addLayer,
-        removeLayer,
-        updateLayer,
-        toggleLayerVisibility,
-        toggleLayerLock,
-        
-        addFrame,
-        removeFrame,
-        selectFrame,
-        
-        updateLayerAnimation,
-        addKeyframe,
-        deleteKeyframe,
-        setCurrentTime,
-        
-        togglePlayback,
-        
-        saveAnimationState,
-        loadAnimationState
-      }}
-    >
+        duration
+      };
+      localStorage.setItem('animation-state', JSON.stringify(state));
+    } catch (error) {
+      console.error('Error saving animation state:', error);
+    }
+  }, [layers, frames, selectedLayerId, duration]);
+
+  // Load animation state from localStorage
+  const loadAnimationState = useCallback(() => {
+    try {
+      const savedState = localStorage.getItem('animation-state');
+      if (savedState) {
+        const { layers, frames, selectedLayerId, duration } = JSON.parse(savedState);
+        setLayers(layers);
+        setFrames(frames);
+        setSelectedLayerId(selectedLayerId);
+        setDuration(duration);
+      }
+    } catch (error) {
+      console.error('Error loading animation state:', error);
+    }
+  }, []);
+
+  // Auto-save state on changes
+  useEffect(() => {
+    const saveTimeout = setTimeout(() => {
+      saveAnimationState();
+    }, 1000);
+    
+    return () => clearTimeout(saveTimeout);
+  }, [layers, frames, selectedLayerId, duration, saveAnimationState]);
+
+  // Load state on initial mount
+  useEffect(() => {
+    loadAnimationState();
+  }, [loadAnimationState]);
+
+  const contextValue: AnimationContextType = {
+    layers,
+    frames,
+    selectedLayerId,
+    currentFrame,
+    isPlaying,
+    currentTime,
+    duration,
+    selectLayer,
+    getSelectedLayer,
+    addLayer,
+    removeLayer,
+    updateLayer,
+    toggleLayerVisibility,
+    toggleLayerLock,
+    addFrame,
+    removeFrame,
+    selectFrame,
+    updateLayerAnimation,
+    addKeyframe,
+    deleteKeyframe,
+    setCurrentTime,
+    togglePlayback,
+    saveAnimationState,
+    loadAnimationState
+  };
+
+  return (
+    <AnimationContext.Provider value={contextValue}>
       {children}
     </AnimationContext.Provider>
   );
 };
 
-// Create a hook to use the animation context
+// Custom hook to use the animation context
 export const useAnimationContext = () => {
   const context = useContext(AnimationContext);
   if (context === undefined) {

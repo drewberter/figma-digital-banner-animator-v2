@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { useAnimationContext } from '../context/AnimationContext';
-import { exportGif, exportHtml } from '../utils/exportUtils';
+import { X, Download } from 'lucide-react';
 
 interface ExportModalProps {
   onClose: () => void;
@@ -14,217 +13,180 @@ interface ExportSize {
   name: string;
 }
 
-const standardSizes: ExportSize[] = [
-  { width: 300, height: 250, name: '300 × 250 (Medium Rectangle)' },
-  { width: 320, height: 50, name: '320 × 50 (Mobile Banner)' },
-  { width: 728, height: 90, name: '728 × 90 (Leaderboard)' },
-  { width: 160, height: 600, name: '160 × 600 (Wide Skyscraper)' },
-  { width: 300, height: 600, name: '300 × 600 (Half Page)' },
-  { width: 970, height: 250, name: '970 × 250 (Billboard)' },
-];
-
 const ExportModal = ({ onClose }: ExportModalProps) => {
   const [exportType, setExportType] = useState<ExportType>('gif');
-  const [selectedSize, setSelectedSize] = useState<string>(standardSizes[0].name);
-  const [quality, setQuality] = useState<number>(85);
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(false);
-  const [customWidth, setCustomWidth] = useState<number>(300);
-  const [customHeight, setCustomHeight] = useState<number>(250);
+  const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
+  const [fps, setFps] = useState(30);
+  const [selectedSizeIndex, setSelectedSizeIndex] = useState(0);
+  const [includeFallback, setIncludeFallback] = useState(true);
+  const [optimizeForAdNetworks, setOptimizeForAdNetworks] = useState(true);
   
-  const { frames } = useAnimationContext();
-
-  const handleExport = async () => {
-    // Get size to use for export
-    let size: ExportSize;
-    if (selectedSize === 'custom') {
-      size = { width: customWidth, height: customHeight, name: 'Custom' };
-    } else {
-      size = standardSizes.find(s => s.name === selectedSize) || standardSizes[0];
-    }
+  // Common banner sizes
+  const sizes: ExportSize[] = [
+    { width: 300, height: 250, name: 'Medium Rectangle (300×250)' },
+    { width: 728, height: 90, name: 'Leaderboard (728×90)' },
+    { width: 320, height: 50, name: 'Mobile Leaderboard (320×50)' },
+    { width: 160, height: 600, name: 'Wide Skyscraper (160×600)' },
+    { width: 300, height: 600, name: 'Half Page (300×600)' },
+    { width: 320, height: 100, name: 'Large Mobile Banner (320×100)' }
+  ];
+  
+  // Handle export
+  const handleExport = () => {
+    let size: ExportSize = sizes[selectedSizeIndex];
     
-    // Export based on selected type
-    if (exportType === 'gif') {
-      await exportGif({
-        frames,
-        quality: quality / 100,
-        width: size.width,
-        height: size.height
-      });
-    } else {
-      await exportHtml({
-        frames,
-        width: size.width,
-        height: size.height
-      });
-    }
+    console.log(`Exporting as ${exportType}:`, {
+      width: size.width,
+      height: size.height,
+      quality,
+      fps,
+      includeFallback,
+      optimizeForAdNetworks
+    });
     
+    // Close the modal after export
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
-      <div className="bg-neutral-800 border border-neutral-700 rounded-lg shadow-lg w-96 max-w-full">
-        <div className="border-b border-neutral-700 p-3 flex items-center justify-between">
-          <h3 className="font-medium">Export Animation</h3>
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50">
+      <div className="bg-[#111111] rounded-lg w-[500px] flex flex-col">
+        <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
+          <h2 className="text-lg font-medium text-white">Export Animation</h2>
           <button 
-            className="text-neutral-400 hover:text-white"
+            className="w-8 h-8 flex items-center justify-center rounded hover:bg-neutral-800"
             onClick={onClose}
           >
-            <i className="fas fa-times"></i>
+            <X size={18} className="text-neutral-400" />
           </button>
         </div>
         
-        <div className="p-4">
-          {/* Export Type */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Export Type</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button 
-                className={`${exportType === 'gif' ? 'bg-primary border-primary' : 'bg-neutral-700 hover:bg-neutral-600 border-neutral-600'} border rounded p-2 flex flex-col items-center justify-center`}
+        <div className="p-5 space-y-5">
+          <div>
+            <label className="block text-sm text-neutral-300 mb-2">Export Format</label>
+            <div className="flex space-x-3">
+              <button
+                className={`flex-1 py-3 rounded-md border ${exportType === 'gif' ? 'border-[#4A7CFF] bg-[#1a1a1a]' : 'border-neutral-700 bg-[#151515]'} flex flex-col items-center justify-center`}
                 onClick={() => setExportType('gif')}
               >
-                <i className="fas fa-file-image text-lg mb-1"></i>
-                <span className="text-xs">Animated GIF</span>
+                <div className={`text-lg font-medium ${exportType === 'gif' ? 'text-[#4A7CFF]' : 'text-neutral-400'}`}>GIF</div>
+                <div className="text-xs text-neutral-500 mt-1">Universal compatibility</div>
               </button>
-              <button 
-                className={`${exportType === 'html' ? 'bg-primary border-primary' : 'bg-neutral-700 hover:bg-neutral-600 border-neutral-600'} border rounded p-2 flex flex-col items-center justify-center`}
+              
+              <button
+                className={`flex-1 py-3 rounded-md border ${exportType === 'html' ? 'border-[#4A7CFF] bg-[#1a1a1a]' : 'border-neutral-700 bg-[#151515]'} flex flex-col items-center justify-center`}
                 onClick={() => setExportType('html')}
               >
-                <i className="fas fa-code text-lg mb-1"></i>
-                <span className="text-xs">HTML5 Banner</span>
+                <div className={`text-lg font-medium ${exportType === 'html' ? 'text-[#4A7CFF]' : 'text-neutral-400'}`}>HTML5</div>
+                <div className="text-xs text-neutral-500 mt-1">Advanced animations</div>
               </button>
             </div>
           </div>
           
-          {/* Size Options */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Size</label>
-            <select 
-              className="w-full bg-neutral-700 border border-neutral-600 rounded text-xs p-2"
-              value={selectedSize}
-              onChange={(e) => setSelectedSize(e.target.value)}
+          <div>
+            <label className="block text-sm text-neutral-300 mb-2">Size</label>
+            <select
+              className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700"
+              value={selectedSizeIndex}
+              onChange={(e) => setSelectedSizeIndex(parseInt(e.target.value))}
             >
-              {standardSizes.map((size) => (
-                <option key={size.name} value={size.name}>
-                  {size.name}
+              {sizes.map((size, index) => (
+                <option key={index} value={index}>
+                  {size.name} - {size.width}×{size.height}
                 </option>
               ))}
-              <option value="custom">Custom Size...</option>
             </select>
-            
-            {selectedSize === 'custom' && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <div>
-                  <label className="block text-xs mb-1">Width</label>
-                  <input 
-                    type="number" 
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded text-xs p-1"
-                    value={customWidth}
-                    onChange={(e) => setCustomWidth(parseInt(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs mb-1">Height</label>
-                  <input 
-                    type="number" 
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded text-xs p-1"
-                    value={customHeight}
-                    onChange={(e) => setCustomHeight(parseInt(e.target.value))}
-                  />
-                </div>
-              </div>
-            )}
           </div>
           
-          {/* Quality Options - only show for GIF */}
           {exportType === 'gif' && (
-            <div className="mb-4">
-              <div className="flex justify-between mb-2">
-                <label className="block text-sm font-medium">Quality</label>
-                <span className="text-xs text-neutral-300">{quality}%</span>
+            <>
+              <div>
+                <label className="block text-sm text-neutral-300 mb-2">Quality</label>
+                <div className="flex rounded-md overflow-hidden border border-neutral-700">
+                  <button
+                    className={`flex-1 py-2 ${quality === 'low' ? 'bg-[#1a1a1a] text-neutral-200' : 'bg-[#151515] text-neutral-400'}`}
+                    onClick={() => setQuality('low')}
+                  >
+                    Low
+                  </button>
+                  <button
+                    className={`flex-1 py-2 ${quality === 'medium' ? 'bg-[#1a1a1a] text-neutral-200' : 'bg-[#151515] text-neutral-400'}`}
+                    onClick={() => setQuality('medium')}
+                  >
+                    Medium
+                  </button>
+                  <button
+                    className={`flex-1 py-2 ${quality === 'high' ? 'bg-[#1a1a1a] text-neutral-200' : 'bg-[#151515] text-neutral-400'}`}
+                    onClick={() => setQuality('high')}
+                  >
+                    High
+                  </button>
+                </div>
               </div>
-              <input 
-                type="range" 
-                className="w-full bg-neutral-700 rounded-lg appearance-none h-2"
-                min="0" 
-                max="100" 
-                value={quality}
-                onChange={(e) => setQuality(parseInt(e.target.value))}
-              />
-            </div>
+              
+              <div>
+                <label className="block text-sm text-neutral-300 mb-2">Frame Rate (FPS)</label>
+                <input
+                  type="range"
+                  min="15"
+                  max="60"
+                  step="1"
+                  value={fps}
+                  onChange={(e) => setFps(parseInt(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-neutral-500">
+                  <span>15 fps</span>
+                  <span className="text-neutral-300">{fps} fps</span>
+                  <span>60 fps</span>
+                </div>
+              </div>
+            </>
           )}
           
-          {/* Advanced Options */}
-          <div className="mb-4">
-            <button 
-              className="flex items-center text-sm text-neutral-300 hover:text-white"
-              onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-            >
-              <i className="fas fa-cog text-xs mr-1"></i>
-              <span>Advanced Options</span>
-              <i className={`fas fa-chevron-${isAdvancedOpen ? 'up' : 'down'} text-xs ml-1`}></i>
-            </button>
-            
-            {isAdvancedOpen && (
-              <div className="mt-2 p-2 bg-neutral-700 rounded text-xs">
-                {exportType === 'gif' && (
-                  <>
-                    <div className="mb-2">
-                      <label className="block mb-1">Dithering</label>
-                      <select className="w-full bg-neutral-700 border border-neutral-600 rounded p-1">
-                        <option value="none">None</option>
-                        <option value="pattern">Pattern</option>
-                        <option value="diffusion">Diffusion</option>
-                      </select>
-                    </div>
-                    <div className="mb-2">
-                      <label className="block mb-1">Color Depth</label>
-                      <select className="w-full bg-neutral-700 border border-neutral-600 rounded p-1">
-                        <option value="8">8-bit (256 colors)</option>
-                        <option value="16">16-bit (65,536 colors)</option>
-                        <option value="24">24-bit (16.7M colors)</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-                {exportType === 'html' && (
-                  <>
-                    <div className="mb-2">
-                      <div className="flex items-center">
-                        <label className="flex-1">Include Click Tag</label>
-                        <input type="checkbox" className="h-3 w-3" defaultChecked />
-                      </div>
-                    </div>
-                    <div className="mb-2">
-                      <div className="flex items-center">
-                        <label className="flex-1">Optimize for Ad Networks</label>
-                        <input type="checkbox" className="h-3 w-3" defaultChecked />
-                      </div>
-                    </div>
-                    <div className="mb-2">
-                      <div className="flex items-center">
-                        <label className="flex-1">Generate Fallback Image</label>
-                        <input type="checkbox" className="h-3 w-3" defaultChecked />
-                      </div>
-                    </div>
-                  </>
-                )}
+          {exportType === 'html' && (
+            <>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="includeFallback"
+                  checked={includeFallback}
+                  onChange={(e) => setIncludeFallback(e.target.checked)}
+                  className="mr-3"
+                />
+                <label htmlFor="includeFallback" className="text-sm text-neutral-300">
+                  Include static fallback image
+                </label>
               </div>
-            )}
-          </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="optimizeForAdNetworks"
+                  checked={optimizeForAdNetworks}
+                  onChange={(e) => setOptimizeForAdNetworks(e.target.checked)}
+                  className="mr-3"
+                />
+                <label htmlFor="optimizeForAdNetworks" className="text-sm text-neutral-300">
+                  Optimize for ad networks (Google, Meta)
+                </label>
+              </div>
+            </>
+          )}
         </div>
         
-        <div className="border-t border-neutral-700 p-3 flex items-center justify-end space-x-2">
-          <button 
-            className="bg-neutral-700 hover:bg-neutral-600 text-white px-3 py-1.5 rounded text-xs"
+        <div className="p-4 border-t border-neutral-800 flex justify-end space-x-3">
+          <button
+            className="px-4 py-2 rounded text-neutral-300 hover:bg-neutral-800"
             onClick={onClose}
           >
             Cancel
           </button>
-          <button 
-            className="bg-primary hover:bg-secondary text-white px-4 py-1.5 rounded text-xs font-medium"
+          <button
+            className="px-4 py-2 rounded bg-[#4A7CFF] hover:bg-[#3A6CEE] text-white flex items-center"
             onClick={handleExport}
           >
+            <Download size={16} className="mr-2" />
             Export
           </button>
         </div>

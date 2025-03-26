@@ -1,176 +1,146 @@
-import { AnimationType, EasingType } from '../types/animation';
 import lottieWeb from 'lottie-web';
+import { AnimationType, EasingType } from '../types/animation';
 
-// Use the standard Lottie library as the default instance
-let lottieInstance: any = lottieWeb;
+// Hold references to different Lottie instances
+let lottieSvg: any = null;
+let lottieCanvas: any = null;
+let lottieWorker: any = null;
 
-// Function to initialize Lottie with the appropriate renderer
-export function initLottie(renderer: 'svg' | 'canvas' | 'html' | 'worker' = 'svg') {
-  // For now, we'll just use the default lottie-web package
-  // We can expand on this with the custom Lottie variants later as needed
-  lottieInstance = lottieWeb;
-  
-  // Return the instance for immediate use
-  return lottieInstance;
+/**
+ * Initialize the appropriate Lottie instance based on renderer
+ */
+export function initLottie(renderer: 'svg' | 'canvas' | 'worker' = 'svg') {
+  try {
+    // Use regular lottie-web for SVG rendering
+    if (renderer === 'svg' && !lottieSvg) {
+      // Try to use imported lottie
+      lottieSvg = lottieWeb;
+    }
+    
+    // Use canvas renderer
+    if (renderer === 'canvas' && !lottieCanvas) {
+      // In a real implementation, we'd use a separate Lottie canvas renderer
+      // For this demo, we'll use the same lottie-web but configure for canvas
+      lottieCanvas = lottieWeb;
+    }
+    
+    // Use worker renderer for high performance 
+    if (renderer === 'worker' && !lottieWorker) {
+      // In a real implementation, we'd use a separate Lottie worker renderer
+      // For this demo, we'll use the same lottie-web
+      lottieWorker = lottieWeb;
+    }
+  } catch (error) {
+    console.error('Error initializing Lottie:', error);
+  }
 }
 
-// Get the initialized Lottie instance
+/**
+ * Get the appropriate Lottie instance based on what's available
+ */
 export function getLottie() {
-  return lottieInstance;
+  // Return the first available instance
+  return lottieSvg || lottieCanvas || lottieWorker || lottieWeb;
 }
 
-// Convert animation type to Lottie configuration
+/**
+ * Convert our animation parameters to Lottie format
+ */
 export function convertAnimationToLottie(
   animation: {
     type: AnimationType;
+    startTime: number;
     duration: number;
     delay?: number;
     easing: EasingType;
     opacity?: number;
     scale?: number;
     rotation?: number;
-    position?: { x: number; y: number };
-  },
-  element: { width: number; height: number }
-) {
-  const lottieData: any = {
-    v: '5.7.4',
-    fr: 30, // 30fps
-    ip: animation.delay || 0, // In frames
-    op: (animation.delay || 0) + animation.duration * 30, // End frame
-    w: element.width,
-    h: element.height,
-    nm: `${animation.type} Animation`,
-    ddd: 0, // 3D setting: 0 = off
-    assets: [],
-    layers: []
-  };
-
-  // Create base object layer
-  const baseLayer = {
-    ddd: 0,
-    ind: 1,
-    ty: 4,
-    nm: 'Element',
-    sr: 1,
-    ks: {
-      o: { a: 0, k: 100 }, // Opacity
-      r: { a: 0, k: 0 },   // Rotation
-      p: { a: 0, k: [element.width / 2, element.height / 2, 0] }, // Position
-      s: { a: 0, k: [100, 100, 100] } // Scale
-    },
-    ao: 0,
-    shapes: [{
-      ty: 'rc', // Rectangle
-      p: { a: 0, k: [0, 0] },
-      s: { a: 0, k: [element.width, element.height] },
-      r: { a: 0, k: 0 }
-    }],
-    ip: 0,
-    op: animation.duration * 30,
-    st: 0
-  };
-
-  // Apply animation properties based on type
-  switch (animation.type) {
-    case AnimationType.Fade:
-      // Add opacity animation
-      baseLayer.ks.o = {
-        a: 1, // Animated
-        k: [
-          {
-            i: { x: [0.833], y: [0.833] },
-            o: { x: [0.167], y: [0.167] },
-            t: animation.delay || 0,
-            s: [animation.opacity === undefined ? 0 : animation.opacity * 100]
-          },
-          {
-            t: (animation.delay || 0) + animation.duration * 30,
-            s: [100]
-          }
-        ]
-      };
-      break;
-    case AnimationType.Scale:
-      // Add scale animation
-      baseLayer.ks.s = {
-        a: 1, // Animated
-        k: [
-          {
-            i: { x: [0.833], y: [0.833] },
-            o: { x: [0.167], y: [0.167] },
-            t: animation.delay || 0,
-            s: [animation.scale === undefined ? 0 : animation.scale * 100, 
-                animation.scale === undefined ? 0 : animation.scale * 100, 100]
-          },
-          {
-            t: (animation.delay || 0) + animation.duration * 30,
-            s: [100, 100, 100]
-          }
-        ]
-      };
-      break;
-    case AnimationType.Rotate:
-      // Add rotation animation
-      baseLayer.ks.r = {
-        a: 1, // Animated
-        k: [
-          {
-            i: { x: [0.833], y: [0.833] },
-            o: { x: [0.167], y: [0.167] },
-            t: animation.delay || 0,
-            s: [animation.rotation || -90]
-          },
-          {
-            t: (animation.delay || 0) + animation.duration * 30,
-            s: [0]
-          }
-        ]
-      };
-      break;
-    case AnimationType.Slide:
-      // Calculate position based on direction (default slide from bottom)
-      let startX = element.width / 2;
-      let startY = element.height * 1.5; // Start below the view
-      
-      if (animation.position) {
-        startX = animation.position.x;
-        startY = animation.position.y;
-      }
-      
-      // Add position animation
-      baseLayer.ks.p = {
-        a: 1, // Animated
-        k: [
-          {
-            i: { x: [0.833], y: [0.833] },
-            o: { x: [0.167], y: [0.167] },
-            t: animation.delay || 0,
-            s: [startX, startY, 0]
-          },
-          {
-            t: (animation.delay || 0) + animation.duration * 30,
-            s: [element.width / 2, element.height / 2, 0]
-          }
-        ]
-      };
-      break;
-    default:
-      // No specific animation
-      break;
   }
+) {
+  // Create a basic Lottie animation object
+  const lottieAnimation = {
+    v: '5.7.4',
+    fr: 30,
+    ip: 0,
+    op: 150,
+    w: 300,
+    h: 250,
+    nm: 'Animation',
+    ddd: 0,
+    assets: [],
+    layers: [
+      {
+        ddd: 0,
+        ind: 1,
+        ty: 4,
+        nm: 'Layer',
+        sr: 1,
+        ks: {
+          o: { // Opacity
+            a: animation.opacity !== undefined ? 1 : 0,
+            k: animation.opacity !== undefined ? [
+              {
+                i: { x: [0.25], y: [1] },
+                o: { x: [0.75], y: [0] },
+                t: animation.startTime * 30,
+                s: [0]
+              },
+              {
+                t: (animation.startTime + animation.duration) * 30,
+                s: [100]
+              }
+            ] : 100
+          },
+          r: { // Rotation
+            a: animation.rotation !== undefined ? 1 : 0,
+            k: animation.rotation !== undefined ? [
+              {
+                i: { x: [0.25], y: [1] },
+                o: { x: [0.75], y: [0] },
+                t: animation.startTime * 30,
+                s: [0]
+              },
+              {
+                t: (animation.startTime + animation.duration) * 30,
+                s: [animation.rotation]
+              }
+            ] : 0
+          },
+          s: { // Scale
+            a: animation.scale !== undefined ? 1 : 0,
+            k: animation.scale !== undefined ? [
+              {
+                i: { x: [0.25], y: [1] },
+                o: { x: [0.75], y: [0] },
+                t: animation.startTime * 30,
+                s: [0, 0, 100]
+              },
+              {
+                t: (animation.startTime + animation.duration) * 30,
+                s: [animation.scale * 100, animation.scale * 100, 100]
+              }
+            ] : [100, 100, 100]
+          },
+          p: { // Position
+            a: 0,
+            k: [150, 125, 0]
+          }
+        },
+        ao: 0,
+        shapes: [{
+          ty: 'rc',
+          p: { a: 0, k: [0, 0] },
+          s: { a: 0, k: [100, 100] },
+          r: { a: 0, k: 0 }
+        }],
+        ip: 0,
+        op: 150,
+        st: 0
+      }
+    ],
+    markers: []
+  };
 
-  // Add the layer to the animation
-  lottieData.layers.push(baseLayer);
-
-  return lottieData;
+  return lottieAnimation;
 }
-
-// Initialize with default SVG renderer
-initLottie();
-
-export default {
-  initLottie,
-  getLottie,
-  convertAnimationToLottie
-};

@@ -1,270 +1,168 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAnimationContext } from '../context/AnimationContext';
 import { AnimationType, EasingType } from '../types/animation';
 
 const PropertiesPanel = () => {
-  const { 
-    selectedLayerId, 
-    getSelectedLayer, 
-    updateLayerAnimation 
-  } = useAnimationContext();
-  
-  const [animationType, setAnimationType] = useState<AnimationType>(AnimationType.None);
-  const [direction, setDirection] = useState<string>('right');
-  const [easing, setEasing] = useState<EasingType>(EasingType.EaseOut);
-  const [duration, setDuration] = useState<number>(1.0);
-  const [delay, setDelay] = useState<number>(0.2);
-  const [positionOverride, setPositionOverride] = useState<boolean>(true);
-  const [positionX, setPositionX] = useState<number>(20);
-  const [positionY, setPositionY] = useState<number>(0);
-  const [opacity, setOpacity] = useState<number>(100);
-  
+  const { getSelectedLayer, updateLayerAnimation } = useAnimationContext();
   const selectedLayer = getSelectedLayer();
-
-  // When selected layer changes, update form values
-  useEffect(() => {
-    if (selectedLayer && selectedLayer.animations.length > 0) {
-      const animation = selectedLayer.animations[0]; // Get first animation for now
-      setAnimationType(animation.type);
-      setDirection(animation.direction || 'right');
-      setEasing(animation.easing);
-      setDuration(animation.duration);
-      setDelay(animation.delay);
-      setPositionOverride(animation.positionOverride || false);
-      setPositionX(animation.position?.x || 0);
-      setPositionY(animation.position?.y || 0);
-      setOpacity(animation.opacity || 100);
-    } else {
-      // Default values
-      setAnimationType(AnimationType.None);
-      setDirection('right');
-      setEasing(EasingType.EaseOut);
-      setDuration(1.0);
-      setDelay(0.2);
-      setPositionOverride(false);
-      setPositionX(0);
-      setPositionY(0);
-      setOpacity(100);
-    }
-  }, [selectedLayer]);
-
-  const handleApplyChanges = () => {
-    if (selectedLayerId) {
-      updateLayerAnimation(selectedLayerId, {
-        type: animationType,
-        direction,
-        easing,
-        duration,
-        delay,
-        positionOverride,
-        position: { x: positionX, y: positionY },
-        opacity
-      });
-    }
+  
+  // Default animation values
+  const defaultAnimation = {
+    type: AnimationType.Fade,
+    startTime: 0,
+    duration: 1,
+    easing: EasingType.EaseInOut,
+    opacity: 1
   };
+  
+  // Get existing animation or use default
+  const existingAnimation = selectedLayer?.animations[0] || defaultAnimation;
+  
+  // State for animation properties
+  const [animationType, setAnimationType] = useState<AnimationType>(existingAnimation.type);
+  const [startTime, setStartTime] = useState(existingAnimation.startTime || 0);
+  const [duration, setDuration] = useState(existingAnimation.duration);
+  const [easing, setEasing] = useState<EasingType>(existingAnimation.easing);
+  const [opacity, setOpacity] = useState(existingAnimation.opacity || 1);
+  const [scale, setScale] = useState(existingAnimation.scale || 1);
+  const [rotation, setRotation] = useState(existingAnimation.rotation || 0);
 
-  const handleSavePreset = () => {
-    // TODO: Implement save preset functionality
-    console.log('Save preset');
+  // Apply animation changes
+  const handleApplyAnimation = () => {
+    if (!selectedLayer) return;
+    
+    const animation = {
+      type: animationType,
+      startTime,
+      duration,
+      easing,
+      opacity: animationType === AnimationType.Fade ? opacity : undefined,
+      scale: animationType === AnimationType.Scale ? scale : undefined,
+      rotation: animationType === AnimationType.Rotate ? rotation : undefined
+    };
+    
+    updateLayerAnimation(selectedLayer.id, animation);
   };
-
-  // Render nothing if no layer is selected
-  if (!selectedLayer) {
-    return (
-      <div className="w-64 bg-neutral-800 border-l border-neutral-700 flex flex-col" style={{ flexShrink: 0 }}>
-        <div className="border-b border-neutral-700 p-2">
-          <h2 className="text-sm font-medium">Animation Properties</h2>
-          <div className="text-xs text-neutral-400">No layer selected</div>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-xs text-neutral-400">Select a layer to edit its animation properties</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="w-64 bg-neutral-800 border-l border-neutral-700 flex flex-col" style={{ flexShrink: 0 }}>
-      <div className="border-b border-neutral-700 p-2">
-        <h2 className="text-sm font-medium">Animation Properties</h2>
-        <div className="text-xs text-neutral-400">{selectedLayer.name}</div>
+    <div className="w-72 bg-[#111111] border-l border-neutral-800 overflow-y-auto">
+      <div className="p-4 border-b border-neutral-800">
+        <h3 className="text-sm font-medium text-neutral-300">Properties</h3>
       </div>
       
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-4">
-        {/* Animation Type */}
-        <div>
-          <label className="block text-xs font-medium mb-1">Animation Type</label>
-          <select 
-            className="w-full bg-neutral-700 border border-neutral-600 rounded text-xs p-1.5"
-            value={animationType}
-            onChange={(e) => setAnimationType(e.target.value as AnimationType)}
-          >
-            <option value={AnimationType.None}>None</option>
-            <option value={AnimationType.Fade}>Fade</option>
-            <option value={AnimationType.Slide}>Slide</option>
-            <option value={AnimationType.Scale}>Scale</option>
-            <option value={AnimationType.Rotate}>Rotate</option>
-            <option value={AnimationType.Bounce}>Bounce</option>
-            <option value={AnimationType.Pulse}>Pulse</option>
-            <option value={AnimationType.Custom}>Custom</option>
-          </select>
+      {!selectedLayer ? (
+        <div className="p-4 text-sm text-neutral-400">
+          No layer selected. Select a layer to edit properties.
         </div>
-        
-        {/* Direction (only show for relevant animation types) */}
-        {(animationType === AnimationType.Slide) && (
+      ) : (
+        <div className="p-4 space-y-4">
           <div>
-            <label className="block text-xs font-medium mb-1">Direction</label>
-            <div className="grid grid-cols-3 gap-1">
-              <button 
-                className={`${direction === 'up' ? 'bg-primary border-primary' : 'bg-neutral-700 hover:bg-neutral-600 border-neutral-600'} border rounded p-1 flex items-center justify-center`}
-                onClick={() => setDirection('up')}
-              >
-                <i className="fas fa-arrow-up text-xs"></i>
-              </button>
-              <button 
-                className={`${direction === 'right' ? 'bg-primary border-primary' : 'bg-neutral-700 hover:bg-neutral-600 border-neutral-600'} border rounded p-1 flex items-center justify-center`}
-                onClick={() => setDirection('right')}
-              >
-                <i className="fas fa-arrow-right text-xs"></i>
-              </button>
-              <button 
-                className={`${direction === 'down' ? 'bg-primary border-primary' : 'bg-neutral-700 hover:bg-neutral-600 border-neutral-600'} border rounded p-1 flex items-center justify-center`}
-                onClick={() => setDirection('down')}
-              >
-                <i className="fas fa-arrow-down text-xs"></i>
-              </button>
-              <button 
-                className={`${direction === 'left' ? 'bg-primary border-primary' : 'bg-neutral-700 hover:bg-neutral-600 border-neutral-600'} border rounded p-1 flex items-center justify-center`}
-                onClick={() => setDirection('left')}
-              >
-                <i className="fas fa-arrow-left text-xs"></i>
-              </button>
+            <label className="block text-xs text-neutral-400 mb-1">Layer</label>
+            <div className="text-sm text-neutral-200">{selectedLayer.name}</div>
+          </div>
+          
+          <div>
+            <label className="block text-xs text-neutral-400 mb-1">Animation Type</label>
+            <select
+              className="w-full bg-[#191919] text-neutral-200 rounded px-2 py-1 text-sm border border-neutral-700"
+              value={animationType}
+              onChange={(e) => setAnimationType(e.target.value as AnimationType)}
+            >
+              {Object.values(AnimationType).map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Start Time (s)</label>
+              <input
+                type="number"
+                className="w-full bg-[#191919] text-neutral-200 rounded px-2 py-1 text-sm border border-neutral-700"
+                value={startTime}
+                onChange={(e) => setStartTime(parseFloat(e.target.value))}
+                step={0.1}
+                min={0}
+              />
             </div>
-          </div>
-        )}
-        
-        {/* Easing */}
-        <div>
-          <label className="block text-xs font-medium mb-1">Easing</label>
-          <select 
-            className="w-full bg-neutral-700 border border-neutral-600 rounded text-xs p-1.5"
-            value={easing}
-            onChange={(e) => setEasing(e.target.value as EasingType)}
-          >
-            <option value={EasingType.Linear}>Linear</option>
-            <option value={EasingType.EaseOut}>Ease Out</option>
-            <option value={EasingType.EaseIn}>Ease In</option>
-            <option value={EasingType.EaseInOut}>Ease In Out</option>
-            <option value={EasingType.Bounce}>Bounce</option>
-            <option value={EasingType.Custom}>Custom...</option>
-          </select>
-        </div>
-        
-        {/* Duration */}
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="block text-xs font-medium">Duration</label>
-            <span className="text-xs text-neutral-300">{duration.toFixed(1)}s</span>
-          </div>
-          <input 
-            type="range" 
-            className="w-full bg-neutral-700 rounded-lg appearance-none h-2"
-            min="0" 
-            max="5" 
-            step="0.1" 
-            value={duration}
-            onChange={(e) => setDuration(parseFloat(e.target.value))}
-          />
-        </div>
-        
-        {/* Delay */}
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="block text-xs font-medium">Delay</label>
-            <span className="text-xs text-neutral-300">{delay.toFixed(1)}s</span>
-          </div>
-          <input 
-            type="range" 
-            className="w-full bg-neutral-700 rounded-lg appearance-none h-2" 
-            min="0" 
-            max="5" 
-            step="0.1" 
-            value={delay}
-            onChange={(e) => setDelay(parseFloat(e.target.value))}
-          />
-        </div>
-        
-        {/* Position Override */}
-        <div>
-          <div className="flex items-center mb-1">
-            <label className="block text-xs font-medium">Position Override</label>
-            <div className="ml-auto">
-              <input 
-                type="checkbox" 
-                className="h-3 w-3" 
-                checked={positionOverride}
-                onChange={(e) => setPositionOverride(e.target.checked)}
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Duration (s)</label>
+              <input
+                type="number"
+                className="w-full bg-[#191919] text-neutral-200 rounded px-2 py-1 text-sm border border-neutral-700"
+                value={duration}
+                onChange={(e) => setDuration(parseFloat(e.target.value))}
+                step={0.1}
+                min={0.1}
               />
             </div>
           </div>
-          {positionOverride && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs mb-1">X</label>
-                <input 
-                  type="number" 
-                  className="w-full bg-neutral-700 border border-neutral-600 rounded text-xs p-1" 
-                  value={positionX} 
-                  onChange={(e) => setPositionX(parseInt(e.target.value))}
-                />
-              </div>
-              <div>
-                <label className="block text-xs mb-1">Y</label>
-                <input 
-                  type="number" 
-                  className="w-full bg-neutral-700 border border-neutral-600 rounded text-xs p-1" 
-                  value={positionY}
-                  onChange={(e) => setPositionY(parseInt(e.target.value))}
-                />
-              </div>
+          
+          <div>
+            <label className="block text-xs text-neutral-400 mb-1">Easing</label>
+            <select
+              className="w-full bg-[#191919] text-neutral-200 rounded px-2 py-1 text-sm border border-neutral-700"
+              value={easing}
+              onChange={(e) => setEasing(e.target.value as EasingType)}
+            >
+              {Object.values(EasingType).map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
+          
+          {animationType === AnimationType.Fade && (
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Opacity Target (0-1)</label>
+              <input
+                type="number"
+                className="w-full bg-[#191919] text-neutral-200 rounded px-2 py-1 text-sm border border-neutral-700"
+                value={opacity}
+                onChange={(e) => setOpacity(parseFloat(e.target.value))}
+                step={0.1}
+                min={0}
+                max={1}
+              />
             </div>
           )}
-        </div>
-        
-        {/* Opacity */}
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="block text-xs font-medium">Opacity</label>
-            <span className="text-xs text-neutral-300">{opacity}%</span>
-          </div>
-          <input 
-            type="range" 
-            className="w-full bg-neutral-700 rounded-lg appearance-none h-2" 
-            min="0" 
-            max="100" 
-            value={opacity}
-            onChange={(e) => setOpacity(parseInt(e.target.value))}
-          />
-        </div>
-      </div>
-      
-      {/* Preset Buttons */}
-      <div className="border-t border-neutral-700 p-2">
-        <div className="flex items-center space-x-2">
-          <button 
-            className="flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs py-1.5 rounded"
-            onClick={handleSavePreset}
+          
+          {animationType === AnimationType.Scale && (
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Scale Target (0-2)</label>
+              <input
+                type="number"
+                className="w-full bg-[#191919] text-neutral-200 rounded px-2 py-1 text-sm border border-neutral-700"
+                value={scale}
+                onChange={(e) => setScale(parseFloat(e.target.value))}
+                step={0.1}
+                min={0}
+                max={2}
+              />
+            </div>
+          )}
+          
+          {animationType === AnimationType.Rotate && (
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Rotation (degrees)</label>
+              <input
+                type="number"
+                className="w-full bg-[#191919] text-neutral-200 rounded px-2 py-1 text-sm border border-neutral-700"
+                value={rotation}
+                onChange={(e) => setRotation(parseFloat(e.target.value))}
+                step={15}
+              />
+            </div>
+          )}
+          
+          <button
+            className="w-full bg-[#4A7CFF] hover:bg-[#3A6CEE] text-white py-2 rounded text-sm"
+            onClick={handleApplyAnimation}
           >
-            Save Preset
-          </button>
-          <button 
-            className="flex-1 bg-accent hover:bg-orange-600 text-white text-xs py-1.5 rounded"
-            onClick={handleApplyChanges}
-          >
-            Apply
+            Apply Animation
           </button>
         </div>
-      </div>
+      )}
     </div>
   );
 };

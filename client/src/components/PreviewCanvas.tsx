@@ -153,25 +153,64 @@ const PreviewCanvas = () => {
 
   return (
     <div 
-      className="flex-1 bg-neutral-900 overflow-hidden relative"
+      className="flex-1 bg-neutral-900 overflow-hidden relative flex flex-col"
       onMouseMove={handlePan}
       onMouseUp={handlePanEnd}
       onMouseLeave={handlePanEnd}
     >
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div 
-          className="bg-white rounded-sm overflow-hidden" 
-          style={{ 
-            width: 300, 
-            height: 250,
-            transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoomLevel})`
-          }}
-        >
+      {/* Top Header */}
+      <div className="flex items-center justify-between p-2 border-b border-neutral-800 bg-[#111111]">
+        <div className="text-sm text-neutral-300">Preview</div>
+        <div className="flex items-center text-xs text-neutral-400">
+          <span className="px-2 py-0.5 bg-[#1a1a1a] rounded mr-1">2.0s</span>
+          <span>/</span>
+          <span className="px-2 py-0.5 bg-[#1a1a1a] rounded ml-1">5.0s</span>
+          <button className="ml-2 w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-400">
+            <Maximize size={12} />
+          </button>
+        </div>
+      </div>
+      
+      {/* Main Canvas Area */}
+      <div className="flex-1 relative">
+        <div className="absolute inset-0 flex items-center justify-center">
           <div 
-            ref={canvasRef} 
-            className="w-full h-full flex items-center justify-center bg-gradient-to-r from-blue-50 to-blue-100 relative"
+            className="bg-white rounded-sm overflow-hidden" 
+            style={{ 
+              width: 300, 
+              height: 250,
+              transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoomLevel})`
+            }}
           >
-            {/* Lottie animation will be rendered here */}
+            <div 
+              ref={canvasRef} 
+              className="w-full h-full flex items-center justify-center relative"
+              style={{ backgroundColor: '#4A7CFF' }}
+            >
+              {/* Mock ad elements */}
+              <div 
+                className="absolute left-5 top-10 text-white font-bold"
+                style={{ fontSize: '28px' }}
+              >
+                Limited Time Offer
+              </div>
+              <div 
+                className="absolute left-5 top-28 text-white text-opacity-80"
+                style={{ fontSize: '16px' }}
+              >
+                Save up to 50% on all products
+              </div>
+              <div 
+                className="absolute left-5 bottom-10 bg-red-500 text-white px-4 py-2 rounded"
+              >
+                Shop Now
+              </div>
+              <div 
+                className="absolute right-5 bottom-10 bg-white rounded-full w-12 h-12 flex items-center justify-center"
+              >
+                LOGO
+              </div>
+            </div>
           </div>
         </div>
       </div>

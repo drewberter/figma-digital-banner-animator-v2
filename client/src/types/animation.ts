@@ -1,4 +1,3 @@
-// Animation types
 export enum AnimationType {
   None = 'None',
   Fade = 'Fade',
@@ -10,7 +9,6 @@ export enum AnimationType {
   Custom = 'Custom'
 }
 
-// Easing types
 export enum EasingType {
   Linear = 'Linear',
   EaseIn = 'Ease In',
@@ -20,13 +18,11 @@ export enum EasingType {
   Custom = 'Custom'
 }
 
-// Keyframe properties
 export interface Keyframe {
   time: number;
   properties: Record<string, any>;
 }
 
-// Animation definition
 export interface Animation {
   type: AnimationType;
   startTime?: number;
@@ -45,7 +41,6 @@ export interface Animation {
   customData?: Record<string, any>;
 }
 
-// Layer definition
 export interface AnimationLayer {
   id: string;
   name: string;
@@ -56,7 +51,6 @@ export interface AnimationLayer {
   keyframes: Keyframe[];
 }
 
-// Frame definition
 export interface AnimationFrame {
   id: string;
   name: string;
@@ -65,7 +59,6 @@ export interface AnimationFrame {
   height: number;
 }
 
-// Animation preset
 export interface Preset {
   id: string;
   name: string;
