@@ -1,270 +1,59 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect } from 'react';
 import { useAnimationContext } from '../context/AnimationContext';
-// Import our custom Lottie utility
-import { getLottie, initLottie, convertAnimationToLottie } from '../utils/lottieUtils';
-// Import default Lottie as fallback
-import lottieDefault from 'lottie-web';
-// Import icons
-import { HandIcon, ZoomIn, ZoomOut, Maximize, MonitorPlay } from 'lucide-react';
+import { mockFrames } from '../mock/animationData';
 
 const PreviewCanvas = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<any>(null);
-  const { currentFrame, isPlaying, currentTime, duration } = useAnimationContext();
-  const [isPanning, setIsPanning] = useState(false);
-  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  // State for renderer selection
-  const [renderer, setRenderer] = useState<'svg' | 'canvas' | 'worker'>('svg');
+  const { currentTime, currentFrame } = useAnimationContext();
   
-  // Initialize animation preview
-  useEffect(() => {
-    // Initialize Lottie with selected renderer
-    initLottie(renderer);
-    
-    // Get sample animation data (simple rectangle)
-    const defaultAnimationData = {
-      v: '5.7.4',
-      fr: 30,
-      ip: 0,
-      op: 30,
-      w: 300,
-      h: 250,
-      nm: 'Default Animation',
-      ddd: 0,
-      assets: [],
-      layers: [{
-        ddd: 0,
-        ind: 1,
-        ty: 4,
-        nm: 'Empty Layer',
-        sr: 1,
-        ks: {
-          o: { a: 0, k: 100 },
-          p: { a: 0, k: [150, 125, 0] }
-        },
-        ao: 0,
-        shapes: [{
-          ty: 'rc',
-          p: { a: 0, k: [0, 0] },
-          s: { a: 0, k: [100, 100] },
-          r: { a: 0, k: 0 }
-        }],
-        ip: 0,
-        op: 30,
-        st: 0
-      }],
-      markers: []
-    };
-
-    if (canvasRef.current) {
-      // Clear the container first
-      canvasRef.current.innerHTML = '';
-      
-      try {
-        // Get the appropriate Lottie instance
-        const lottie = getLottie();
-        
-        // Initialize Lottie animation
-        animationRef.current = lottie.loadAnimation({
-          container: canvasRef.current,
-          renderer: renderer,
-          loop: true,
-          autoplay: false,
-          animationData: defaultAnimationData
-        });
-      } catch (error) {
-        console.error('Error initializing Lottie animation:', error);
-      }
-    }
-
-    return () => {
-      if (animationRef.current) {
-        try {
-          animationRef.current.destroy();
-        } catch (error) {
-          console.error('Error destroying Lottie animation:', error);
-        }
-      }
-    };
-  }, [renderer]);
-
-  // Update animation playback state
-  useEffect(() => {
-    if (animationRef.current) {
-      try {
-        if (isPlaying) {
-          animationRef.current.play();
-        } else {
-          animationRef.current.pause();
-        }
-      } catch (error) {
-        console.error('Error controlling animation playback:', error);
-      }
-    }
-  }, [isPlaying]);
-
-  // Update animation frame when time changes
-  useEffect(() => {
-    if (animationRef.current && duration > 0) {
-      try {
-        // Safely access totalFrames property
-        const totalFrames = animationRef.current.totalFrames;
-        if (totalFrames) {
-          const framePos = (currentTime / duration) * totalFrames;
-          animationRef.current.goToAndStop(framePos, true);
-        }
-      } catch (error) {
-        console.error('Error updating animation frame:', error);
-      }
-    }
-  }, [currentTime, duration]);
-
-  const handlePanStart = () => {
-    setIsPanning(true);
-  };
-
-  const handlePanEnd = () => {
-    setIsPanning(false);
-  };
-
-  const handlePan = (e: React.MouseEvent) => {
-    if (isPanning) {
-      setPanPosition(prev => ({
-        x: prev.x + e.movementX,
-        y: prev.y + e.movementY
-      }));
-    }
-  };
-
-  const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(prev + 0.25, 3));
-  };
-
-  const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
-  };
-
-  const handleResetView = () => {
-    setPanPosition({ x: 0, y: 0 });
-    setZoomLevel(1);
-  };
+  // Set up canvas dimensions based on current frame
+  const frameWidth = currentFrame?.width || 300;
+  const frameHeight = currentFrame?.height || 250;
+  
+  // For demo purposes we'll just show a frame from our mock data
+  const demoFrame = mockFrames[0]; // Using the first frame as demo
 
   return (
-    <div 
-      className="flex-1 bg-neutral-900 overflow-hidden relative flex flex-col"
-      onMouseMove={handlePan}
-      onMouseUp={handlePanEnd}
-      onMouseLeave={handlePanEnd}
-    >
-      {/* Top Header */}
-      <div className="flex items-center justify-between p-2 border-b border-neutral-800 bg-[#111111]">
-        <div className="text-sm text-neutral-300">Preview</div>
-        <div className="flex items-center text-xs text-neutral-400">
-          <span className="px-2 py-0.5 bg-[#1a1a1a] rounded mr-1">2.0s</span>
-          <span>/</span>
-          <span className="px-2 py-0.5 bg-[#1a1a1a] rounded ml-1">5.0s</span>
-          <button className="ml-2 w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-400">
-            <Maximize size={12} />
-          </button>
+    <div className="h-full bg-neutral-900 flex items-center justify-center overflow-hidden">
+      <div className="flex flex-col items-center">
+        <div className="mb-4 text-sm text-neutral-500">
+          Time: {currentTime.toFixed(1)}s
         </div>
-      </div>
-      
-      {/* Main Canvas Area */}
-      <div className="flex-1 relative">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div 
-            className="bg-white rounded-sm overflow-hidden" 
-            style={{ 
-              width: 300, 
-              height: 250,
-              transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoomLevel})`
-            }}
-          >
-            <div 
-              ref={canvasRef} 
-              className="w-full h-full flex items-center justify-center relative"
-              style={{ backgroundColor: '#4A7CFF' }}
-            >
-              {/* Mock ad elements */}
-              <div 
-                className="absolute left-5 top-10 text-white font-bold"
-                style={{ fontSize: '28px' }}
-              >
-                Limited Time Offer
-              </div>
-              <div 
-                className="absolute left-5 top-28 text-white text-opacity-80"
-                style={{ fontSize: '16px' }}
-              >
-                Save up to 50% on all products
-              </div>
-              <div 
-                className="absolute left-5 bottom-10 bg-red-500 text-white px-4 py-2 rounded"
-              >
+        
+        {/* Canvas preview area */}
+        <div
+          ref={canvasRef}
+          className="bg-white rounded shadow-lg overflow-hidden"
+          style={{
+            width: `${frameWidth}px`,
+            height: `${frameHeight}px`
+          }}
+        >
+          {/* Demo content showing a typical banner structure */}
+          <div className="relative w-full h-full bg-gradient-to-br from-blue-500 to-indigo-700">
+            {/* Headline text */}
+            <div className="absolute top-10 left-0 right-0 text-center">
+              <h2 className="text-white text-2xl font-bold mb-2">Amazing Offer</h2>
+              <p className="text-white text-sm">Limited time only!</p>
+            </div>
+            
+            {/* CTA Button */}
+            <div className="absolute bottom-12 left-0 right-0 flex justify-center">
+              <button className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-medium">
                 Shop Now
-              </div>
-              <div 
-                className="absolute right-5 bottom-10 bg-white rounded-full w-12 h-12 flex items-center justify-center"
-              >
-                LOGO
-              </div>
+              </button>
+            </div>
+            
+            {/* Logo */}
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+              <div className="text-white text-xs opacity-75">LOGO</div>
             </div>
           </div>
         </div>
-      </div>
-      
-      {/* Canvas Controls */}
-      <div className="absolute top-2 right-2 flex items-center space-x-1 bg-neutral-800 bg-opacity-80 rounded p-1">
-        <button 
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300" 
-          title="Pan"
-          onMouseDown={handlePanStart}
-        >
-          <HandIcon size={16} />
-        </button>
-        <button 
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300" 
-          title="Zoom In"
-          onClick={handleZoomIn}
-        >
-          <ZoomIn size={16} />
-        </button>
-        <button 
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300" 
-          title="Zoom Out"
-          onClick={handleZoomOut}
-        >
-          <ZoomOut size={16} />
-        </button>
-        <button 
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300" 
-          title="Reset View"
-          onClick={handleResetView}
-        >
-          <Maximize size={16} />
-        </button>
-      </div>
-      
-      {/* Renderer Selection */}
-      <div className="absolute bottom-2 right-2 flex items-center space-x-1 bg-neutral-800 bg-opacity-80 rounded p-1">
-        <select 
-          className="text-xs bg-neutral-700 text-neutral-200 rounded p-1 border-none"
-          value={renderer}
-          onChange={(e) => setRenderer(e.target.value as any)}
-        >
-          <option value="svg">SVG Renderer</option>
-          <option value="canvas">Canvas Renderer</option>
-          <option value="worker">WebWorker (High Performance)</option>
-        </select>
-        <button 
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300" 
-          title="Preview Animation"
-          onClick={() => animationRef.current?.play()}
-        >
-          <MonitorPlay size={16} />
-        </button>
+        
+        <div className="mt-4 text-xs text-neutral-400">
+          {demoFrame.width} × {demoFrame.height}
+        </div>
       </div>
     </div>
   );

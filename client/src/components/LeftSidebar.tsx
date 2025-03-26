@@ -1,114 +1,250 @@
-import { useState } from 'react';
-import { useAnimationContext } from '../context/AnimationContext';
+import { useState, useEffect } from 'react';
+import { ChevronDown, ChevronRight, ChevronLeftSquare, ChevronRightSquare, Plus, Eye, EyeOff, Lock, Unlock, Square, CheckSquare, Image, Type, Box, Layout } from 'lucide-react';
+import { mockFrames, mockLayers } from '../mock/animationData';
 
 interface LeftSidebarProps {
   onOpenPresets: () => void;
 }
 
 const LeftSidebar = ({ onOpenPresets }: LeftSidebarProps) => {
-  const [activeTab, setActiveTab] = useState<'layers' | 'presets'>('layers');
-  const { layers, frames, selectedLayerId, selectLayer, toggleLayerVisibility, toggleLayerLock } = useAnimationContext();
-
-  return (
-    <div className="w-56 bg-neutral-800 border-r border-neutral-700 flex flex-col">
-      {/* Tabs for Layers and Presets */}
-      <div className="flex border-b border-neutral-700">
-        <button 
-          className={`flex-1 py-2 text-xs font-medium ${activeTab === 'layers' ? 'bg-neutral-700 text-white border-b-2 border-primary' : 'text-neutral-400 hover:text-white'}`}
-          onClick={() => setActiveTab('layers')}
-        >
-          Layers
-        </button>
-        <button 
-          className={`flex-1 py-2 text-xs font-medium ${activeTab === 'presets' ? 'bg-neutral-700 text-white border-b-2 border-primary' : 'text-neutral-400 hover:text-white'}`}
-          onClick={onOpenPresets}
-        >
-          Presets
-        </button>
-      </div>
-      
-      {/* Layers Tab Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {layers.map((layer) => (
-          <div 
-            key={layer.id}
-            className={`px-1 py-1 border-b border-neutral-800 hover:bg-neutral-700 cursor-pointer ${selectedLayerId === layer.id ? 'bg-neutral-700' : ''}`}
-            onClick={() => selectLayer(layer.id)}
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [frameListExpanded, setFrameListExpanded] = useState(true);
+  const [layerListExpanded, setLayerListExpanded] = useState(true);
+  const [selectedFrameId, setSelectedFrameId] = useState<string>('frame-1');
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [layers, setLayers] = useState(mockLayers[selectedFrameId] || []);
+  
+  // Update layers when selected frame changes
+  useEffect(() => {
+    setLayers(mockLayers[selectedFrameId] || []);
+    // Select the first layer of the frame
+    if (mockLayers[selectedFrameId]?.length > 0) {
+      setSelectedLayerId(mockLayers[selectedFrameId][0].id);
+    } else {
+      setSelectedLayerId(null);
+    }
+  }, [selectedFrameId]);
+  
+  // Toggle sidebar collapsed state
+  const toggleCollapsed = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+  
+  // Select a frame
+  const handleSelectFrame = (frameId: string) => {
+    console.log('Selected frame:', frameId);
+    setSelectedFrameId(frameId);
+  };
+  
+  // Select a layer
+  const handleSelectLayer = (layerId: string) => {
+    console.log('Selected layer:', layerId);
+    setSelectedLayerId(layerId);
+  };
+  
+  // Toggle layer visibility
+  const toggleLayerVisibility = (layerId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setLayers(prev => 
+      prev.map(layer => 
+        layer.id === layerId 
+          ? { ...layer, visible: !layer.visible } 
+          : layer
+      )
+    );
+  };
+  
+  // Toggle layer lock
+  const toggleLayerLock = (layerId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setLayers(prev => 
+      prev.map(layer => 
+        layer.id === layerId 
+          ? { ...layer, locked: !layer.locked } 
+          : layer
+      )
+    );
+  };
+  
+  // Get layer icon based on type
+  function getLayerIcon(type: string) {
+    switch (type.toLowerCase()) {
+      case 'image':
+        return <Image size={14} />;
+      case 'text':
+        return <Type size={14} />;
+      case 'rectangle':
+        return <Box size={14} />;
+      case 'button':
+        return <Layout size={14} />;
+      default:
+        return <Box size={14} />;
+    }
+  }
+  
+  // If collapsed, show a narrow sidebar with just the collapse/expand button
+  if (isCollapsed) {
+    return (
+      <div className="w-10 bg-[#111111] border-r border-neutral-800 flex flex-col items-center">
+        <div className="p-2 border-b border-neutral-800 w-full flex justify-center">
+          <button 
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700"
+            onClick={toggleCollapsed}
+            title="Expand Sidebar"
           >
-            <div className="flex items-center">
-              <div className="w-5 h-5 flex items-center justify-center text-xs">
-                <i className={`fas fa-${getLayerIcon(layer.type)} ${selectedLayerId === layer.id ? 'text-blue-400' : 'text-neutral-400'}`}></i>
-              </div>
-              <div className={`ml-1 text-xs ${selectedLayerId === layer.id ? 'text-white' : 'text-neutral-200'} truncate flex-1`}>
-                {layer.name}
-              </div>
-              <div className="flex items-center">
-                <button 
-                  className={`w-5 h-5 flex items-center justify-center rounded hover:bg-neutral-600 text-xs ${layer.visible ? (selectedLayerId === layer.id ? 'text-neutral-100' : 'text-neutral-400') : 'text-neutral-600'}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleLayerVisibility(layer.id);
-                  }}
-                >
-                  <i className={`fas fa-${layer.visible ? 'eye' : 'eye-slash'}`}></i>
-                </button>
-                <button 
-                  className={`w-5 h-5 flex items-center justify-center rounded hover:bg-neutral-600 text-xs ml-1 ${layer.locked ? 'text-neutral-100' : (selectedLayerId === layer.id ? 'text-neutral-100' : 'text-neutral-400')}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleLayerLock(layer.id);
-                  }}
-                >
-                  <i className={`fas fa-${layer.locked ? 'lock' : 'lock-open'}`}></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {/* Frames Section */}
-      <div className="border-t border-neutral-700">
-        <div className="py-2 px-2 flex justify-between items-center">
-          <h3 className="text-xs font-medium">Frames</h3>
-          <button className="w-5 h-5 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-400 text-xs">
-            <i className="fas fa-plus"></i>
+            <ChevronRightSquare size={16} className="text-neutral-400" />
           </button>
         </div>
-        
-        <div className="px-2 pb-2 flex space-x-2 overflow-x-auto custom-scrollbar">
-          {frames.map((frame, index) => (
+        <div className="flex-1 flex flex-col items-center pt-2">
+          {mockFrames.map((frame) => (
             <div 
               key={frame.id}
-              className={`w-16 h-16 bg-neutral-700 rounded border ${frame.selected ? 'border-primary' : 'border-neutral-600'} flex items-center justify-center text-xs relative`}
+              className={`w-6 h-6 mb-1 rounded-sm flex items-center justify-center cursor-pointer ${selectedFrameId === frame.id ? 'bg-[#4A7CFF]' : 'bg-neutral-800 hover:bg-neutral-700'}`}
+              onClick={() => handleSelectFrame(frame.id)}
+              title={`${frame.name} (${frame.width}×${frame.height})`}
             >
-              <span className={`absolute bottom-0 left-0 right-0 ${frame.selected ? 'bg-primary' : 'bg-neutral-600'} text-center text-[10px] py-0.5`}>
-                Frame {index + 1}
+              <span className="text-xs font-bold text-white">
+                {frame.id.charAt(frame.id.length - 1)}
               </span>
             </div>
           ))}
         </div>
+        <div className="p-2 border-t border-neutral-800 w-full flex justify-center">
+          <button 
+            className="w-6 h-6 flex items-center justify-center rounded text-[#4A7CFF] hover:bg-neutral-800"
+            title="Add Frame"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  // Regular expanded sidebar
+  return (
+    <div className="w-64 bg-[#111111] border-r border-neutral-800 flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="p-3 border-b border-neutral-800 flex items-center justify-between">
+        <h3 className="text-sm font-medium text-neutral-300">Timeline</h3>
+        <div className="flex">
+          <button 
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700"
+            onClick={toggleCollapsed}
+            title="Collapse Sidebar"
+          >
+            <ChevronLeftSquare size={16} className="text-neutral-400" />
+          </button>
+        </div>
+      </div>
+      
+      {/* Frames Section */}
+      <div className="border-b border-neutral-800">
+        <div 
+          className="p-2 flex items-center justify-between cursor-pointer hover:bg-neutral-800"
+          onClick={() => setFrameListExpanded(!frameListExpanded)}
+        >
+          {frameListExpanded ? 
+            <ChevronDown size={16} className="text-neutral-400 mr-1" /> : 
+            <ChevronRight size={16} className="text-neutral-400 mr-1" />
+          }
+          <span className="text-xs font-medium text-neutral-300 flex-1">FRAMES</span>
+        </div>
+        
+        {frameListExpanded && (
+          <div className="max-h-48 overflow-y-auto">
+            {mockFrames.map((frame) => (
+              <div 
+                key={frame.id}
+                className={`pl-4 pr-2 py-1 flex items-center cursor-pointer hover:bg-neutral-800 ${selectedFrameId === frame.id ? 'bg-neutral-800' : ''}`}
+                onClick={() => handleSelectFrame(frame.id)}
+              >
+                <div className="mr-2">
+                  {selectedFrameId === frame.id ? (
+                    <CheckSquare size={16} className="text-[#4A7CFF]" />
+                  ) : (
+                    <Square size={16} className="text-neutral-500" />
+                  )}
+                </div>
+                <div className="flex-1 text-sm truncate">
+                  <span className={selectedFrameId === frame.id ? "text-white" : "text-neutral-300"}>
+                    {frame.name}
+                  </span>
+                </div>
+                <div className="text-xs text-neutral-500">
+                  {frame.width}×{frame.height}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      
+      {/* Layers Section */}
+      <div className="flex-1 flex flex-col">
+        <div 
+          className="p-2 flex items-center justify-between cursor-pointer hover:bg-neutral-800"
+          onClick={() => setLayerListExpanded(!layerListExpanded)}
+        >
+          {layerListExpanded ? 
+            <ChevronDown size={16} className="text-neutral-400 mr-1" /> : 
+            <ChevronRight size={16} className="text-neutral-400 mr-1" />
+          }
+          <span className="text-xs font-medium text-neutral-300 flex-1">LAYERS</span>
+        </div>
+        
+        {layerListExpanded && (
+          <div className="flex-1 overflow-y-auto">
+            {layers.map((layer) => (
+              <div 
+                key={layer.id}
+                className={`pl-4 pr-2 py-1 flex items-center cursor-pointer hover:bg-neutral-800 ${selectedLayerId === layer.id ? 'bg-neutral-800' : ''}`}
+                onClick={() => handleSelectLayer(layer.id)}
+              >
+                <div className="mr-2 flex items-center space-x-1">
+                  <button
+                    onClick={(e) => toggleLayerVisibility(layer.id, e)}
+                    className="text-neutral-400 hover:text-neutral-200"
+                    title={layer.visible ? "Hide Layer" : "Show Layer"}
+                  >
+                    {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                  </button>
+                  
+                  <button
+                    onClick={(e) => toggleLayerLock(layer.id, e)}
+                    className="text-neutral-400 hover:text-neutral-200"
+                    title={layer.locked ? "Unlock Layer" : "Lock Layer"}
+                  >
+                    {layer.locked ? <Lock size={14} /> : <Unlock size={14} />}
+                  </button>
+                </div>
+                
+                <div className="flex-1 text-sm flex items-center">
+                  <span className="mr-2 text-neutral-500">
+                    {getLayerIcon(layer.type)}
+                  </span>
+                  <span className={selectedLayerId === layer.id ? "text-white" : "text-neutral-300"}>
+                    {layer.name}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      
+      {/* Bottom actions */}
+      <div className="p-2 border-t border-neutral-800 flex flex-col space-y-1">
+        <button 
+          className="w-full py-1 text-sm text-[#4A7CFF] rounded hover:bg-neutral-800 flex items-center justify-center"
+          onClick={onOpenPresets}
+        >
+          <Plus size={16} className="mr-1" />
+          Add Animation
+        </button>
       </div>
     </div>
   );
 };
-
-// Helper function to get the appropriate icon based on layer type
-function getLayerIcon(type: string): string {
-  switch (type) {
-    case 'text':
-      return 'font';
-    case 'image':
-      return 'image';
-    case 'vector':
-      return 'bezier-curve';
-    case 'shape':
-      return 'shapes';
-    case 'rectangle':
-      return 'square';
-    default:
-      return 'object-group';
-  }
-}
 
 export default LeftSidebar;

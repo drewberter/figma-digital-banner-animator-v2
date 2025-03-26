@@ -1,254 +1,203 @@
 import { useState, useRef, useEffect } from 'react';
+import { Play, Pause, SkipBack, Clock } from 'lucide-react';
 import { useAnimationContext } from '../context/AnimationContext';
-import { Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Timeline = () => {
+  const { currentTime, duration, setCurrentTime, isPlaying, togglePlayback, getSelectedLayer } = useAnimationContext();
+  const [isDragging, setIsDragging] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
-  const [hoverTime, setHoverTime] = useState(0);
-  const [selectedKeyframeTime, setSelectedKeyframeTime] = useState<number | null>(null);
-
-  const { 
-    currentTime, 
-    setCurrentTime, 
-    duration, 
-    isPlaying, 
-    togglePlayback, 
-    getSelectedLayer,
-    addKeyframe,
-    deleteKeyframe
-  } = useAnimationContext();
-
-  // Calculate playhead position from current time
-  const getPlayheadPosition = (time: number) => {
+  
+  // Generate time markers (every 0.5 seconds)
+  const timeMarkers = [];
+  const interval = 0.5; // in seconds
+  for (let time = 0; time <= duration; time += interval) {
+    timeMarkers.push({
+      time,
+      isMajor: time % 1 === 0 // Major markers at every second
+    });
+  }
+  
+  // Convert a time value to a position in the timeline
+  const timeToPosition = (time: number) => {
     if (!timelineRef.current) return 0;
-    const timelineWidth = timelineRef.current.clientWidth - 12; // Accounting for padding
-    return (time / duration) * timelineWidth;
+    const width = timelineRef.current.clientWidth - 16; // Account for playhead width
+    return (time / duration) * width;
   };
-
-  // Calculate time from position
-  const getTimeFromPosition = (position: number) => {
+  
+  // Convert a position in the timeline to a time value
+  const positionToTime = (position: number) => {
     if (!timelineRef.current) return 0;
-    const timelineWidth = timelineRef.current.clientWidth - 12; // Accounting for padding
-    return Math.max(0, Math.min(duration, (position / timelineWidth) * duration));
+    const width = timelineRef.current.clientWidth - 16; // Account for playhead width
+    return Math.max(0, Math.min(duration, (position / width) * duration));
   };
-
-  // Generate time markers
-  const generateTimeMarkers = () => {
-    const markers = [];
-    const interval = duration <= 5 ? 0.5 : 1; // Every half second for shorter durations
-    
-    for (let i = 0; i <= duration; i += interval) {
-      const position = getPlayheadPosition(i);
-      const isFullSecond = i % 1 === 0;
-      
-      markers.push(
-        <div 
-          key={i} 
-          className={`absolute h-${isFullSecond ? '4' : '2'} bg-neutral-600 w-px`}
-          style={{ 
-            left: `${position}px`, 
-            top: isFullSecond ? '0px' : '4px'
-          }}
-        >
-          {isFullSecond && (
-            <div className="absolute top-4 text-[10px] text-neutral-400 transform -translate-x-1/2">
-              {i}s
-            </div>
-          )}
-        </div>
-      );
-    }
-    
-    return markers;
-  };
-
-  // Handle playhead drag start
-  const handlePlayheadDragStart = (e: React.MouseEvent) => {
-    if (isPlaying) togglePlayback();
-    setIsDragging(true);
-    document.addEventListener('mousemove', handlePlayheadDrag);
-    document.addEventListener('mouseup', handlePlayheadDragEnd);
-  };
-
-  // Handle playhead drag
-  const handlePlayheadDrag = (e: MouseEvent) => {
-    if (!timelineRef.current || !isDragging) return;
-    
-    const rect = timelineRef.current.getBoundingClientRect();
-    const position = e.clientX - rect.left;
-    const newTime = getTimeFromPosition(position);
-    
-    setCurrentTime(newTime);
-  };
-
-  // Handle playhead drag end
-  const handlePlayheadDragEnd = () => {
-    setIsDragging(false);
-    document.removeEventListener('mousemove', handlePlayheadDrag);
-    document.removeEventListener('mouseup', handlePlayheadDragEnd);
-  };
-
-  // Handle timeline click
+  
+  // Handle clicking on the timeline to set current time
   const handleTimelineClick = (e: React.MouseEvent) => {
     if (!timelineRef.current) return;
     
     const rect = timelineRef.current.getBoundingClientRect();
-    const position = e.clientX - rect.left;
-    const newTime = getTimeFromPosition(position);
+    const clickPosition = e.clientX - rect.left;
+    const newTime = positionToTime(clickPosition);
     
     setCurrentTime(newTime);
   };
-
-  // Handle timeline hover
-  const handleTimelineHover = (e: React.MouseEvent) => {
-    if (!timelineRef.current) return;
-    
-    const rect = timelineRef.current.getBoundingClientRect();
-    const position = e.clientX - rect.left;
-    const time = getTimeFromPosition(position);
-    
-    setHoverTime(time);
+  
+  // Handle playhead drag start
+  const handlePlayheadMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
   };
-
-  // Handle keyframe add
-  const handleAddKeyframe = () => {
-    const selectedLayer = getSelectedLayer();
-    if (selectedLayer) {
-      addKeyframe(selectedLayer.id, currentTime);
-    }
-  };
-
-  // Handle keyframe delete
-  const handleDeleteKeyframe = () => {
-    const selectedLayer = getSelectedLayer();
-    if (selectedLayer && selectedKeyframeTime !== null) {
-      deleteKeyframe(selectedLayer.id, selectedKeyframeTime);
-      setSelectedKeyframeTime(null);
-    }
-  };
-
-  // Cleanup event listeners
+  
+  // Handle playhead drag
   useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handlePlayheadDrag);
-      document.removeEventListener('mouseup', handlePlayheadDragEnd);
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !timelineRef.current) return;
+      
+      const rect = timelineRef.current.getBoundingClientRect();
+      const mousePosition = e.clientX - rect.left;
+      const newTime = positionToTime(mousePosition);
+      
+      setCurrentTime(newTime);
     };
-  }, []);
-
+    
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+    
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, setCurrentTime]);
+  
   // Get keyframes for the selected layer
   const selectedLayer = getSelectedLayer();
-  const keyframes = selectedLayer ? [...selectedLayer.keyframes] : [];
-  keyframes.sort((a, b) => a.time - b.time);
-
+  const keyframes = selectedLayer?.keyframes || [];
+  
   return (
-    <div className="bg-[#111111] border-t border-neutral-800 h-32 flex flex-col">
-      {/* Timeline Controls */}
-      <div className="h-10 border-b border-neutral-800 flex items-center px-3 justify-between">
-        <div className="flex items-center gap-2">
+    <div className="h-full bg-[#111111] flex flex-col">
+      <div className="p-2 border-b border-neutral-800 flex items-center justify-between">
+        <div className="flex items-center space-x-2">
           <button 
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300" 
+            className="w-8 h-8 flex items-center justify-center rounded hover:bg-neutral-800"
             onClick={togglePlayback}
+            title={isPlaying ? "Pause" : "Play"}
           >
-            {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+            {isPlaying ? <Pause size={16} className="text-neutral-200" /> : <Play size={16} className="text-neutral-200" />}
           </button>
-          <span className="text-sm text-neutral-400">
-            {currentTime.toFixed(2)}s / {duration.toFixed(1)}s
-          </span>
+          
+          <button 
+            className="w-8 h-8 flex items-center justify-center rounded hover:bg-neutral-800"
+            onClick={() => setCurrentTime(0)}
+            title="Restart"
+          >
+            <SkipBack size={16} className="text-neutral-300" />
+          </button>
+          
+          <div className="text-xs text-neutral-400 flex items-center">
+            <Clock size={14} className="mr-1" />
+            <span>{currentTime.toFixed(1)}s</span>
+            <span className="mx-1">/</span>
+            <span>{duration.toFixed(1)}s</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button 
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300"
-            onClick={handleAddKeyframe}
-            title="Add Keyframe"
-          >
-            +
-          </button>
-          <button 
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300 disabled:opacity-50 disabled:hover:bg-transparent"
-            onClick={handleDeleteKeyframe}
-            disabled={selectedKeyframeTime === null}
-            title="Delete Keyframe"
-          >
-            -
-          </button>
-          <button 
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300"
-            title="Previous Keyframe"
-          >
-            <ChevronLeft size={14} />
-          </button>
-          <button 
-            className="w-7 h-7 flex items-center justify-center rounded hover:bg-neutral-700 text-neutral-300"
-            title="Next Keyframe"
-          >
-            <ChevronRight size={14} />
-          </button>
-        </div>
-      </div>
-      
-      {/* Timeline Ruler */}
-      <div className="h-6 border-b border-neutral-800 relative px-3">
-        <div className="absolute inset-0 px-3">
-          {generateTimeMarkers()}
-        </div>
-      </div>
-      
-      {/* Timeline Tracks */}
-      <div className="flex-1 relative">
-        {/* Vertical time indicator for current position */}
-        <div 
-          className="absolute h-full w-px bg-[#4A7CFF] z-10 pointer-events-none"
-          style={{ left: `${getPlayheadPosition(currentTime) + 12}px` }}
-        ></div>
         
-        {/* Timeline Area */}
-        <div 
-          ref={timelineRef}
-          className="absolute inset-0 px-3"
-          onClick={handleTimelineClick}
-          onMouseMove={handleTimelineHover}
-          onMouseEnter={() => setIsHovering(true)}
-          onMouseLeave={() => setIsHovering(false)}
-        >
-          {/* Playhead handle */}
-          <div 
-            ref={playheadRef}
-            className="absolute top-0 w-5 h-5 bg-[#4A7CFF] rounded-full transform -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer"
-            style={{ left: `${getPlayheadPosition(currentTime) + 12}px` }}
-            onMouseDown={handlePlayheadDragStart}
-          ></div>
+        <div className="flex items-center space-x-2">
+          <div className="text-xs text-neutral-500">
+            {selectedLayer ? selectedLayer.name : 'No layer selected'}
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex-1 flex p-3 relative">
+        {/* Layer track */}
+        <div className="w-40 flex flex-col mr-2">
+          <div className="h-8 flex items-center text-xs text-neutral-400 px-2 border-b border-neutral-800">
+            Layers
+          </div>
           
-          {/* Keyframes */}
-          {keyframes.map((keyframe, index) => (
-            <div 
-              key={`keyframe-${index}`}
-              className={`absolute w-3 h-3 rounded transform -translate-x-1/2 -translate-y-1/2 cursor-pointer border ${selectedKeyframeTime === keyframe.time ? 'border-white' : 'border-yellow-500'} ${selectedKeyframeTime === keyframe.time ? 'bg-yellow-500' : 'bg-yellow-400'}`}
-              style={{ 
-                left: `${getPlayheadPosition(keyframe.time) + 12}px`,
-                top: '20px' 
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedKeyframeTime(keyframe.time);
-                setCurrentTime(keyframe.time);
-              }}
-            ></div>
-          ))}
-          
-          {/* Time hover indicator */}
-          {isHovering && (
-            <div 
-              className="absolute h-full w-px bg-neutral-500 opacity-50 pointer-events-none"
-              style={{ left: `${getPlayheadPosition(hoverTime) + 12}px` }}
-            >
-              <div className="absolute top-0 transform -translate-x-1/2 -translate-y-full bg-neutral-800 text-neutral-300 px-1 py-0.5 text-[10px] rounded">
-                {hoverTime.toFixed(2)}s
-              </div>
+          {selectedLayer && (
+            <div className="h-10 flex items-center px-2 rounded hover:bg-neutral-800 text-sm text-neutral-300">
+              {selectedLayer.name}
             </div>
           )}
+        </div>
+        
+        {/* Timeline area */}
+        <div className="flex-1 flex flex-col relative">
+          {/* Time markers */}
+          <div className="h-8 flex items-end border-b border-neutral-800 relative">
+            {timeMarkers.map(({ time, isMajor }) => (
+              <div 
+                key={time}
+                className="absolute bottom-0 flex flex-col items-center"
+                style={{ left: `${timeToPosition(time)}px` }}
+              >
+                <div 
+                  className={`h-${isMajor ? '4' : '2'} w-px bg-neutral-700`}
+                ></div>
+                {isMajor && (
+                  <div className="text-xs text-neutral-500 mb-1">
+                    {time}s
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          
+          {/* Playhead */}
+          <div 
+            className="absolute top-0 bottom-0 w-0.5 bg-[#4A7CFF] z-10"
+            style={{ left: `${timeToPosition(currentTime)}px` }}
+            ref={playheadRef}
+          >
+            <div 
+              className="w-4 h-4 -ml-1.5 -mt-1 bg-[#4A7CFF] rounded-full cursor-move"
+              onMouseDown={handlePlayheadMouseDown}
+            ></div>
+          </div>
+          
+          {/* Timeline Track */}
+          <div 
+            className="flex-1 bg-neutral-900 rounded cursor-pointer relative"
+            onClick={handleTimelineClick}
+            ref={timelineRef}
+          >
+            {selectedLayer && (
+              <div className="h-10 relative">
+                {/* Animation blocks */}
+                {selectedLayer.animations.map((animation, index) => (
+                  <div 
+                    key={index}
+                    className="absolute h-6 top-2 rounded bg-[#2A5BFF] bg-opacity-70 border border-[#4A7CFF]"
+                    style={{
+                      left: `${timeToPosition(animation.startTime || 0)}px`,
+                      width: `${timeToPosition(animation.duration)}px`
+                    }}
+                  >
+                    <div className="px-2 text-xs text-white truncate">
+                      {animation.type}
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Keyframes */}
+                {keyframes.map((keyframe, index) => (
+                  <div 
+                    key={index}
+                    className="absolute w-3 h-3 top-3.5 -ml-1.5 rounded-sm bg-yellow-500 border border-yellow-600"
+                    style={{ left: `${timeToPosition(keyframe.time)}px` }}
+                  ></div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
