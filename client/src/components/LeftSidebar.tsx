@@ -4,9 +4,10 @@ import { mockFrames, mockLayers } from '../mock/animationData';
 
 interface LeftSidebarProps {
   onOpenPresets: () => void;
+  onSelectFrame?: (frameId: string) => void;
 }
 
-const LeftSidebar = ({ onOpenPresets }: LeftSidebarProps) => {
+const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [frameListExpanded, setFrameListExpanded] = useState(true);
   const [layerListExpanded, setLayerListExpanded] = useState(true);
@@ -30,10 +31,22 @@ const LeftSidebar = ({ onOpenPresets }: LeftSidebarProps) => {
     setIsCollapsed(!isCollapsed);
   };
   
-  // Select a frame
+  // Select a frame and pass the event to parent
   const handleSelectFrame = (frameId: string) => {
     console.log('Selected frame:', frameId);
     setSelectedFrameId(frameId);
+    
+    // Reset selected layer when changing frames
+    if (mockLayers[frameId]?.length > 0) {
+      setSelectedLayerId(mockLayers[frameId][0].id);
+    } else {
+      setSelectedLayerId(null);
+    }
+    
+    // Update the preview via App.tsx
+    if (onSelectFrame) {
+      onSelectFrame(frameId);
+    }
   };
   
   // Select a layer

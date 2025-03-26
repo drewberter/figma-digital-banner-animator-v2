@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { X, Search, FolderOpen, Save, Sparkles } from 'lucide-react';
 import { AnimationType, EasingType, Animation } from '../types/animation';
-import { useAnimationContext } from '../context/AnimationContext';
 
 interface PresetsPanelProps {
   onClose: () => void;
@@ -93,7 +92,15 @@ const PresetsPanel = ({ onClose }: PresetsPanelProps) => {
   const [savingPreset, setSavingPreset] = useState(false);
   const [presetName, setPresetName] = useState('');
   
-  const { getSelectedLayer, updateLayerAnimation } = useAnimationContext();
+  // Mock function to simulate getting the selected layer
+  const getSelectedLayer = () => {
+    return { id: 'layer-1-1', name: 'Text Layer' };
+  };
+  
+  // Mock function to simulate updating animation
+  const updateLayerAnimation = (layerId: string, animation: Animation) => {
+    console.log('Updating animation for layer', layerId, animation);
+  };
   
   // Filter presets by search term and category
   const filteredPresets = presets.filter(preset => {
@@ -107,6 +114,7 @@ const PresetsPanel = ({ onClose }: PresetsPanelProps) => {
     const selectedLayer = getSelectedLayer();
     if (selectedLayer) {
       updateLayerAnimation(selectedLayer.id, { ...animation });
+      onClose(); // Close the panel after applying preset
     }
   };
   

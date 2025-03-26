@@ -42,7 +42,7 @@ const PropertiesPanel = () => {
         rotation: selectedLayer.animations[0].rotation || 0
       });
     }
-  }, [getSelectedLayer]);
+  }, [selectedLayerId]); // Only re-run when the selected layer ID changes
   
   // Update animation
   const handleChange = (key: string, value: any) => {

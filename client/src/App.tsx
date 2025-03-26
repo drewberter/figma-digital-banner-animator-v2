@@ -12,6 +12,7 @@ import { PluginProvider } from "./context/PluginContext";
 const AppContent = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPresetsPanelOpen, setIsPresetsPanelOpen] = useState(false);
+  const [selectedFrameId, setSelectedFrameId] = useState('frame-1');
 
   const handleExport = () => {
     setIsExportModalOpen(true);
@@ -25,16 +26,25 @@ const AppContent = () => {
   const handleOpenPresets = () => {
     setIsPresetsPanelOpen(true);
   };
+  
+  // Handle frame selection from left sidebar
+  const handleFrameSelect = (frameId: string) => {
+    console.log('App: Selected frame:', frameId);
+    setSelectedFrameId(frameId);
+  };
 
   return (
     <div className="bg-[#0A0A0A] text-white h-screen flex flex-col">
       <Toolbar onExport={handleExport} onPreview={handlePreview} />
       
       <div className="flex-1 flex overflow-hidden">
-        <LeftSidebar onOpenPresets={handleOpenPresets} />
+        <LeftSidebar 
+          onOpenPresets={handleOpenPresets} 
+          onSelectFrame={handleFrameSelect}
+        />
         
         <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden">
-          <PreviewCanvas />
+          <PreviewCanvas selectedFrameId={selectedFrameId} />
           <Timeline />
         </div>
         

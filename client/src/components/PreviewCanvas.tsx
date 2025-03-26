@@ -1,16 +1,20 @@
 import { useRef, useState } from 'react';
 import { mockFrames } from '../mock/animationData';
 
-const PreviewCanvas = () => {
+interface PreviewCanvasProps {
+  selectedFrameId?: string;
+}
+
+const PreviewCanvas = ({ selectedFrameId = 'frame-1' }: PreviewCanvasProps) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   
-  // For demo purposes we'll just show a frame from our mock data
-  const demoFrame = mockFrames[0]; // Using the first frame as demo
+  // Find the selected frame or default to the first one
+  const selectedFrame = mockFrames.find(frame => frame.id === selectedFrameId) || mockFrames[0];
   
-  // Set up canvas dimensions based on demo frame
-  const frameWidth = demoFrame?.width || 300;
-  const frameHeight = demoFrame?.height || 250;
+  // Set up canvas dimensions based on selected frame
+  const frameWidth = selectedFrame?.width || 300;
+  const frameHeight = selectedFrame?.height || 250;
 
   return (
     <div className="h-full bg-neutral-900 flex items-center justify-center overflow-hidden">
@@ -51,7 +55,7 @@ const PreviewCanvas = () => {
         </div>
         
         <div className="mt-4 text-xs text-neutral-400">
-          {demoFrame.width} × {demoFrame.height}
+          {selectedFrame.width} × {selectedFrame.height}
         </div>
       </div>
     </div>
