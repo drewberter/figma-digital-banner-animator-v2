@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, File, ChevronDown, ChevronRight, CheckSquare, Square } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, CheckSquare, Square, ChevronLeft, ChevronLeftSquare, ChevronRightSquare } from 'lucide-react';
 
 interface FigmaFramesSidebarProps {
   onSelectFrame: (frameId: string) => void;
@@ -41,6 +41,7 @@ const FigmaFrame = ({ id, name, dimensions, isSelected, onSelect }: FigmaFramePr
 const FigmaFramesSidebar = ({ onSelectFrame }: FigmaFramesSidebarProps) => {
   const [selectedFrameId, setSelectedFrameId] = useState<string>('frame-1');
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Sample frames data
   const frames = [
@@ -55,16 +56,71 @@ const FigmaFramesSidebar = ({ onSelectFrame }: FigmaFramesSidebarProps) => {
     onSelectFrame(frameId);
   };
 
+  // Toggle sidebar collapsed state
+  const toggleCollapsed = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+
+  // If collapsed, we show a narrow sidebar with just the collapse/expand button
+  if (isCollapsed) {
+    return (
+      <div className="w-10 bg-[#111111] border-r border-neutral-800 flex flex-col items-center">
+        <div className="p-2 border-b border-neutral-800 w-full flex justify-center">
+          <button 
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700"
+            onClick={toggleCollapsed}
+            title="Expand Sidebar"
+          >
+            <ChevronRightSquare size={16} className="text-neutral-400" />
+          </button>
+        </div>
+        <div className="flex-1 flex flex-col items-center pt-2">
+          {frames.map((frame) => (
+            <div 
+              key={frame.id}
+              className={`w-6 h-6 mb-1 rounded-sm flex items-center justify-center cursor-pointer ${selectedFrameId === frame.id ? 'bg-[#4A7CFF]' : 'bg-neutral-800 hover:bg-neutral-700'}`}
+              onClick={() => handleSelectFrame(frame.id)}
+              title={`${frame.name} (${frame.dimensions})`}
+            >
+              <span className="text-xs font-bold text-white">
+                {frame.id.charAt(frame.id.length - 1)}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="p-2 border-t border-neutral-800 w-full flex justify-center">
+          <button 
+            className="w-6 h-6 flex items-center justify-center rounded text-[#4A7CFF] hover:bg-neutral-800"
+            title="Add Frame"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular expanded sidebar
   return (
     <div className="w-64 bg-[#111111] border-r border-neutral-800 flex flex-col overflow-hidden">
       <div className="p-3 border-b border-neutral-800 flex items-center justify-between">
         <h3 className="text-sm font-medium text-neutral-300">Frames</h3>
-        <button 
-          className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          {isExpanded ? <ChevronDown size={16} className="text-neutral-400" /> : <ChevronRight size={16} className="text-neutral-400" />}
-        </button>
+        <div className="flex">
+          <button 
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700 mr-1"
+            onClick={toggleCollapsed}
+            title="Collapse Sidebar"
+          >
+            <ChevronLeftSquare size={16} className="text-neutral-400" />
+          </button>
+          <button 
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700"
+            onClick={() => setIsExpanded(!isExpanded)}
+            title={isExpanded ? "Collapse List" : "Expand List"}
+          >
+            {isExpanded ? <ChevronDown size={16} className="text-neutral-400" /> : <ChevronRight size={16} className="text-neutral-400" />}
+          </button>
+        </div>
       </div>
       
       {isExpanded && (
