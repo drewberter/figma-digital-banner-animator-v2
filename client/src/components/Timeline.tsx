@@ -160,24 +160,13 @@ const Timeline = ({
   
   // Handle toggling layer visibility in the current frame
   const handleToggleLayerVisibility = (layerId: string) => {
-    console.log("Toggling visibility for layer", layerId, "in frame", localSelectedFrameId);
-    
-    // Find the current frame
-    const currentFrameIndex = Object.keys(mockLayers).findIndex(frameId => frameId === localSelectedFrameId);
-    if (currentFrameIndex === -1) return;
-    
-    const frame = mockLayers[localSelectedFrameId];
-    const layerIndex = frame.findIndex(l => l.id === layerId);
-    if (layerIndex === -1) return;
-    
-    // Toggle the layer's visibility
-    frame[layerIndex].visible = !frame[layerIndex].visible;
-    
-    // Update the layers for the current frame
-    mockLayers[localSelectedFrameId] = [...frame];
-    
-    // Force a re-render
-    forceUpdate();
+    // Use the handleToggleLayerVisibilityInFrame function with the current selected frame
+    if (localSelectedFrameId) {
+      console.log("Toggling visibility for layer", layerId, "in frame", localSelectedFrameId);
+      handleToggleLayerVisibilityInFrame(localSelectedFrameId, layerId);
+    } else {
+      console.error("No frame selected for layer visibility toggle");
+    }
   };
 
   // Handle toggling layer visibility in a specific frame
@@ -1289,7 +1278,10 @@ const Timeline = ({
                       title={layer.visible ? 'Layer is visible (click to hide)' : 'Layer is hidden (click to show)'}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleToggleLayerVisibility(layer.id);
+                        // Since we're in the timeline, we need to toggle visibility in the currently selected frame
+                        if (localSelectedFrameId) {
+                          handleToggleLayerVisibility(layer.id);
+                        }
                       }}
                     >
                       {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -1316,7 +1308,10 @@ const Timeline = ({
                     className={`p-1 rounded ${layer.visible ? 'text-green-400 hover:bg-neutral-700' : 'text-neutral-500 hover:bg-neutral-700'}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleToggleLayerVisibility(layer.id);
+                      // Since we're in the timeline, we need to toggle visibility in the currently selected frame
+                      if (localSelectedFrameId) {
+                          handleToggleLayerVisibility(layer.id);
+                      }
                     }}
                     title={layer.visible ? 'Hide layer' : 'Show layer'}
                   >
