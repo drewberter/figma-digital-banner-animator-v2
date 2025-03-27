@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { AnimationLayer, Animation, LinkSyncMode, LinkedLayerInfo, AnimationFrame, GifFrame } from '../types/animation';
-import { syncDebug, syncError, syncInfo, syncWarn, syncSuccess, logLayerMatch, logFrameSyncState, logOverrideBlocked } from './syncLogger';
+import { syncDebug, syncError, syncInfo, syncWarn, syncSuccess, logLayerMatch, logFrameSyncState, logOverrideBlocked, logSyncIssue } from './syncLogger';
 
 /**
  * Extracts information from a GIF frame ID
@@ -88,6 +88,39 @@ export function translateLayerId(
     syncDebug(`No layer name or layer data available, falling back to ID-based translation`);
   }
   
+  // STRATEGY 2a: Try to find the layer by role-based nomenclature (Background, Headline, etc.)
+  if (allLayers && allLayers[sourceAdSizeId] && allLayers[targetAdSizeId]) {
+    const sourceLayer = allLayers[sourceAdSizeId].find(layer => layer.id === layerId);
+    if (sourceLayer) {
+      // Try to find the layer by its relative position in the layer stack
+      const sourceLayerIndex = allLayers[sourceAdSizeId].findIndex(l => l.id === layerId);
+      
+      // If we found this layer's index and the target ad size has enough layers
+      if (sourceLayerIndex !== -1 && sourceLayerIndex < allLayers[targetAdSizeId].length) {
+        // Try to match by index first if the layers are in the same order
+        const targetLayerByIndex = allLayers[targetAdSizeId][sourceLayerIndex];
+        syncDebug(`Found potential match by position: ${targetLayerByIndex.id} (${targetLayerByIndex.name})`);
+        
+        // Extra sanity check - if names are available, verify they're similar (basic role check)
+        if (sourceLayer.name && targetLayerByIndex.name) {
+          const sourceRole = sourceLayer.name.split(' ')[0].toLowerCase(); // e.g., "Background" from "Background Layer"
+          const targetRole = targetLayerByIndex.name.split(' ')[0].toLowerCase();
+          
+          if (sourceRole === targetRole) {
+            syncSuccess(`Matched layer by position and role: ${sourceRole}`);
+            return targetLayerByIndex.id;
+          } else {
+            syncWarn(`Position match failed role check: ${sourceRole} vs ${targetRole}`);
+          }
+        } else {
+          // If no names to compare, just use position
+          syncDebug(`Using position-based match: ${targetLayerByIndex.id}`);
+          return targetLayerByIndex.id;
+        }
+      }
+    }
+  }
+  
   // Parse layer ID - for our specific format "layer-X-Y"
   const layerIdParts = layerId.split('-');
   
@@ -110,7 +143,7 @@ export function translateLayerId(
     return layerId; // Return original as fallback
   }
   
-  // STRATEGY 2: Match by position in the layers array
+  // STRATEGY 3: Match by position in the layers array
   // For our specific format "layer-X-Y", we can substitute X with the target frame number
   const targetLayerId = `layer-${targetFrameNumber}-${layerPosition}`;
   
@@ -121,8 +154,8 @@ export function translateLayerId(
     // Check if the target layer exists
     const targetLayerExists = allLayers[targetAdSizeId].some(layer => layer.id === targetLayerId);
     if (!targetLayerExists) {
-      syncWarn(`Generated target layer ID ${targetLayerId} does not exist in target ad size ${targetAdSizeId}`);
-      // We'll still return it as it follows the pattern
+      syncWarn(`Generated target layer ID ${targetLayerId} does not exist in target ad size ${targetAdSizeId} - SYNC MAY FAIL`);
+      // We'll still return it as it follows the pattern, but give a stronger warning
     } else {
       syncSuccess(`Verified that layer ${targetLayerId} exists in target ad size ${targetAdSizeId}`);
     }
@@ -624,34 +657,69 @@ export function syncGifFramesByNumber(
     - Layer ID: ${layerId}`);
     
     // Check if the layer is hidden in the source frame
-    const isHiddenInSource = sourceFrame.hiddenLayers && sourceFrame.hiddenLayers.includes(layerId);
+    if (!sourceFrame.hiddenLayers) {
+      sourceFrame.hiddenLayers = []; // Initialize if not exists
+      syncDebug(`Initialized empty hiddenLayers array for source frame: ${sourceFrameId}`);
+    }
+    
+    const isHiddenInSource = sourceFrame.hiddenLayers.includes(layerId);
     syncDebug(`Source layer ${layerId} visibility status: ${isHiddenInSource ? 'hidden' : 'visible'}`);
     
     // Find the source layer name if we have all layers data
     let sourceLayerName: string | undefined;
+    let sourceRole: string | undefined;
+    let sourceIndex: number = -1;
+    
     if (allLayers && allLayers[sourceAdSize]) {
-      const sourceLayer = allLayers[sourceAdSize].find(layer => layer.id === layerId);
+      const sourceLayers = allLayers[sourceAdSize];
+      const sourceLayer = sourceLayers.find(layer => layer.id === layerId);
+      sourceIndex = sourceLayers.findIndex(layer => layer.id === layerId);
+      
       if (sourceLayer) {
         sourceLayerName = sourceLayer.name;
-        syncDebug(`Found source layer name: "${sourceLayerName}"`);
+        if (sourceLayerName) {
+          sourceRole = sourceLayerName.split(' ')[0].toLowerCase(); // e.g., "background" from "Background Layer"
+        }
+        
+        syncDebug(`Found source layer details:
+        - Name: "${sourceLayerName}"
+        - Role: "${sourceRole}"
+        - Index in layer stack: ${sourceIndex}
+        - Total layers in source ad size: ${sourceLayers.length}`);
       } else {
-        syncWarn(`Could not find source layer ${layerId} in ad size ${sourceAdSize}`);
+        syncWarn(`Could not find source layer ${layerId} in ad size ${sourceAdSize} - SYNC WILL LIKELY FAIL`);
       }
     } else {
-      syncWarn(`Missing layer data for ad size ${sourceAdSize} - Cannot perform name-based syncing`);
+      syncWarn(`Missing layer data for ad size ${sourceAdSize} - Cannot perform advanced layer matching`);
     }
     
     // Find all frames with the same frame number across all ad sizes
     const matchingFrames = findFramesWithSameNumber(updatedGifFrames, frameNumber);
     
     if (matchingFrames.length === 0) {
-      syncWarn(`No matching frames found with frame number ${frameNumber}`);
+      syncWarn(`No matching frames found with frame number ${frameNumber} - SYNC BLOCKED`);
       return gifFrames;
     }
     
-    syncDebug(`Found ${matchingFrames.length} frames with frame number ${frameNumber}`);
+    syncDebug(`Found ${matchingFrames.length} frames with number ${frameNumber} for syncing`);
+    
+    // ---- SYNC DIAGNOSTICS ----
+    // Map out all ad sizes and their frames to help with debugging
+    const adSizesInSync = new Set<string>();
+    matchingFrames.forEach(frame => {
+      const parsed = parseGifFrameId(frame.id);
+      if (parsed.isValid) {
+        adSizesInSync.add(parsed.adSizeId);
+      }
+    });
+    
+    syncDebug(`Ad sizes involved in this sync operation: ${Array.from(adSizesInSync).join(', ')}`);
+    // -------------------------
     
     // Process each matching frame
+    let syncSuccessCount = 0;
+    let syncFailCount = 0;
+    
     matchingFrames.forEach(frame => {
       // Skip the source frame itself
       if (frame.id === sourceFrameId) {
@@ -661,37 +729,108 @@ export function syncGifFramesByNumber(
       // Get the target frame's ad size
       const parsedTargetId = parseGifFrameId(frame.id);
       if (!parsedTargetId.isValid) {
-        syncWarn(`Could not parse target frame ID: ${frame.id}, skipping sync`);
+        logSyncIssue(
+          sourceFrameId,
+          frame.id,
+          layerId,
+          sourceLayerName || '[unknown]',
+          'unknown',
+          `Invalid target frame ID format: ${frame.id}`,
+          'frame ID parsing'
+        );
+        syncFailCount++;
         return;
       }
       
       const targetAdSize = frame.adSizeId || parsedTargetId.adSizeId;
       syncDebug(`Processing target frame: ${frame.id} (Ad size: ${targetAdSize})`);
       
-      // Only proceed if we have layer data for name matching
-      if (!allLayers || !allLayers[targetAdSize] || !sourceLayerName) {
-        syncWarn(`Missing layer data for target ad size ${targetAdSize} or source layer name, skipping sync`);
-        return;
-      }
-      
-      // Find the equivalent layer in the target frame by name
-      const targetLayer = allLayers[targetAdSize].find(layer => layer.name === sourceLayerName);
-      if (!targetLayer) {
-        syncWarn(`No matching layer found with name "${sourceLayerName}" in ad size ${targetAdSize}`);
-        return;
-      }
-      
-      syncInfo(`Found matching layer in target ad size: ${targetLayer.id} (${targetLayer.name})`);
-      
       // Initialize hiddenLayers array if it doesn't exist
       if (!frame.hiddenLayers) {
         frame.hiddenLayers = [];
+        syncDebug(`Initialized empty hiddenLayers array for target frame: ${frame.id}`);
       }
+      
+      // ---- ADVANCED LAYER MATCHING LOGIC ----
+      let targetLayer: AnimationLayer | undefined;
+      let matchMethod = "none";
+      
+      // STRATEGY 1: Match by layer name (most reliable)
+      if (allLayers && allLayers[targetAdSize] && sourceLayerName) {
+        targetLayer = allLayers[targetAdSize].find(layer => layer.name === sourceLayerName);
+        if (targetLayer) {
+          syncDebug(`Found layer match by name: "${sourceLayerName}" → ${targetLayer.id}`);
+          matchMethod = "name";
+        }
+      }
+      
+      // STRATEGY 2: Match by role (word in name) if available
+      if (!targetLayer && allLayers && allLayers[targetAdSize] && sourceRole) {
+        targetLayer = allLayers[targetAdSize].find(layer => {
+          const targetRole = layer.name?.split(' ')[0].toLowerCase();
+          return targetRole === sourceRole;
+        });
+        
+        if (targetLayer) {
+          syncDebug(`Found layer match by role: "${sourceRole}" → ${targetLayer.id}`);
+          matchMethod = "role";
+        }
+      }
+      
+      // STRATEGY 3: Match by position in layer stack
+      if (!targetLayer && allLayers && allLayers[targetAdSize] && sourceIndex !== -1) {
+        const targetLayers = allLayers[targetAdSize];
+        if (sourceIndex < targetLayers.length) {
+          targetLayer = targetLayers[sourceIndex];
+          syncDebug(`Found layer match by stack position: Index ${sourceIndex} → ${targetLayer.id}`);
+          matchMethod = "position";
+        }
+      }
+      
+      // STRATEGY 4: Try ID-based mapping as last resort
+      if (!targetLayer) {
+        const targetLayerId = translateLayerId(
+          layerId, 
+          sourceAdSize, 
+          targetAdSize,
+          sourceLayerName,
+          allLayers
+        );
+        
+        if (targetLayerId !== layerId) { // If translation succeeded
+          if (allLayers && allLayers[targetAdSize]) {
+            targetLayer = allLayers[targetAdSize].find(layer => layer.id === targetLayerId);
+            if (targetLayer) {
+              syncDebug(`Found layer match by ID translation: ${layerId} → ${targetLayerId}`);
+              matchMethod = "id-translation";
+            }
+          }
+        }
+      }
+      
+      // If we still couldn't find a target layer, log detailed info and skip
+      if (!targetLayer) {
+        // Use the specialized sync issue logging function
+        logSyncIssue(
+          sourceFrameId,
+          frame.id,
+          layerId,
+          sourceLayerName || '[unknown]',
+          targetAdSize,
+          'Failed to find matching layer after trying all matching methods',
+          'name, role, position, and ID translation'
+        );
+        syncFailCount++;
+        return;
+      }
+      
+      syncInfo(`Found matching layer in target ad size: ${targetLayer.id} (${targetLayer.name}) using method: ${matchMethod}`);
       
       // Check if this layer has an override
       const layerHasOverride = frame.overrides?.layerVisibility?.[targetLayer.id];
       if (layerHasOverride) {
-        logOverrideBlocked(frame.id, targetLayer.id, targetLayer.name);
+        logOverrideBlocked(frame.id, targetLayer.id, targetLayer.name || '');
+        syncDebug(`Layer has override - keeping current visibility state`);
         return;
       }
       
@@ -702,11 +841,13 @@ export function syncGifFramesByNumber(
       if (isHiddenInSource && !isHiddenInTarget) {
         frame.hiddenLayers.push(targetLayer.id);
         wasUpdated = true;
-        syncDebug(`Hiding layer ${targetLayer.id} (${targetLayer.name}) in frame ${frame.id}`);
+        syncDebug(`Visibility change: Hiding layer ${targetLayer.id} (${targetLayer.name}) in frame ${frame.id}`);
       } else if (!isHiddenInSource && isHiddenInTarget) {
         frame.hiddenLayers = frame.hiddenLayers.filter(id => id !== targetLayer.id);
         wasUpdated = true;
-        syncDebug(`Showing layer ${targetLayer.id} (${targetLayer.name}) in frame ${frame.id}`);
+        syncDebug(`Visibility change: Showing layer ${targetLayer.id} (${targetLayer.name}) in frame ${frame.id}`);
+      } else {
+        syncDebug(`No visibility change needed - layer visibility already matches source`);
       }
       
       // Log the sync result
@@ -715,58 +856,22 @@ export function syncGifFramesByNumber(
         frame.id,
         layerId,
         targetLayer.id,
+        sourceLayerName || '',
+        targetLayer.name || '',
         isHiddenInSource,
         isHiddenInTarget,
         wasUpdated
       );
       
-      // Translate the source layer ID to the target ad size
-      // Use the enhanced version with name-based lookup if available
-      const targetLayerId = translateLayerId(
-        layerId, 
-        sourceAdSize, 
-        targetAdSize,
-        sourceLayerName,
-        allLayers
-      );
-      
-      // Secondary check using the translated ID (for redundancy)
-      // Check if this layer has an override in this frame
-      // Override format: frame.overrides.layerVisibility[layerId].overridden
-      const targetLayerHasOverride = frame.overrides?.layerVisibility?.[targetLayerId]?.overridden || false;
-      
-      // Only sync if there's no override
-      if (!targetLayerHasOverride) {
-        // Ensure hiddenLayers array is initialized
-        if (!frame.hiddenLayers) {
-          frame.hiddenLayers = [];
-        }
-        
-        // Get current visibility state
-        const isCurrentlyHidden = frame.hiddenLayers.includes(targetLayerId);
-        syncDebug(`Layer ${targetLayerId} in frame ${frame.id} is currently ${isCurrentlyHidden ? 'hidden' : 'visible'}`);
-        
-        if (isHiddenInSource && !isCurrentlyHidden) {
-          // Source is hidden but target is visible - hide the target layer
-          frame.hiddenLayers.push(targetLayerId);
-          syncDebug(`Added layer ${targetLayerId} to hidden layers in frame ${frame.id}`);
-        } else if (!isHiddenInSource && isCurrentlyHidden) {
-          // Source is visible but target is hidden - show the target layer
-          frame.hiddenLayers = frame.hiddenLayers.filter(id => id !== targetLayerId);
-          syncDebug(`Removed layer ${targetLayerId} from hidden layers in frame ${frame.id}`);
-        }
-        
-        // Update the visibleLayerCount if present
-        if (typeof frame.visibleLayerCount === 'number') {
-          const totalLayers = 5; // Default number of layers
-          frame.visibleLayerCount = totalLayers - frame.hiddenLayers.length;
-        }
-      } else {
-        syncWarn(`Layer ${targetLayerId} has an override in frame ${frame.id} - not syncing`);
+      // Also update visibleLayerCount if needed
+      if (wasUpdated) {
+        const totalLayers = allLayers && allLayers[targetAdSize] ? allLayers[targetAdSize].length : 0;
+        frame.visibleLayerCount = totalLayers - frame.hiddenLayers.length;
+        syncSuccessCount++;
       }
     });
     
-    syncSuccess(`Successfully synced layer visibility across ${matchingFrames.length} frames`);
+    syncInfo(`Layer sync complete - Success: ${syncSuccessCount}, Failed: ${syncFailCount}`);
     return updatedGifFrames;
   } catch (error) {
     syncError(`Error in syncGifFramesByNumber: ${error}`);

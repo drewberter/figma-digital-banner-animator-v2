@@ -1,0 +1,300 @@
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 1 of ad size frame-1
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-1-2 with 5 parts: gif, frame, frame, 1, 2
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-1, frameNumber: 2
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 2 of ad size frame-1
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-1-3 with 5 parts: gif, frame, frame, 1, 3
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-1, frameNumber: 3
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 3 of ad size frame-1
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-1-4 with 5 parts: gif, frame, frame, 1, 4
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-1, frameNumber: 4
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 4 of ad size frame-1
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-1 with 5 parts: gif, frame, frame, 2, 1
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 1
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 1 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-2 with 5 parts: gif, frame, frame, 2, 2
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 2
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 2 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-3 with 5 parts: gif, frame, frame, 2, 3
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 3
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 3 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-1 with 5 parts: gif, frame, frame, 2, 1
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 1
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 1 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-2 with 5 parts: gif, frame, frame, 2, 2
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 2
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 2 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-3 with 5 parts: gif, frame, frame, 2, 3
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 3
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 3 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-1 with 5 parts: gif, frame, frame, 2, 1
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 1
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 1 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-2 with 5 parts: gif, frame, frame, 2, 2
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 2
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 2 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-3 with 5 parts: gif, frame, frame, 2, 3
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 3
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 3 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-1 with 5 parts: gif, frame, frame, 2, 1
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 1
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 1 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-2 with 5 parts: gif, frame, frame, 2, 2
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 2
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 2 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-3 with 5 parts: gif, frame, frame, 2, 3
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 3
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 3 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-1 with 5 parts: gif, frame, frame, 2, 1
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 1
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 1 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-2 with 5 parts: gif, frame, frame, 2, 2
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 2
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 2 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-3 with 5 parts: gif, frame, frame, 2, 3
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 3
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 3 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-1 with 5 parts: gif, frame, frame, 2, 1
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 1
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 1 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-2 with 5 parts: gif, frame, frame, 2, 2
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 2
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 2 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-2-3 with 5 parts: gif, frame, frame, 2, 3
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-2, frameNumber: 3
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 3 of ad size frame-2
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-3-1 with 5 parts: gif, frame, frame, 3, 1
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-3, frameNumber: 1
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 1 of ad size frame-3
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-3-2 with 5 parts: gif, frame, frame, 3, 2
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-3, frameNumber: 2
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 2 of ad size frame-3
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-3-3 with 5 parts: gif, frame, frame, 3, 3
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-3, frameNumber: 3
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 3 of ad size frame-3
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-3-1 with 5 parts: gif, frame, frame, 3, 1
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-3, frameNumber: 1
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 1 of ad size frame-3
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-3-2 with 5 parts: gif, frame, frame, 3, 2
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-3, frameNumber: 2
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 2 of ad size frame-3
+[DEBUG]
+3:21:02 PM
+Parsing frame ID gif-frame-frame-3-3 with 5 parts: gif, frame, frame, 3, 3
+[DEBUG]
+3:21:02 PM
+Using new format - adSizeId: frame-3, frameNumber: 3
+[DEBUG]
+3:21:02 PM
+Frame ID parsed successfully: frame 3 of ad size frame-3
+[DEBUG]
+3:21:03 PM
+Parsing frame ID gif-frame-frame-3-1 with 5 parts: gif, frame, frame, 3, 1
+[DEBUG]
+3:21:03 PM
+Using new format - adSizeId: frame-3, frameNumber: 1
+[DEBUG]
+3:21:03 PM
+Frame ID parsed successfully: frame 1 of ad size frame-3
+[DEBUG]
+3:21:03 PM
+Parsing frame ID gif-frame-frame-3-2 with 5 parts: gif, frame, frame, 3, 2
+[DEBUG]
+3:21:03 PM
+Using new format - adSizeId: frame-3, frameNumber: 2
+[DEBUG]
+3:21:03 PM
+Frame ID parsed successfully: frame 2 of ad size frame-3
+[DEBUG]
+3:21:03 PM
+Parsing frame ID gif-frame-frame-3-3 with 5 parts: gif, frame, frame, 3, 3
+[DEBUG]
+3:21:03 PM
+Using new format - adSizeId: frame-3, frameNumber: 3
+[DEBUG]
+3:21:03 PM
+Frame ID parsed successfully: frame 3 of ad size frame-3
+[DEBUG]
+3:21:03 PM
+Parsing frame ID gif-frame-frame-3-1 with 5 parts: gif, frame, frame, 3, 1
+[DEBUG]
+3:21:03 PM
+Using new format - adSizeId: frame-3, frameNumber: 1
+[DEBUG]
+3:21:03 PM
+Frame ID parsed successfully: frame 1 of ad size frame-3
+[DEBUG]
+3:21:03 PM
+Parsing frame ID gif-frame-frame-3-2 with 5 parts: gif, frame, frame, 3, 2
+[DEBUG]
+3:21:03 PM
+Using new format - adSizeId: frame-3, frameNumber: 2
+[DEBUG]
+3:21:03 PM
+Frame ID parsed successfully: frame 2 of ad size frame-3
+[DEBUG]
+3:21:03 PM
+Parsing frame ID gif-frame-frame-3-3 with 5 parts: gif, frame, frame, 3, 3
+[DEBUG]
+3:21:03 PM
+Using new format - adSizeId: frame-3, frameNumber: 3
+[DEBUG]
+3:21:03 PM
+Frame ID parsed successfully: frame 3 of ad size frame-3

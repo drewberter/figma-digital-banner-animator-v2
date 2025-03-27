@@ -103,6 +103,8 @@ export function logFrameSyncState(
   targetFrameId: string,
   sourceLayerId: string, 
   targetLayerId: string,
+  sourceLayerName: string,
+  targetLayerName: string,
   sourceIsHidden: boolean,
   targetIsHidden: boolean,
   wasUpdated: boolean
@@ -110,12 +112,12 @@ export function logFrameSyncState(
   if (wasUpdated) {
     syncSuccess(
       `Synced layer visibility from ${sourceFrameId} to ${targetFrameId}:
-       Layer ${sourceLayerId} → ${targetLayerId}
+       Layer ${sourceLayerId} (${sourceLayerName}) → ${targetLayerId} (${targetLayerName})
        Visibility: ${sourceIsHidden ? 'hidden' : 'visible'} → ${targetIsHidden ? 'hidden' : 'visible'}`
     );
   } else {
     syncDebug(
-      `No visibility update needed for layer ${targetLayerId} in frame ${targetFrameId}`
+      `No visibility update needed for layer ${targetLayerId} (${targetLayerName}) in frame ${targetFrameId} - already matches source`
     );
   }
 }
@@ -129,6 +131,23 @@ export function logOverrideBlocked(
   syncWarn(
     `Layer "${layerName}" (${layerId}) in frame ${frameId} has an override and was not synced`
   );
+}
+
+// Log when a layer sync issue occurs due to layer matching problems
+export function logSyncIssue(
+  sourceFrameId: string, 
+  targetFrameId: string,
+  sourceLayerId: string,
+  sourceLayerName: string,
+  targetAdSize: string,
+  reason: string,
+  attemptedMethod?: string
+): void {
+  const methodInfo = attemptedMethod ? ` (attempted method: ${attemptedMethod})` : '';
+  syncWarn(`Unable to sync layer from ${sourceFrameId} to ${targetFrameId}:
+   Source layer: ${sourceLayerId} (${sourceLayerName})
+   Target ad size: ${targetAdSize}
+   Reason: ${reason}${methodInfo}`);
 }
 
 // Clear all logs
