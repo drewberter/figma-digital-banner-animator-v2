@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Eye, EyeOff } from 'lucide-react';
-import { AnimationFrame, AnimationLayer } from '../types/animation';
+import { X, Eye, EyeOff, Layers } from 'lucide-react';
+import { AnimationFrame, AnimationLayer, TimelineMode } from '../types/animation';
 
 interface FrameEditDialogProps {
   isOpen: boolean;
@@ -14,6 +14,7 @@ interface FrameEditDialogProps {
   frame?: AnimationFrame;
   isEditing: boolean;
   availableLayers?: AnimationLayer[]; // Pass layers from parent
+  timelineMode?: TimelineMode;
 }
 
 const FrameEditDialog = ({
@@ -22,7 +23,8 @@ const FrameEditDialog = ({
   onSave,
   frame,
   isEditing,
-  availableLayers = []
+  availableLayers = [],
+  timelineMode = TimelineMode.Animation
 }: FrameEditDialogProps) => {
   const [name, setName] = useState('');
   const [headlineText, setHeadlineText] = useState('');
@@ -69,8 +71,14 @@ const FrameEditDialog = ({
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
       <div className="bg-[#111111] rounded-lg w-[400px] max-h-[90vh] flex flex-col overflow-hidden">
         <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-white">
-            {isEditing ? 'Edit Frame Content' : 'Add New Frame Content'}
+          <h2 className="text-lg font-medium text-white flex items-center">
+            {timelineMode === TimelineMode.FrameStyle ? (
+              <Layers size={18} className="mr-2 text-neutral-400" />
+            ) : null}
+            {isEditing 
+              ? (timelineMode === TimelineMode.FrameStyle ? 'Edit Frame Layers' : 'Edit Frame Content')
+              : (timelineMode === TimelineMode.FrameStyle ? 'Add New Frame Layers' : 'Add New Frame Content')
+            }
           </h2>
           <button 
             className="w-8 h-8 flex items-center justify-center rounded hover:bg-neutral-800"
@@ -95,47 +103,62 @@ const FrameEditDialog = ({
             />
           </div>
           
-          <div>
-            <label htmlFor="headlineText" className="block text-sm text-neutral-300 mb-2">
-              Headline Text
-            </label>
-            <input
-              id="headlineText"
-              type="text"
-              value={headlineText}
-              onChange={(e) => setHeadlineText(e.target.value)}
-              placeholder="Enter headline text"
-              className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700 focus:border-[#4A7CFF] focus:outline-none"
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="description" className="block text-sm text-neutral-300 mb-2">
-              Description (Optional)
-            </label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter description text"
-              rows={3}
-              className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700 focus:border-[#4A7CFF] focus:outline-none resize-none"
-            />
-          </div>
+          {timelineMode === TimelineMode.Animation && (
+            <>
+              <div>
+                <label htmlFor="headlineText" className="block text-sm text-neutral-300 mb-2">
+                  Headline Text
+                </label>
+                <input
+                  id="headlineText"
+                  type="text"
+                  value={headlineText}
+                  onChange={(e) => setHeadlineText(e.target.value)}
+                  placeholder="Enter headline text"
+                  className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700 focus:border-[#4A7CFF] focus:outline-none"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="description" className="block text-sm text-neutral-300 mb-2">
+                  Description (Optional)
+                </label>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter description text"
+                  rows={3}
+                  className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700 focus:border-[#4A7CFF] focus:outline-none resize-none"
+                />
+              </div>
+            </>
+          )}
           
           {/* Layer Visibility Controls */}
           {availableLayers.length > 0 && (
-            <div>
-              <label className="block text-sm text-neutral-300 mb-2">
+            <div className={timelineMode === TimelineMode.FrameStyle ? "mt-3" : ""}>
+              <label className="block text-sm text-neutral-300 mb-2 flex items-center">
+                {timelineMode === TimelineMode.FrameStyle && <Eye size={16} className="mr-2 text-neutral-400" />}
                 Layer Visibility
               </label>
-              <div className="bg-[#191919] rounded border border-neutral-700 p-1 max-h-[150px] overflow-y-auto">
+              {timelineMode === TimelineMode.FrameStyle && (
+                <p className="text-xs text-neutral-500 mb-3">
+                  Select which layers should be visible in this frame. This helps you create variations without duplicating layers.
+                </p>
+              )}
+              <div className={`bg-[#191919] rounded border ${timelineMode === TimelineMode.FrameStyle ? "border-neutral-600" : "border-neutral-700"} p-1 ${timelineMode === TimelineMode.FrameStyle ? "max-h-[200px]" : "max-h-[150px]"} overflow-y-auto`}>
                 {availableLayers.map(layer => (
                   <div 
                     key={layer.id}
-                    className="flex items-center justify-between p-2 hover:bg-[#222] rounded"
+                    className={`flex items-center justify-between p-2 hover:bg-[#222] rounded ${timelineMode === TimelineMode.FrameStyle ? "mb-1" : ""}`}
                   >
-                    <div className="text-sm text-neutral-300">{layer.name}</div>
+                    <div className="text-sm text-neutral-300 flex items-center">
+                      {timelineMode === TimelineMode.FrameStyle && (
+                        <span className="w-2 h-2 rounded-full bg-neutral-500 mr-2 flex-shrink-0"></span>
+                      )}
+                      {layer.name}
+                    </div>
                     <button
                       type="button"
                       onClick={() => toggleLayerVisibility(layer.id)}
@@ -149,10 +172,19 @@ const FrameEditDialog = ({
                   <div className="p-2 text-sm text-neutral-500">No layers available</div>
                 )}
               </div>
-              <p className="text-xs text-neutral-500 mt-1">
+              <p className="text-xs text-neutral-500 mt-2 flex items-center">
                 {hiddenLayers.length > 0 
-                  ? `${hiddenLayers.length} layer${hiddenLayers.length > 1 ? 's' : ''} hidden in this frame` 
-                  : `All layers visible in this frame`}
+                  ? (
+                    <>
+                      <EyeOff size={14} className="mr-1.5 text-neutral-500" />
+                      {`${hiddenLayers.length} layer${hiddenLayers.length > 1 ? 's' : ''} hidden in this frame`}
+                    </>
+                  ) : (
+                    <>
+                      <Eye size={14} className="mr-1.5 text-neutral-400" />
+                      All layers visible in this frame
+                    </>
+                  )}
               </p>
             </div>
           )}
@@ -169,7 +201,10 @@ const FrameEditDialog = ({
               type="submit"
               className="px-4 py-2 rounded bg-[#4A7CFF] hover:bg-[#3A6CEE] text-white"
             >
-              {isEditing ? 'Update' : 'Add'} Frame
+              {isEditing 
+                ? (timelineMode === TimelineMode.FrameStyle ? 'Update Layer Visibility' : 'Update Frame')
+                : (timelineMode === TimelineMode.FrameStyle ? 'Create Frame with Layers' : 'Add Frame')
+              }
             </button>
           </div>
         </form>

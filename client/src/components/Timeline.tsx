@@ -21,6 +21,8 @@ interface TimelineProps {
   onDurationChange?: (duration: number) => void;
   onLinkLayers?: () => void;
   onUnlinkLayer?: (layerId: string) => void;
+  timelineMode?: TimelineMode;
+  onTimelineModeChange?: (mode: TimelineMode) => void;
 }
 
 const Timeline = ({
@@ -31,14 +33,20 @@ const Timeline = ({
   selectedFrameId = 'frame-1', // Default to frame-1 if no frame ID is provided
   onDurationChange,
   onLinkLayers,
-  onUnlinkLayer
+  onUnlinkLayer,
+  timelineMode = TimelineMode.Animation, // Default to Animation mode
+  onTimelineModeChange
 }: TimelineProps) => {
   // Create a forceUpdate function for timeline component
   const [, forceUpdate] = useReducer(x => x + 1, 0);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   
-  // Add state for timeline mode (Animation or Frame Style)
-  const [timelineMode, setTimelineMode] = useState<TimelineMode>(TimelineMode.Animation);
+  // Handle mode changes
+  const handleTimelineModeChange = (mode: TimelineMode) => {
+    if (onTimelineModeChange) {
+      onTimelineModeChange(mode);
+    }
+  };
   
   // Duration state
   const [duration, setDuration] = useState(5); // Default duration of 5 seconds

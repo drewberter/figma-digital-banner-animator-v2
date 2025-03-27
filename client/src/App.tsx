@@ -9,6 +9,7 @@ import PresetsPanel from "./components/PresetsPanel";
 import AutoSaveIndicator from "./components/AutoSaveIndicator";
 import { AnimationProvider, useAnimationContext } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
+import { TimelineMode } from "./types/animation";
 
 function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -17,6 +18,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timelineDuration, setTimelineDuration] = useState(5); // Default 5 seconds
+  const [timelineMode, setTimelineMode] = useState<TimelineMode>(TimelineMode.Animation);
   
   // Track auto-save state for notifications
   const [saving, setSaving] = useState(false);
@@ -82,6 +84,12 @@ function App() {
     console.log("App: Unlinking layer", layerId);
     // The actual unlinking is handled in the Timeline component
     // This function is just a callback to inform the App component
+  };
+  
+  // Handle timeline mode changes
+  const handleTimelineModeChange = (mode: TimelineMode) => {
+    console.log(`App: Switching to ${mode} mode`);
+    setTimelineMode(mode);
   };
   
   // Track animation frame ID in a ref so we can cancel it
@@ -179,6 +187,8 @@ function App() {
                 onDurationChange={setTimelineDuration}
                 onLinkLayers={handleLinkLayers}
                 onUnlinkLayer={handleUnlinkLayer}
+                timelineMode={timelineMode}
+                onTimelineModeChange={handleTimelineModeChange}
               />
             </div>
             

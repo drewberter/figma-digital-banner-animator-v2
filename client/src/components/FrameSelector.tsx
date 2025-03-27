@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { PlusCircle, Edit, Trash, Plus } from 'lucide-react';
-import { AnimationFrame, AnimationLayer } from '../types/animation';
+import { PlusCircle, Edit, Trash, Plus, Layers, Eye, EyeOff } from 'lucide-react';
+import { AnimationFrame, AnimationLayer, TimelineMode } from '../types/animation';
 import FrameEditDialog from './FrameEditDialog';
 
 interface FrameSelectorProps {
@@ -11,6 +11,7 @@ interface FrameSelectorProps {
   onFrameDelete: (frameId: string) => void;
   onFrameSelect: (frameId: string) => void;
   selectedFrameId: string | null;
+  timelineMode?: TimelineMode;
 }
 
 const FrameSelector = ({
@@ -20,7 +21,8 @@ const FrameSelector = ({
   onFrameEdit,
   onFrameDelete,
   onFrameSelect,
-  selectedFrameId
+  selectedFrameId,
+  timelineMode = TimelineMode.Animation
 }: FrameSelectorProps) => {
   const [isHovered, setIsHovered] = useState<string | null>(null);
   const [isAddingFrame, setIsAddingFrame] = useState(false);
@@ -98,9 +100,20 @@ const FrameSelector = ({
                 {frame.name}
               </div>
               
-              <div className="text-xs text-neutral-400 mt-1 truncate">
-                {frame.headlineText || 'No headline text'}
-              </div>
+              {timelineMode === TimelineMode.Animation ? (
+                <div className="text-xs text-neutral-400 mt-1 truncate">
+                  {frame.headlineText || 'No headline text'}
+                </div>
+              ) : (
+                <div className="flex items-center text-xs text-neutral-400 mt-1">
+                  <Layers size={12} className="mr-1" />
+                  {frame.hiddenLayers && frame.hiddenLayers.length > 0 ? (
+                    <span>{frame.hiddenLayers.length} hidden layer{frame.hiddenLayers.length !== 1 ? 's' : ''}</span>
+                  ) : (
+                    <span>All layers visible</span>
+                  )}
+                </div>
+              )}
               
               {/* Actions */}
               {(isHovered === frame.id || selectedFrameId === frame.id) && (
@@ -135,8 +148,17 @@ const FrameSelector = ({
           onClick={handleAddFrame}
         >
           <PlusCircle size={24} className="text-neutral-500 mb-2" />
-          <div className="text-sm text-neutral-400">Add content frames to create banner variations</div>
-          <div className="text-xs text-neutral-500 mt-1">Each frame can have different headline text</div>
+          {timelineMode === TimelineMode.Animation ? (
+            <>
+              <div className="text-sm text-neutral-400">Add content frames to create banner variations</div>
+              <div className="text-xs text-neutral-500 mt-1">Each frame can have different headline text</div>
+            </>
+          ) : (
+            <>
+              <div className="text-sm text-neutral-400">Add a new frame with custom layer visibility</div>
+              <div className="text-xs text-neutral-500 mt-1">Control which layers appear in each frame</div>
+            </>
+          )}
         </div>
       )}
     </div>
