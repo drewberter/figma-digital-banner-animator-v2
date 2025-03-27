@@ -71,6 +71,11 @@ const Timeline = ({
   const timelineRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   
+  // Update local selected frame ID when the prop changes
+  useEffect(() => {
+    setSelectedFrameId(selectedFrameId);
+  }, [selectedFrameId]);
+  
   // Auto link layers on component mount
   useEffect(() => {
     console.log("Auto-linking layers with the same name on load");
@@ -961,7 +966,7 @@ const Timeline = ({
                   acc[frameId] = {
                     id: frameId,
                     name: `Frame ${frameId.split('-')[1] || ''}`, // Extract frame number from ID
-                    selected: frameId === selectedFrameId,
+                    selected: frameId === localSelectedFrameId,
                     width: 300, // Default width
                     height: 250, // Default height
                     delay: 0 // Default delay
