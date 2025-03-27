@@ -42,16 +42,23 @@ const getLayersForFrame = (frameId: string, layersMap: Record<string, AnimationL
     
     // Apply the GIF frame's hidden layers to create new layer objects with correct visibility
     if (frame && frame.hiddenLayers) {
-      return parentLayers.map(layer => {
+      console.log("getLayersForFrame - GIF frame has hiddenLayers:", frame.hiddenLayers);
+      
+      const modifiedLayers = parentLayers.map(layer => {
         // Check if this layer is hidden in this GIF frame
         const isHidden = frame.hiddenLayers?.includes(layer.id);
         
         // Create a new layer object with the correct visibility
-        return {
+        const newLayer = {
           ...layer,
           visible: !isHidden
         };
+        
+        console.log("getLayersForFrame - Layer", layer.id, "original visibility:", layer.visible, "new visibility:", newLayer.visible);
+        return newLayer;
       });
+      
+      return modifiedLayers;
     }
     
     return parentLayers;
@@ -76,6 +83,8 @@ const FrameCardGrid = ({
   const frameEntries = Object.entries(frames).map(([id, frame]) => ({
     ...frame
   }));
+  
+  console.log("FrameCardGrid - Rendering with frames:", Object.keys(frames).length, "selected:", selectedFrameId);
 
   return (
     <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 overflow-y-auto max-h-[calc(100vh-180px)]">
@@ -279,7 +288,10 @@ const FrameCard = ({
                 <span className="text-xs text-neutral-300">{layer.name}</span>
                 <button
                   className={`p-1 rounded ${layer.visible ? 'text-green-400' : 'text-neutral-500'}`}
-                  onClick={() => onToggleLayerVisibility(layer.id)}
+                  onClick={() => {
+                    console.log("FrameCard - onClick toggle visibility for layer:", layer.id, "current visible state:", layer.visible);
+                    onToggleLayerVisibility(layer.id);
+                  }}
                   title={layer.visible ? 'Hide layer' : 'Show layer'}
                 >
                   {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
