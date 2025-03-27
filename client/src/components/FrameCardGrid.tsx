@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Eye, EyeOff, Copy, Trash2, Edit, Clock, Link } from 'lucide-react';
 import { AnimationFrame, AnimationLayer, GifFrame } from '../types/animation';
 import { v4 as uuidv4 } from 'uuid';
-import { syncGifFramesByNumber } from '../utils/linkingUtils';
+import { syncGifFramesByNumber, parseGifFrameId, translateLayerId, findFramesWithSameNumber } from '../utils/linkingUtils';
 
 interface FrameCardGridProps {
   frames: Record<string, AnimationFrame>;
@@ -23,20 +23,14 @@ const getLayersForFrame = (frameId: string, layersMap: Record<string, AnimationL
   
   // Check if this is a GIF frame
   if (frameId.startsWith('gif-frame-')) {
-    // Extract the parent ad size ID from the GIF frame ID
-    const parts = frameId.split('-');
-    let adSizeId = '';
-    
-    if (parts.length >= 4) {
-      if (parts[2] === 'frame') {
-        // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
-        adSizeId = `${parts[2]}-${parts[3]}`;
-      } else {
-        // Format is gif-frame-X-Y, determine if X is a frame number or part of the ad size ID
-        adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
-      }
+    // Use our parser to extract frame information
+    const parsedFrameId = parseGifFrameId(frameId);
+    if (!parsedFrameId.isValid) {
+      console.error("FrameCardGrid - Invalid GIF frame ID format:", frameId);
+      return [];
     }
     
+    const { adSizeId, frameNumber } = parsedFrameId;
     console.log("FrameCardGrid - Extracted adSizeId from GIF frame:", adSizeId);
     
     // Get the parent ad size's layers
@@ -50,10 +44,16 @@ const getLayersForFrame = (frameId: string, layersMap: Record<string, AnimationL
         // Check if this layer is hidden in this GIF frame
         const isHidden = frame.hiddenLayers?.includes(layer.id);
         
+        // We need to check if the frame is a GIF frame to access overrides
+        const gifFrame = frame as unknown as GifFrame;
+        const isOverridden = gifFrame.overrides?.layerVisibility?.[layer.id]?.overridden || false;
+        
         // Create a new layer object with the correct visibility
         const newLayer = {
           ...layer,
-          visible: !isHidden
+          visible: !isHidden,
+          // If we have override information in the frame, add it to the layer
+          isOverridden
         };
         
         console.log("getLayersForFrame - Layer", layer.id, "original visibility:", layer.visible, "new visibility:", newLayer.visible);
@@ -151,12 +151,12 @@ const FrameCard = ({
   const [showDelayInput, setShowDelayInput] = useState(false);
   const [delay, setDelay] = useState(frame.delay || 0);
 
-  // Extract frame number for GIF frames
+  // Extract frame number for GIF frames using our new parser
   const getFrameNumber = (frameId: string): string | null => {
     if (!frameId.startsWith('gif-frame-')) return null;
     
-    const parts = frameId.split('-');
-    return parts[parts.length - 1];
+    const parsedId = parseGifFrameId(frameId);
+    return parsedId.isValid ? parsedId.frameNumber : null;
   };
   
   // Extract and display frame number for UI
@@ -349,7 +349,12 @@ const FrameCard = ({
                         
                         // Add enhanced logging and explicit frame-number-based syncing
                         if (frame.id.startsWith('gif-frame-')) {
-                          console.log("FrameCard - This is a GIF frame, will need frame-number syncing");
+                          // Get frame information for improved syncing
+                          const parsedFrame = parseGifFrameId(frame.id);
+                          if (parsedFrame.isValid) {
+                            console.log(`FrameCard - This is GIF frame ${parsedFrame.frameNumber} for ad size ${parsedFrame.adSizeId}`);
+                          }
+                          
                           // Call the visibility toggle handler which will handle GIF frame syncing
                           onToggleLayerVisibility(layer.id);
                         } else {
