@@ -625,6 +625,36 @@ export function syncGifFramesByNumber(
       
       // Get the target frame's ad size
       const parsedTargetId = parseGifFrameId(frame.id);
+      if (!parsedTargetId.isValid) return;
+      
+      const targetAdSize = frame.adSizeId || parsedTargetId.adSizeId;
+      
+      // Only proceed if we have layer data for name matching
+      if (!allLayers || !allLayers[targetAdSize] || !sourceLayerName) return;
+      
+      // Find the equivalent layer in the target frame by name
+      const targetLayer = allLayers[targetAdSize].find(layer => layer.name === sourceLayerName);
+      if (!targetLayer) return;
+      
+      // Initialize hiddenLayers array if it doesn't exist
+      if (!frame.hiddenLayers) {
+        frame.hiddenLayers = [];
+      }
+      
+      // Check if this layer has an override
+      const hasOverride = frame.overrides?.layerVisibility?.[targetLayer.id];
+      if (hasOverride) {
+        console.log(`Layer ${targetLayer.id} has an override in frame ${frame.id}, skipping sync`);
+        return;
+      }
+      
+      // Sync visibility state
+      const isHiddenInTarget = frame.hiddenLayers.includes(targetLayer.id);
+      if (isHiddenInSource && !isHiddenInTarget) {
+        frame.hiddenLayers.push(targetLayer.id);
+      } else if (!isHiddenInSource && isHiddenInTarget) {
+        frame.hiddenLayers = frame.hiddenLayers.filter(id => id !== targetLayer.id);
+      }
       if (!parsedTargetId.isValid) {
         console.warn(`syncGifFramesByNumber - Could not parse target frame ID: ${frame.id}, skipping`);
         return;
