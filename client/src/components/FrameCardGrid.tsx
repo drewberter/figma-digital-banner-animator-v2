@@ -126,11 +126,11 @@ interface FrameCardProps {
   layers: AnimationLayer[];
   isSelected: boolean;
   onSelect: () => void;
-  onToggleLayerVisibility: (frameId: string, layerId: string) => void;
+  onToggleLayerVisibility: (layerId: string) => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onDelayChange?: (frameId: string, delay: number) => void;
-  onToggleLayerOverride?: (frameId: string, layerId: string) => void; // Add this to toggle the layer override status
+  onToggleLayerOverride?: (layerId: string) => void; // Add this to toggle the layer override status
 }
 
 const FrameCard = ({
@@ -356,12 +356,12 @@ const FrameCard = ({
                           }
                           
                           // Call the visibility toggle handler which will handle GIF frame syncing
-                          // IMPORTANT: We need to pass both frame.id and layer.id for proper syncing
+                          // IMPORTANT: We only need to pass layer.id as the parent component provides the frame.id
                           console.log(`FrameCard - Toggling visibility for layer ${layer.id} in frame ${frame.id}`);
-                          onToggleLayerVisibility(frame.id, layer.id);
+                          onToggleLayerVisibility(layer.id);
                         } else {
                           // Regular frame, just toggle visibility
-                          onToggleLayerVisibility(frame.id, layer.id);
+                          onToggleLayerVisibility(layer.id);
                         }
                       }}
                       title={layer.visible ? 'Hide layer' : 'Show layer'}
@@ -377,7 +377,7 @@ const FrameCard = ({
                           // Only if the callback is provided
                           if (onToggleLayerOverride) {
                             console.log("FrameCard - onClick toggle override for layer:", layer.id, "in frame:", frame.id);
-                            onToggleLayerOverride(frame.id, layer.id);
+                            onToggleLayerOverride(layer.id);
                           }
                         }}
                         title={isOverridden ? 'Remove override (use linked value)' : 'Add override (set independent value)'}
