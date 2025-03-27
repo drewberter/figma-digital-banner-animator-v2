@@ -29,6 +29,16 @@ const Timeline = ({
   // Get the layers for the current frame
   const frameLayers = mockLayers[selectedFrameId] || [];
   
+  // Force an update after the component mounts to ensure timeline renders correctly
+  useEffect(() => {
+    // Give the timeline a small delay to fully render
+    const timer = setTimeout(() => {
+      forceUpdate();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
   // Generate time markers (every 0.5 seconds)
   const timeMarkers = [];
   const interval = 0.5; // in seconds
@@ -41,7 +51,13 @@ const Timeline = ({
   
   // Convert a time value to a position in the timeline
   const timeToPosition = (time: number) => {
-    if (!timelineRef.current) return 0;
+    if (!timelineRef.current) {
+      // Use a fallback width calculation when the timeline isn't rendered yet
+      // This ensures animation blocks display with reasonable sizes on initial load
+      const fallbackWidth = 800 - 16; // Default width - playhead width
+      return (time / duration) * fallbackWidth;
+    }
+    
     const width = timelineRef.current.clientWidth - 16; // Account for playhead width
     return (time / duration) * width;
   };
@@ -277,6 +293,7 @@ const Timeline = ({
           {/* Timeline Track */}
           <div 
             className="flex-1 bg-neutral-900 rounded cursor-pointer relative"
+            style={{ minWidth: '800px' }} /* Ensure a minimum width for consistent scaling */
             onClick={handleTimelineClick}
             ref={timelineRef}
           >
