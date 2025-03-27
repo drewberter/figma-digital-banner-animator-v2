@@ -127,7 +127,11 @@ export const mockGifFrames: GifFrame[] = [
     adSizeId: 'frame-1',
     hiddenLayers: [],
     visibleLayerCount: 5,
-    frameIndex: 0
+    frameIndex: 0,
+    overrides: {
+      layerVisibility: {}
+    },
+    sourceOfTruth: true // First frame is the source of truth by default
   },
   {
     id: 'gif-frame-frame-1-2',
@@ -137,7 +141,15 @@ export const mockGifFrames: GifFrame[] = [
     adSizeId: 'frame-1', 
     hiddenLayers: ['layer-1-3'],
     visibleLayerCount: 4,
-    frameIndex: 1
+    frameIndex: 1,
+    overrides: {
+      layerVisibility: {
+        'layer-1-3': {
+          overridden: false,
+          hidden: true
+        }
+      }
+    }
   },
   {
     id: 'gif-frame-frame-1-3',
@@ -147,7 +159,19 @@ export const mockGifFrames: GifFrame[] = [
     adSizeId: 'frame-1',
     hiddenLayers: ['layer-1-3', 'layer-1-5'],
     visibleLayerCount: 3,
-    frameIndex: 2
+    frameIndex: 2,
+    overrides: {
+      layerVisibility: {
+        'layer-1-3': {
+          overridden: false,
+          hidden: true
+        },
+        'layer-1-5': {
+          overridden: false,
+          hidden: true
+        }
+      }
+    }
   }
 ];
 
@@ -185,7 +209,11 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
     adSizeId: adSizeId,
     hiddenLayers: [],
     visibleLayerCount: layers.length,
-    frameIndex: 0
+    frameIndex: 0,
+    overrides: {
+      layerVisibility: {}
+    },
+    sourceOfTruth: true // First frame is source of truth by default
   });
   
   // Find the third layer (usually the subhead) to hide in frame 2
@@ -200,7 +228,15 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
     adSizeId: adSizeId,
     hiddenLayers: thirdLayerId ? [thirdLayerId] : [],
     visibleLayerCount: thirdLayerId ? layers.length - 1 : layers.length,
-    frameIndex: 1
+    frameIndex: 1,
+    overrides: {
+      layerVisibility: thirdLayerId ? {
+        [thirdLayerId]: {
+          overridden: false,
+          hidden: true
+        }
+      } : {}
+    }
   });
   
   // Find the last layer (usually the logo) to hide in frame 3
@@ -218,7 +254,23 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
       ...(lastLayerId ? [lastLayerId] : [])
     ],
     visibleLayerCount: layers.length - (thirdLayerId ? 1 : 0) - (lastLayerId ? 1 : 0),
-    frameIndex: 2
+    frameIndex: 2,
+    overrides: {
+      layerVisibility: {
+        ...(thirdLayerId ? {
+          [thirdLayerId]: {
+            overridden: false,
+            hidden: true
+          }
+        } : {}),
+        ...(lastLayerId ? {
+          [lastLayerId]: {
+            overridden: false,
+            hidden: true
+          }
+        } : {})
+      }
+    }
   });
   
   // Add the new frames to mockGifFrames

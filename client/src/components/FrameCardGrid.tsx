@@ -13,6 +13,7 @@ interface FrameCardGridProps {
   onDuplicateFrame: (frameId: string) => void;
   onDeleteFrame: (frameId: string) => void;
   onDelayChange?: (frameId: string, delay: number) => void;
+  onToggleLayerOverride?: (frameId: string, layerId: string) => void; // Add this to handle layer override toggling
 }
 
 // Helper function to get layers for a frame (handles GIF frames by using parent ad size layers)
@@ -77,7 +78,8 @@ const FrameCardGrid = ({
   onAddFrame,
   onDuplicateFrame,
   onDeleteFrame,
-  onDelayChange
+  onDelayChange,
+  onToggleLayerOverride
 }: FrameCardGridProps) => {
   // Create an array of frame entries for easier mapping
   const frameEntries = Object.entries(frames).map(([id, frame]) => ({
@@ -100,6 +102,9 @@ const FrameCardGrid = ({
           onDuplicate={() => onDuplicateFrame(frame.id)}
           onDelete={() => onDeleteFrame(frame.id)}
           onDelayChange={onDelayChange}
+          onToggleLayerOverride={onToggleLayerOverride 
+            ? (layerId) => onToggleLayerOverride(frame.id, layerId) 
+            : undefined}
         />
       ))}
 
@@ -124,6 +129,7 @@ interface FrameCardProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onDelayChange?: (frameId: string, delay: number) => void;
+  onToggleLayerOverride?: (layerId: string) => void; // Add this to toggle the layer override status
 }
 
 const FrameCard = ({
@@ -134,7 +140,8 @@ const FrameCard = ({
   onToggleLayerVisibility,
   onDuplicate,
   onDelete,
-  onDelayChange
+  onDelayChange,
+  onToggleLayerOverride
 }: FrameCardProps) => {
   const [isLayerListOpen, setIsLayerListOpen] = useState(false);
   const [showDelayInput, setShowDelayInput] = useState(false);
@@ -280,24 +287,72 @@ const FrameCard = ({
         {/* Layer visibility list */}
         {isLayerListOpen && (
           <div className="mt-2 bg-neutral-800 rounded-md max-h-[150px] overflow-y-auto">
-            {layers.map(layer => (
-              <div 
-                key={layer.id}
-                className="flex items-center justify-between px-3 py-2 hover:bg-neutral-700"
-              >
-                <span className="text-xs text-neutral-300">{layer.name}</span>
-                <button
-                  className={`p-1 rounded ${layer.visible ? 'text-green-400' : 'text-neutral-500'}`}
-                  onClick={() => {
-                    console.log("FrameCard - onClick toggle visibility for layer:", layer.id, "current visible state:", layer.visible);
-                    onToggleLayerVisibility(layer.id);
-                  }}
-                  title={layer.visible ? 'Hide layer' : 'Show layer'}
+            {layers.map(layer => {
+              // For display purposes only: get override indicator
+              // In a full implementation, we would fetch this from the GifFrame's overrides property
+              const isOverridden = frame.id.startsWith('gif-frame-') && 
+                ((layer as any).isOverridden || false);
+
+              return (
+                <div 
+                  key={layer.id}
+                  className="flex items-center justify-between px-3 py-2 hover:bg-neutral-700"
                 >
-                  {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                </button>
-              </div>
-            ))}
+                  {/* Layer name with optional override indicator */}
+                  <div className="flex items-center">
+                    <span className="text-xs text-neutral-300">{layer.name}</span>
+                    {isOverridden && (
+                      <span className="ml-1.5 px-1 py-0.5 bg-orange-900 rounded-sm text-[10px] text-orange-300">
+                        Override
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Visibility toggle button */}
+                  <div className="flex items-center space-x-1">
+                    {/* Layer visibility toggle */}
+                    <button
+                      className={`p-1 rounded ${layer.visible ? 'text-green-400' : 'text-neutral-500'}`}
+                      onClick={() => {
+                        console.log("FrameCard - onClick toggle visibility for layer:", layer.id, "current visible state:", layer.visible);
+                        onToggleLayerVisibility(layer.id);
+                      }}
+                      title={layer.visible ? 'Hide layer' : 'Show layer'}
+                    >
+                      {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                    </button>
+                    
+                    {/* Only show the override button for gif frames */}
+                    {frame.id.startsWith('gif-frame-') && (
+                      <button
+                        className={`p-1 rounded ${isOverridden ? 'text-orange-400' : 'text-neutral-500'}`}
+                        onClick={() => {
+                          // Only if the callback is provided
+                          if (onToggleLayerOverride) {
+                            console.log("FrameCard - onClick toggle override for layer:", layer.id);
+                            onToggleLayerOverride(layer.id);
+                          }
+                        }}
+                        title={isOverridden ? 'Remove override (use linked value)' : 'Add override (set independent value)'}
+                      >
+                        {isOverridden ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M7 7L17 17M7 17L17 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

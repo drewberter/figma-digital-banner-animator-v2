@@ -233,7 +233,11 @@ const Timeline = ({
           adSizeId,
           hiddenLayers: [],
           visibleLayerCount: mockLayers[adSizeId]?.length || 0,
-          frameIndex: frameIndex - 1
+          frameIndex: frameIndex - 1,
+          overrides: {
+            layerVisibility: {}
+          },
+          sourceOfTruth: true // First frame is source of truth
         };
         
         // Add the new frame to the array
@@ -243,10 +247,21 @@ const Timeline = ({
       
       const gifFrame = mockGifFrames[gifFrameIndex];
       
-      // Update the hiddenLayers array in the GIF frame
-      const newHiddenLayers = [...gifFrame.hiddenLayers];
+      // Check if we already have an override for this layer
+      const isLayerOverridden = gifFrame.overrides?.layerVisibility?.[layerId]?.overridden || false;
+      const isLayerHidden = gifFrame.hiddenLayers.includes(layerId);
       
-      if (newHiddenLayers.includes(layerId)) {
+      // Create new copies of the data structures (for reactivity)
+      const newHiddenLayers = [...gifFrame.hiddenLayers];
+      const newOverrides = { 
+        ...gifFrame.overrides,
+        layerVisibility: {
+          ...gifFrame.overrides.layerVisibility
+        }
+      };
+      
+      // Toggle the layer visibility
+      if (isLayerHidden) {
         // Make the layer visible by removing it from hiddenLayers
         const index = newHiddenLayers.indexOf(layerId);
         newHiddenLayers.splice(index, 1);
@@ -255,15 +270,30 @@ const Timeline = ({
         newHiddenLayers.push(layerId);
       }
       
-      // Create a new GIF frame object with updated hiddenLayers to ensure reactivity
+      // Update the override status
+      newOverrides.layerVisibility[layerId] = {
+        overridden: isLayerOverridden, // Keep the current override status
+        hidden: !isLayerHidden         // Toggle the hidden status
+      };
+      
+      // Create a new GIF frame object with updated properties to ensure reactivity
       const updatedGifFrame = {
         ...gifFrame,
-        hiddenLayers: newHiddenLayers
+        hiddenLayers: newHiddenLayers,
+        overrides: newOverrides
       };
       
       // Update the visibleLayerCount
       const totalLayers = mockLayers[adSizeId]?.length || 0;
       updatedGifFrame.visibleLayerCount = totalLayers - updatedGifFrame.hiddenLayers.length;
+      
+      console.log(`Layer ${layerId} is now ${isLayerHidden ? 'visible' : 'hidden'} with override: ${isLayerOverridden}`);
+      
+      // If this frame is the source of truth and the layer is not overridden,
+      // we would propagate changes to other ad sizes, but for now we'll just log this
+      if (gifFrame.sourceOfTruth && !isLayerOverridden) {
+        console.log("This frame is source of truth - changes would be propagated to linked frames");
+      }
       
       // Replace the frame in the array
       mockGifFrames[gifFrameIndex] = updatedGifFrame;
@@ -788,7 +818,11 @@ const Timeline = ({
         adSizeId: selectedAdSizeId,
         hiddenLayers: [], // All layers visible by default
         visibleLayerCount: layers.length,
-        frameIndex: currentGifFrames.length
+        frameIndex: currentGifFrames.length,
+        overrides: {
+          layerVisibility: {} // No overrides initially
+        },
+        sourceOfTruth: currentGifFrames.length === 0 // First frame is source of truth
       };
       
       console.log("Created new GIF frame:", newGifFrame);
@@ -874,13 +908,22 @@ const Timeline = ({
       
       console.log("Creating new GIF frame with ID:", newGifFrameId);
       
-      // Clone the source GIF frame
+      // Deep clone the source GIF frame
+      const sourceClone = JSON.parse(JSON.stringify(sourceGifFrame));
+      
+      // Create the new frame with all properties properly set
       const newGifFrame: GifFrame = {
-        ...JSON.parse(JSON.stringify(sourceGifFrame)), // Deep clone
+        ...sourceClone, 
         id: newGifFrameId,
         name: `GIF Frame ${newGifFrameNumber}`,
         selected: false,
-        frameIndex: existingGifFrames.length
+        frameIndex: existingGifFrames.length,
+        // Ensure overrides are properly included (though they should be in the deep clone)
+        overrides: sourceClone.overrides || {
+          layerVisibility: {}
+        },
+        // Never set the duplicate as the source of truth
+        sourceOfTruth: false
       };
       
       // Add the new GIF frame to mockGifFrames

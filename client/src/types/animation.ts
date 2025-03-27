@@ -113,6 +113,15 @@ export interface GifFrame {
   hiddenLayers: string[]; // IDs of layers that should be hidden in this frame
   visibleLayerCount?: number; // Count of visible layers (for UI display)
   frameIndex?: number; // Optional index to track frame sequence
+  overrides: {
+    layerVisibility: {
+      [layerId: string]: {
+        overridden: boolean; // true = this layer's visibility is overridden
+        hidden: boolean;    // true = this layer is hidden when override is active
+      }
+    }
+  };
+  sourceOfTruth?: boolean; // If true, this GIF frame is the source of truth for its frame sequence position
 }
 
 export interface Preset {

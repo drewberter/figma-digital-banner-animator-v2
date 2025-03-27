@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { Animation, AnimationLayer, AnimationFrame, Keyframe, LinkSyncMode, AdSize } from '../types/animation';
+import { Animation, AnimationLayer, AnimationFrame, Keyframe, LinkSyncMode, AdSize, GifFrame } from '../types/animation';
 import { useAutoSave, loadSavedData } from '../hooks/useAutoSave';
 import { v4 as uuidv4 } from 'uuid';
 import { 
@@ -9,6 +9,7 @@ import {
   unlinkLayer as unlinkLayerUtil,
   setSyncMode as setSyncModeUtil 
 } from '../utils/linkingUtils';
+import { mockLayers, mockGifFrames, mockFrames } from '../mock/animationData';
 
 // Define the context type
 interface AnimationContextType {
@@ -35,6 +36,7 @@ interface AnimationContextType {
   removeLayer: (layerId: string) => void;
   updateLayer: (layerId: string, updates: Partial<AnimationLayer>) => void;
   toggleLayerVisibility: (frameId: string, layerId: string) => void;
+  toggleLayerOverride: (frameId: string, layerId: string) => void; // Add override control for granular layer visibility
   toggleLayerLock: (layerId: string) => void;
   
   // Frames
@@ -86,7 +88,6 @@ const defaultLayer: AnimationLayer = {
 };
 
 // Import mock data
-import { mockFrames, mockLayers } from '../mock/animationData';
 
 // Storage keys
 const STORAGE_KEY = 'figma-animation-plugin';
@@ -250,9 +251,8 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       
       console.log("AnimationContext - For GIF frame:", frameId, "using parent ad size:", adSizeId);
       
-      // For GIF frames, we update the hiddenLayers array instead of modifying the parent layer's visibility
-      // Find the GIF frame in mockGifFrames
-      const gifFrameIndex = mockGifFrames.findIndex(f => f.id === frameId);
+      // Find the GIF frame index
+      const gifFrameIndex = mockGifFrames.findIndex((f: GifFrame) => f.id === frameId);
       if (gifFrameIndex !== -1) {
         // Create a copy of the frame
         const updatedGifFrame = { ...mockGifFrames[gifFrameIndex] };
@@ -271,7 +271,7 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
         const totalLayers = mockLayers[adSizeId]?.length || 0;
         updatedGifFrame.visibleLayerCount = totalLayers - updatedGifFrame.hiddenLayers.length;
         
-        // Replace the frame in the array
+        // Replace the frame in the array (this modifies the mock data directly)
         mockGifFrames[gifFrameIndex] = updatedGifFrame;
         
         console.log("Updated GIF frame:", updatedGifFrame);
@@ -303,6 +303,98 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
         
         return updatedFramesLayers;
       });
+    }
+  }, []);
+
+  // Toggle layer override status (to control whether a layer should use independent visibility settings)
+  const toggleLayerOverride = useCallback((frameId: string, layerId: string) => {
+    // This function only applies to GIF frames
+    if (!frameId.startsWith('gif-frame-')) {
+      console.log("toggleLayerOverride only applies to GIF frames");
+      return;
+    }
+
+    // Extract the parent ad size ID from the GIF frame ID
+    const parts = frameId.split('-');
+    let adSizeId = 'frame-1'; // Default fallback
+    
+    if (parts.length >= 4) {
+      if (parts[2] === 'frame') {
+        // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
+        adSizeId = `${parts[2]}-${parts[3]}`;
+      } else {
+        // Format is gif-frame-X-Y, determine if X is a frame number or part of the ad size ID
+        adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+      }
+    }
+    
+    console.log("AnimationContext - toggleLayerOverride for GIF frame:", frameId, "layer:", layerId);
+    
+    // Find the GIF frame index
+    const gifFrameIndex = mockGifFrames.findIndex((f: GifFrame) => f.id === frameId);
+    if (gifFrameIndex !== -1) {
+      // Create a copy of the frame
+      const updatedGifFrame = { ...mockGifFrames[gifFrameIndex] };
+      
+      // Initialize overrides.layerVisibility object if not present
+      if (!updatedGifFrame.overrides) {
+        updatedGifFrame.overrides = { layerVisibility: {} };
+      }
+      if (!updatedGifFrame.overrides.layerVisibility) {
+        updatedGifFrame.overrides.layerVisibility = {};
+      }
+      
+      // Get current visibility state
+      const isHidden = updatedGifFrame.hiddenLayers.includes(layerId);
+      
+      // Toggle override status for this layer
+      if (updatedGifFrame.overrides.layerVisibility[layerId]) {
+        // Layer already has an override - toggle it off
+        const currentOverride = updatedGifFrame.overrides.layerVisibility[layerId];
+        currentOverride.overridden = !currentOverride.overridden;
+        
+        // If we're turning off override, update the hidden state from the parent layer
+        if (!currentOverride.overridden) {
+          // Get parent layer visibility
+          const parentLayers = mockLayers[adSizeId] || [];
+          const parentLayer = parentLayers.find(layer => layer.id === layerId);
+          
+          if (parentLayer) {
+            // If parent layer is visible, remove from hiddenLayers
+            // If parent layer is hidden, add to hiddenLayers
+            if (parentLayer.visible && isHidden) {
+              // Make visible
+              updatedGifFrame.hiddenLayers = updatedGifFrame.hiddenLayers.filter(id => id !== layerId);
+            } else if (!parentLayer.visible && !isHidden) {
+              // Make hidden
+              updatedGifFrame.hiddenLayers = [...updatedGifFrame.hiddenLayers, layerId];
+            }
+          }
+        }
+      } else {
+        // Layer doesn't have an override yet - create one
+        updatedGifFrame.overrides.layerVisibility[layerId] = {
+          overridden: true,
+          hidden: isHidden
+        };
+      }
+      
+      // Mark all affected layers as having override changes
+      setLayers(prev => 
+        prev.map(layer => {
+          if (layer.id === layerId) {
+            // For temporary UI feedback
+            return { ...layer, isOverridden: updatedGifFrame.overrides.layerVisibility[layerId]?.overridden || false };
+          }
+          return layer;
+        })
+      );
+      
+      // Update the GIF frame (this modifies the mock data directly)
+      mockGifFrames[gifFrameIndex] = updatedGifFrame;
+      console.log("Updated GIF frame with layer override:", updatedGifFrame);
+    } else {
+      console.error("GIF frame not found:", frameId);
     }
   }, []);
 
@@ -795,6 +887,7 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
     removeLayer,
     updateLayer,
     toggleLayerVisibility,
+    toggleLayerOverride,
     toggleLayerLock,
     
     // Frame methods
