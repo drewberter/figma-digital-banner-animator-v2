@@ -25,7 +25,30 @@ const PreviewCanvas = ({
   });
   
   // Find the selected frame or default to the first one
-  const selectedFrame = mockFrames.find(frame => frame.id === selectedFrameId) || mockFrames[0];
+  // If it's a GIF frame ID, we need to extract the parent ad size and use that
+  const isGifFrame = selectedFrameId && selectedFrameId.startsWith('gif-frame-');
+  
+  // Extract ad size ID from GIF frame if needed
+  let effectiveFrameId = selectedFrameId;
+  if (isGifFrame) {
+    const parts = selectedFrameId.split('-');
+    if (parts.length >= 4) {
+      if (parts[2] === 'frame') {
+        // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
+        effectiveFrameId = `${parts[2]}-${parts[3]}`;
+      } else {
+        // Format is gif-frame-X-Y, determine if X is a frame number or part of the ad size ID
+        effectiveFrameId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+      }
+    } else if (parts.length === 4) {
+      // Old format: gif-frame-1-1
+      effectiveFrameId = `frame-${parts[2]}`;
+    }
+    console.log("PreviewCanvas: For GIF frame", selectedFrameId, "using parent ad size:", effectiveFrameId);
+  }
+  
+  // Now get the actual frame data from mockFrames using the effective ID
+  const selectedFrame = mockFrames.find(frame => frame.id === effectiveFrameId) || mockFrames[0];
   
   // Set up canvas dimensions based on selected frame
   const frameWidth = selectedFrame?.width || 300;
@@ -63,7 +86,8 @@ const PreviewCanvas = ({
   };
 
   // Get the animation data for the current frame
-  const frameLayers = mockLayers[selectedFrameId] || [];
+  // For GIF frames, we need to use the parent ad size's layers
+  const frameLayers = mockLayers[effectiveFrameId] || [];
   
   // Get the hidden layers for the current frame
   const hiddenLayerIds = selectedFrame.hiddenLayers || [];

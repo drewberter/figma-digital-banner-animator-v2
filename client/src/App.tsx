@@ -405,7 +405,24 @@ function App() {
             <LeftSidebar 
               onOpenPresets={handleOpenPresets} 
               onSelectFrame={handleFrameSelect}
-              selectedAdSizeId={selectedAdSizeId}
+              selectedAdSizeId={timelineMode === TimelineMode.Animation ? selectedAdSizeId : 
+                // In GIF Frames mode, extract the ad size ID from the selected GIF frame
+                (selectedGifFrameId && selectedGifFrameId.startsWith('gif-frame-') ? 
+                  (() => {
+                    const parts = selectedGifFrameId.split('-');
+                    if (parts.length >= 4) {
+                      if (parts[2] === 'frame') {
+                        return `${parts[2]}-${parts[3]}`;
+                      } else {
+                        return parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+                      }
+                    } else if (parts.length === 4) {
+                      return `frame-${parts[2]}`;
+                    }
+                    return selectedAdSizeId;
+                  })() 
+                : selectedAdSizeId)
+              }
             />
             
             <div className="flex-1 flex flex-col bg-neutral-900 overflow-auto">
