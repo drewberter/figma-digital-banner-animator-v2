@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { mockFrames, mockLayers } from '../mock/animationData';
 import { AnimationType, EasingType, AnimationMode } from '../types/animation';
 
@@ -11,11 +11,18 @@ const PreviewCanvas = ({
   selectedFrameId = 'frame-1',
   currentTime = 0
 }: PreviewCanvasProps) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLHeadingElement>(null);
   const subtitleRef = useRef<HTMLParagraphElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
+  
+  // State to track container dimensions
+  const [containerDimensions, setContainerDimensions] = useState({
+    width: 500,
+    height: 400
+  });
   
   // Find the selected frame or default to the first one
   const selectedFrame = mockFrames.find(frame => frame.id === selectedFrameId) || mockFrames[0];
@@ -221,6 +228,31 @@ const PreviewCanvas = ({
     }
   };
   
+  // Effect to handle resize events
+  useEffect(() => {
+    const updateContainerSize = () => {
+      if (containerRef.current) {
+        // Get the actual size of the container
+        const rect = containerRef.current.getBoundingClientRect();
+        setContainerDimensions({
+          width: rect.width || 500,
+          height: Math.max(rect.height, window.innerHeight * 0.6) || 400 // At least 60% of window height
+        });
+      }
+    };
+    
+    // Initial update
+    updateContainerSize();
+    
+    // Add event listener for window resize
+    window.addEventListener('resize', updateContainerSize);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('resize', updateContainerSize);
+    };
+  }, []);
+  
   // Update animations when currentTime changes
   useEffect(() => {
     // Process animations for each element
@@ -231,48 +263,75 @@ const PreviewCanvas = ({
     processAnimations(logoRef.current, logoLayer, '1', 'rotate(0deg)');
   }, [currentTime, selectedFrameId]);
 
+  // Calculate scaling factor to fit the frame within the preview area
+  const calculateScaleFactor = () => {
+    // Use container dimensions for more responsive scaling
+    const containerWidth = containerDimensions.width;
+    const containerHeight = containerDimensions.height;
+    
+    // Calculate scaling factors for both dimensions
+    const widthScale = containerWidth / frameWidth;
+    const heightScale = containerHeight / frameHeight;
+    
+    // Use the smaller scaling factor to ensure the frame fits within the preview area
+    // Apply a small buffer (0.95) to ensure there's some margin
+    return Math.min(widthScale, heightScale, 1) * 0.95; 
+  };
+  
+  const scaleFactor = calculateScaleFactor();
+  
   return (
-    <div className="h-full bg-neutral-900 flex items-center justify-center overflow-hidden">
+    <div 
+      ref={containerRef}
+      className="h-full bg-neutral-900 flex items-center justify-center overflow-hidden"
+    >
       <div className="flex flex-col items-center">
         <div className="mb-4 text-sm text-neutral-500">
           Time: {currentTime.toFixed(1)}s
         </div>
         
-        {/* Canvas preview area */}
-        <div
-          ref={canvasRef}
-          className="bg-white rounded shadow-lg overflow-hidden"
-          style={{
-            width: `${frameWidth}px`,
-            height: `${frameHeight}px`
-          }}
-        >
-          {/* Demo content showing a typical banner structure */}
-          <div className="relative w-full h-full bg-gradient-to-br from-blue-500 to-indigo-700">
-            {/* Headline text */}
-            <div className="absolute top-10 left-0 right-0 text-center">
-              <h2 ref={headlineRef} className="text-white text-2xl font-bold mb-2 transition-all duration-300">
-                Amazing Offer
-              </h2>
-              <p ref={subtitleRef} className="text-white text-sm transition-all duration-300">
-                Limited time only!
-              </p>
-            </div>
-            
-            {/* CTA Button */}
-            <div className="absolute bottom-12 left-0 right-0 flex justify-center">
-              <button 
-                ref={buttonRef}
-                className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-medium transition-all duration-300"
-              >
-                Shop Now
-              </button>
-            </div>
-            
-            {/* Logo */}
-            <div className="absolute bottom-2 left-0 right-0 flex justify-center">
-              <div ref={logoRef} className="text-white text-xs opacity-75 transition-all duration-300">
-                LOGO
+        {/* Canvas preview area with scaling */}
+        <div className="relative" style={{ 
+          width: `${frameWidth * scaleFactor}px`, 
+          height: `${frameHeight * scaleFactor}px` 
+        }}>
+          <div
+            ref={canvasRef}
+            className="bg-white rounded shadow-lg overflow-hidden"
+            style={{
+              width: `${frameWidth}px`,
+              height: `${frameHeight}px`,
+              transform: `scale(${scaleFactor})`,
+              transformOrigin: 'top left'
+            }}
+          >
+            {/* Demo content showing a typical banner structure */}
+            <div className="relative w-full h-full bg-gradient-to-br from-blue-500 to-indigo-700">
+              {/* Headline text */}
+              <div className="absolute top-10 left-0 right-0 text-center">
+                <h2 ref={headlineRef} className="text-white text-2xl font-bold mb-2 transition-all duration-300">
+                  Amazing Offer
+                </h2>
+                <p ref={subtitleRef} className="text-white text-sm transition-all duration-300">
+                  Limited time only!
+                </p>
+              </div>
+              
+              {/* CTA Button */}
+              <div className="absolute bottom-12 left-0 right-0 flex justify-center">
+                <button 
+                  ref={buttonRef}
+                  className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-medium transition-all duration-300"
+                >
+                  Shop Now
+                </button>
+              </div>
+              
+              {/* Logo */}
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+                <div ref={logoRef} className="text-white text-xs opacity-75 transition-all duration-300">
+                  LOGO
+                </div>
               </div>
             </div>
           </div>

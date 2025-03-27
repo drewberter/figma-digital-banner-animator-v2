@@ -1,22 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ChevronLeftSquare, ChevronRightSquare, Clock, Zap, Palette, LogIn, LogOut } from 'lucide-react';
 import { AnimationType, EasingType, AnimationMode } from '../types/animation';
-import { mockLayers } from '../mock/animationData';
 
 const PropertiesPanel = () => {
-  const [selectedLayerId, setSelectedLayerId] = useState<string>('layer-1-1');
-  
-  // Mock functions to replace context
-  const getSelectedLayer = () => {
-    return mockLayers['frame-1'].find(layer => layer.id === selectedLayerId) || null;
-  };
-  
-  const updateLayerAnimation = (layerId: string, animation: any) => {
-    console.log('Update animation for layer', layerId, animation);
-  };
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  // Define a local interface for the animation state to avoid optional properties
+  // Define a local interface for the animation state
   interface AnimationState {
     type: AnimationType;
     mode: AnimationMode;
@@ -28,6 +17,7 @@ const PropertiesPanel = () => {
     rotation: number;
   }
   
+  // Local state for the animation properties
   const [animation, setAnimation] = useState<AnimationState>({
     type: AnimationType.Fade,
     mode: AnimationMode.Entrance,
@@ -39,31 +29,11 @@ const PropertiesPanel = () => {
     rotation: 0
   });
   
-  // Get selected layer's animation data
-  useEffect(() => {
-    const selectedLayer = getSelectedLayer();
-    if (selectedLayer && selectedLayer.animations.length > 0) {
-      setAnimation({
-        ...selectedLayer.animations[0],
-        // Set default values for optional properties
-        startTime: selectedLayer.animations[0].startTime || 0,
-        mode: selectedLayer.animations[0].mode || AnimationMode.Entrance,
-        opacity: selectedLayer.animations[0].opacity || 1,
-        scale: selectedLayer.animations[0].scale || 1,
-        rotation: selectedLayer.animations[0].rotation || 0
-      });
-    }
-  }, [selectedLayerId]); // Only re-run when the selected layer ID changes
-  
-  // Update animation
+  // Update animation properties
   const handleChange = (key: string, value: any) => {
     const newAnimation = { ...animation, [key]: value };
     setAnimation(newAnimation);
-    
-    const selectedLayer = getSelectedLayer();
-    if (selectedLayer) {
-      updateLayerAnimation(selectedLayer.id, newAnimation);
-    }
+    console.log('Properties Panel: Animation updated', newAnimation);
   };
   
   // Toggle collapsed state
@@ -141,7 +111,7 @@ const PropertiesPanel = () => {
           <select
             className="w-full bg-[#191919] text-neutral-200 rounded px-2 py-1.5 text-sm border border-neutral-700"
             value={animation.type}
-            onChange={(e) => handleChange('type', e.target.value)}
+            onChange={(e) => handleChange('type', e.target.value as AnimationType)}
           >
             {Object.values(AnimationType).map(type => (
               <option key={type} value={type}>{type}</option>
@@ -178,7 +148,7 @@ const PropertiesPanel = () => {
           <select
             className="w-full bg-[#191919] text-neutral-200 rounded px-2 py-1.5 text-sm border border-neutral-700"
             value={animation.easing}
-            onChange={(e) => handleChange('easing', e.target.value)}
+            onChange={(e) => handleChange('easing', e.target.value as EasingType)}
           >
             {Object.values(EasingType).map(easing => (
               <option key={easing} value={easing}>{easing}</option>
@@ -200,7 +170,7 @@ const PropertiesPanel = () => {
             />
             <div className="flex justify-between text-xs text-neutral-500">
               <span>0</span>
-              <span className="text-neutral-300">{animation.opacity?.toFixed(2) || 0}</span>
+              <span className="text-neutral-300">{animation.opacity.toFixed(2)}</span>
               <span>1</span>
             </div>
           </div>
@@ -220,7 +190,7 @@ const PropertiesPanel = () => {
             />
             <div className="flex justify-between text-xs text-neutral-500">
               <span>0</span>
-              <span className="text-neutral-300">{animation.scale?.toFixed(2) || 1}</span>
+              <span className="text-neutral-300">{animation.scale.toFixed(2)}</span>
               <span>2</span>
             </div>
           </div>
@@ -240,11 +210,19 @@ const PropertiesPanel = () => {
             />
             <div className="flex justify-between text-xs text-neutral-500">
               <span>0°</span>
-              <span className="text-neutral-300">{animation.rotation || 0}°</span>
+              <span className="text-neutral-300">{animation.rotation}°</span>
               <span>360°</span>
             </div>
           </div>
         )}
+        
+        {/* Developer Info Section */}
+        <div className="mt-6 pt-4 border-t border-neutral-800">
+          <div className="text-xs text-neutral-500">
+            <p className="mb-1">Note: Properties Panel is currently in development mode.</p>
+            <p className="mb-1">Changes are tracked but not connected to the timeline yet.</p>
+          </div>
+        </div>
       </div>
     </div>
   );
