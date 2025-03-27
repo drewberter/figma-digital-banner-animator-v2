@@ -300,7 +300,7 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
     },
     {
       id: 'layer-3-3',
-      name: 'Price Tag',
+      name: 'Subhead',
       type: 'text',
       visible: true,
       locked: false,
@@ -337,6 +337,20 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
         }
       ],
       keyframes: []
+    },
+    {
+      id: 'layer-3-5',
+      name: 'Logo',
+      type: 'image',
+      visible: true,
+      locked: false,
+      animations: [
+        {
+          ...entranceAnimations.fadeIn,
+          startTime: 0.6
+        }
+      ],
+      keyframes: []
     }
   ],
   'frame-4': [
@@ -356,7 +370,7 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
     },
     {
       id: 'layer-4-2',
-      name: 'Title',
+      name: 'Headline',
       type: 'text',
       visible: true,
       locked: false,
@@ -371,7 +385,7 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
     },
     {
       id: 'layer-4-3',
-      name: 'Description',
+      name: 'Subhead',
       type: 'text',
       visible: true,
       locked: false,
@@ -380,61 +394,12 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
           ...entranceAnimations.fadeIn,
           startTime: 0.6,
           duration: 0.5
-        },
-        {
-          ...exitAnimations.fadeOut,
-          startTime: 4.0
         }
       ],
       keyframes: []
     },
     {
       id: 'layer-4-4',
-      name: 'Feature 1',
-      type: 'text',
-      visible: true,
-      locked: false,
-      animations: [
-        {
-          ...entranceAnimations.slideIn,
-          startTime: 0.8,
-          direction: 'left'
-        }
-      ],
-      keyframes: []
-    },
-    {
-      id: 'layer-4-5',
-      name: 'Feature 2',
-      type: 'text',
-      visible: true,
-      locked: false,
-      animations: [
-        {
-          ...entranceAnimations.slideIn,
-          startTime: 1.0,
-          direction: 'left'
-        }
-      ],
-      keyframes: []
-    },
-    {
-      id: 'layer-4-6',
-      name: 'Feature 3',
-      type: 'text',
-      visible: true,
-      locked: false,
-      animations: [
-        {
-          ...entranceAnimations.slideIn,
-          startTime: 1.2,
-          direction: 'left'
-        }
-      ],
-      keyframes: []
-    },
-    {
-      id: 'layer-4-7',
       name: 'CTA Button',
       type: 'button',
       visible: true,
@@ -442,26 +407,26 @@ export const mockLayers: Record<string, AnimationLayer[]> = {
       animations: [
         {
           ...entranceAnimations.scaleUp,
-          startTime: 1.5
+          startTime: 0.9
         },
         {
           ...emphasisAnimations.pulse,
-          startTime: 2.5
+          startTime: 2.0
         }
       ],
       keyframes: []
     },
     {
-      id: 'layer-4-8',
+      id: 'layer-4-5',
       name: 'Logo',
       type: 'image',
       visible: true,
       locked: false,
       animations: [
         {
-          ...entranceAnimations.rotateIn,
+          ...entranceAnimations.fadeIn,
           startTime: 0.5,
-          duration: 1.0
+          duration: 0.8
         }
       ],
       keyframes: []

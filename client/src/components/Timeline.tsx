@@ -3,6 +3,7 @@ import { Play, Pause, SkipBack, Clock, LogIn, LogOut } from 'lucide-react';
 import { mockLayers } from '../mock/animationData';
 import { Animation, AnimationType, EasingType, AnimationMode } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import { autoLinkLayers } from '../utils/linkingUtils';
 
 interface TimelineProps {
   onTimeUpdate: (time: number) => void;
@@ -43,6 +44,19 @@ const Timeline = ({
   const [isDragging, setIsDragging] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
+  
+  // Auto link layers on component mount
+  useEffect(() => {
+    console.log("Auto-linking layers with the same name on load");
+    // Use auto-linking utility to connect layers across frames
+    const linkedFrames = autoLinkLayers(mockLayers);
+    // This is a workaround in the mock version
+    // In a real implementation, this would update the global state via context
+    Object.keys(linkedFrames).forEach(frameId => {
+      mockLayers[frameId] = linkedFrames[frameId];
+    });
+    forceUpdate(); // Force a re-render after linking
+  }, []);
   
   // Get the layers for the current frame
   const frameLayers = mockLayers[selectedFrameId] || [];

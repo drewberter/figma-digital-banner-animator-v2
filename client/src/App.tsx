@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Toolbar from "./components/Toolbar";
 import LeftSidebar from "./components/LeftSidebar";
 import PreviewCanvas from "./components/PreviewCanvas";
@@ -83,6 +83,9 @@ function App() {
     // This will be handled by the Timeline component directly
   };
   
+  // Track animation frame ID in a ref so we can cancel it
+  const animationFrameIdRef = useRef<number | null>(null);
+  
   // Handle play/pause toggle
   const handlePlayPauseToggle = (playing: boolean) => {
     // Reset to beginning if we're at the end of the timeline and trying to play
@@ -92,13 +95,19 @@ function App() {
     
     setIsPlaying(playing);
     
+    // If we're stopping playback, cancel the animation frame
+    if (!playing) {
+      if (animationFrameIdRef.current !== null) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+        animationFrameIdRef.current = null;
+      }
+      return;
+    }
+    
     // If we're starting playback, set up the animation loop
     if (playing) {
       const startTime = performance.now();
       const initialTime = currentTime;
-      
-      // Use a ref to track the animation frame ID
-      let animationFrameId: number;
       
       const animationFrame = (now: number) => {
         const elapsed = (now - startTime) / 1000; // Convert to seconds
@@ -108,23 +117,27 @@ function App() {
         if (newTime >= timelineDuration) {
           setCurrentTime(timelineDuration);
           setIsPlaying(false);
+          animationFrameIdRef.current = null;
           return;
         }
         
         setCurrentTime(newTime);
-        animationFrameId = requestAnimationFrame(animationFrame);
+        animationFrameIdRef.current = requestAnimationFrame(animationFrame);
       };
       
-      animationFrameId = requestAnimationFrame(animationFrame);
-      
-      // Cancel animation frame when isPlaying changes to false
-      return () => {
-        if (animationFrameId) {
-          cancelAnimationFrame(animationFrameId);
-        }
-      };
+      // Start the animation loop
+      animationFrameIdRef.current = requestAnimationFrame(animationFrame);
     }
-  };
+  }
+  
+  // Clean up animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameIdRef.current !== null) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
+    };
+  }, []);
 
   return (
     <PluginProvider>
