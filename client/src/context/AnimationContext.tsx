@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { Animation, AnimationLayer, AnimationFrame, Keyframe } from '../types/animation';
+import { Animation, AnimationLayer, AnimationFrame, Keyframe, AnimationType, EasingType } from '../types/animation';
 import { useAutoSave, loadSavedData } from '../hooks/useAutoSave';
 
 // Define the context type
@@ -52,99 +52,110 @@ const defaultFrame: AnimationFrame = {
   height: 250
 };
 
-// Sample default layers that will be used if no saved data
+// Helper function to create default layers for a frame
+const createDefaultLayersForFrame = (frameId: string): AnimationLayer[] => {
+  const frameNumber = frameId.split('-')[1];
+  return [
+    {
+      id: `layer-${frameNumber}-1`,
+      name: 'Background',
+      type: 'rectangle',
+      visible: true,
+      locked: false,
+      animations: [{
+        type: AnimationType.Fade,
+        startTime: 0,
+        duration: 0.8,
+        easing: EasingType.EaseOut,
+        opacity: 1
+      }],
+      keyframes: []
+    },
+    {
+      id: `layer-${frameNumber}-2`,
+      name: 'Headline',
+      type: 'text',
+      visible: true,
+      locked: false,
+      animations: [{
+        type: AnimationType.Scale,
+        startTime: 0.3,
+        duration: 0.7,
+        easing: EasingType.EaseOut,
+        scale: 1.2
+      }, {
+        type: AnimationType.Pulse,
+        startTime: 2.5,
+        duration: 0.5,
+        easing: EasingType.EaseInOut
+      }],
+      keyframes: []
+    },
+    {
+      id: `layer-${frameNumber}-3`,
+      name: 'Subhead',
+      type: 'text',
+      visible: true,
+      locked: false,
+      animations: [{
+        type: AnimationType.Slide,
+        startTime: 0.6,
+        duration: 0.7,
+        easing: EasingType.EaseOut,
+        direction: 'right'
+      }],
+      keyframes: []
+    },
+    {
+      id: `layer-${frameNumber}-4`,
+      name: 'CTA Button',
+      type: 'button',
+      visible: true,
+      locked: false,
+      animations: [{
+        type: AnimationType.Fade,
+        startTime: 1,
+        duration: 0.8,
+        easing: EasingType.EaseOut,
+        opacity: 1
+      }, {
+        type: AnimationType.Bounce,
+        startTime: 2,
+        duration: 0.6,
+        easing: EasingType.Bounce
+      }],
+      keyframes: []
+    },
+    {
+      id: `layer-${frameNumber}-5`,
+      name: 'Logo',
+      type: 'logo',
+      visible: true,
+      locked: false,
+      animations: [{
+        type: AnimationType.Fade,
+        startTime: 1.2,
+        duration: 0.5,
+        easing: EasingType.EaseOut,
+        opacity: 1
+      }, {
+        type: AnimationType.Rotate,
+        startTime: 1.2,
+        duration: 0.8,
+        easing: EasingType.EaseOut,
+        rotation: 360
+      }],
+      keyframes: []
+    }
+  ];
+};
+
+// Create default layers for all frames
 const defaultLayers: AnimationLayer[] = [
-  {
-    id: 'layer-1-1',
-    name: 'Background',
-    type: 'rectangle',
-    visible: true,
-    locked: false,
-    animations: [{
-      type: 'Fade',
-      startTime: 0,
-      duration: 0.8,
-      easing: 'Ease Out',
-      opacity: 1
-    }],
-    keyframes: []
-  },
-  {
-    id: 'layer-1-2',
-    name: 'Headline',
-    type: 'text',
-    visible: true,
-    locked: false,
-    animations: [{
-      type: 'Scale',
-      startTime: 0.3,
-      duration: 0.7,
-      easing: 'Ease Out',
-      scale: 1.2
-    }, {
-      type: 'Pulse',
-      startTime: 2.5,
-      duration: 0.5,
-      easing: 'Ease In Out'
-    }],
-    keyframes: []
-  },
-  {
-    id: 'layer-1-3',
-    name: 'Subhead',
-    type: 'text',
-    visible: true,
-    locked: false,
-    animations: [{
-      type: 'Slide',
-      startTime: 0.6,
-      duration: 0.7,
-      easing: 'Ease Out',
-      direction: 'right'
-    }],
-    keyframes: []
-  },
-  {
-    id: 'layer-1-4',
-    name: 'CTA Button',
-    type: 'button',
-    visible: true,
-    locked: false,
-    animations: [{
-      type: 'Fade',
-      startTime: 1,
-      duration: 0.8,
-      easing: 'Ease Out',
-      opacity: 1
-    }, {
-      type: 'Bounce',
-      startTime: 2,
-      duration: 0.6,
-      easing: 'Bounce'
-    }],
-    keyframes: []
-  },
-  {
-    id: 'layer-1-5',
-    name: 'Logo',
-    type: 'logo',
-    visible: true,
-    locked: false,
-    animations: [{
-      type: 'Fade',
-      startTime: 1.2,
-      duration: 0.5,
-      easing: 'Ease Out',
-      opacity: 1
-    }, {
-      type: 'Rotate',
-      startTime: 1.2,
-      duration: 0.8,
-      easing: 'Ease Out',
-      rotation: 360
-    }],
-    keyframes: []
-  }
+  ...createDefaultLayersForFrame('frame-1'),
+  ...createDefaultLayersForFrame('frame-2'),
+  ...createDefaultLayersForFrame('frame-3'),
+  ...createDefaultLayersForFrame('frame-4')
 ];
 
 // Default frames for initial load

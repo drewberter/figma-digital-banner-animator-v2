@@ -32,7 +32,12 @@ const Timeline = ({
   const playheadRef = useRef<HTMLDivElement>(null);
   
   // Get the layers for the current frame
-  const frameLayers = animationContext.layers;
+  const currentFrameId = animationContext.currentFrame?.id || 'frame-1';
+  const frameNumber = currentFrameId.split('-')[1];
+  // Filter layers to only show those belonging to the current frame
+  const frameLayers = animationContext.layers.filter(layer => 
+    layer.id.startsWith(`layer-${frameNumber}-`)
+  );
   
   // Reference objects for drag state and positioning
   const dragState = useRef({
