@@ -80,7 +80,8 @@ function App() {
   
   const handleUnlinkLayer = (layerId: string) => {
     console.log("App: Unlinking layer", layerId);
-    // This will be handled by the Timeline component directly
+    // The actual unlinking is handled in the Timeline component
+    // This function is just a callback to inform the App component
   };
   
   // Track animation frame ID in a ref so we can cancel it

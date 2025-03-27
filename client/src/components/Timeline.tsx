@@ -3,7 +3,7 @@ import { Play, Pause, SkipBack, Clock, LogIn, LogOut } from 'lucide-react';
 import { mockLayers } from '../mock/animationData';
 import { Animation, AnimationType, EasingType, AnimationMode } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { autoLinkLayers, syncLinkedLayerAnimations } from '../utils/linkingUtils';
+import { autoLinkLayers, syncLinkedLayerAnimations, unlinkLayer } from '../utils/linkingUtils';
 
 interface TimelineProps {
   onTimeUpdate: (time: number) => void;
@@ -57,6 +57,22 @@ const Timeline = ({
     });
     forceUpdate(); // Force a re-render after linking
   }, []);
+  
+  // Handle unlinking a layer
+  const handleUnlinkLayer = (layerId: string) => {
+    console.log("Timeline: Unlinking layer", layerId);
+    // Use unlinking utility
+    const updatedLayers = unlinkLayer(mockLayers, layerId);
+    // Update mock layers
+    Object.keys(updatedLayers).forEach(frameId => {
+      mockLayers[frameId] = updatedLayers[frameId];
+    });
+    // Notify parent component
+    if (onUnlinkLayer) {
+      onUnlinkLayer(layerId);
+    }
+    forceUpdate(); // Force a re-render after unlinking
+  };
   
   // Get the layers for the current frame
   const frameLayers = mockLayers[selectedFrameId] || [];
@@ -540,10 +556,10 @@ const Timeline = ({
                       : 'Not linked'
                     }
                     onClick={(e) => {
-                      e.stopPropagation();
-                      if (layer.linkedLayer && onUnlinkLayer) {
-                        onUnlinkLayer(layer.id);
-                      }
+                      e.stopPropagation(); // Prevent selection of layer
+                      // Call our local handleUnlinkLayer function which updates the state
+                      handleUnlinkLayer(layer.id);
+                      console.log("Timeline: Clicked to unlink layer", layer.id);
                     }}
                   >
                     <svg 
