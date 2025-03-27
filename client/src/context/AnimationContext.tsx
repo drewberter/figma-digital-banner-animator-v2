@@ -286,8 +286,22 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       // This ensures all frame #1 in different ad sizes show/hide the same layers
       console.log("AnimationContext - Syncing layer visibility across frames with number:", frameNumber);
       
-      // Use our improved syncing function
-      const updatedGifFrames = syncGifFramesByNumber(mockGifFrames, frameId, layerId);
+      // Use our improved syncing function with layer name information
+      // Create a map of frame IDs to layers for name-based matching
+      const layersByFrame: Record<string, AnimationLayer[]> = {};
+      
+      // Populate the map with all available layers from mockLayers
+      Object.keys(mockLayers).forEach(frameId => {
+        layersByFrame[frameId] = mockLayers[frameId];
+      });
+      
+      // Pass this layer data to the sync function for better layer matching
+      const updatedGifFrames = syncGifFramesByNumber(
+        mockGifFrames, 
+        frameId, 
+        layerId,
+        layersByFrame
+      );
       
       // Debug output
       console.log(`AnimationContext - After sync: ${updatedGifFrames.length} GIF frames updated`);
@@ -296,9 +310,27 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       updatedGifFrames.forEach(frame => {
         const parsedId = parseGifFrameId(frame.id);
         if (parsedId.isValid && parsedId.frameNumber === frameNumber && frame.id !== frameId) {
-          // Find equivalent layer ID in this frame
+          // Find equivalent layer ID in this frame using name-based matching if possible
           const targetAdSize = frame.adSizeId || parsedId.adSizeId;
-          const targetLayerId = translateLayerId(layerId, adSizeId, targetAdSize);
+          
+          // Find the source layer name if possible
+          let sourceLayerName: string | undefined;
+          if (mockLayers[adSizeId]) {
+            const sourceLayer = mockLayers[adSizeId].find(layer => layer.id === layerId);
+            if (sourceLayer) {
+              sourceLayerName = sourceLayer.name;
+            }
+          }
+          
+          // Use the enhanced translateLayerId with name-based matching
+          const targetLayerId = translateLayerId(
+            layerId, 
+            adSizeId, 
+            targetAdSize,
+            sourceLayerName,
+            mockLayers
+          );
+          
           console.log(
             `AnimationContext - Frame ${frame.id} - Layer ${targetLayerId} - ` +
             `Hidden: ${frame.hiddenLayers.includes(targetLayerId)} - ` +
@@ -447,7 +479,21 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
     
     // If we're turning off the override, we should sync this layer with other frames
     if (!hasOverride) {
-      const updatedGifFrames = syncGifFramesByNumber(mockGifFrames, frameId, layerId);
+      // Create a map of frame IDs to layers for name-based matching
+      const layersByFrame: Record<string, AnimationLayer[]> = {};
+      
+      // Populate the map with all available layers from mockLayers
+      Object.keys(mockLayers).forEach(frameId => {
+        layersByFrame[frameId] = mockLayers[frameId];
+      });
+      
+      // Pass the layer data to the sync function for better layer matching
+      const updatedGifFrames = syncGifFramesByNumber(
+        mockGifFrames,
+        frameId,
+        layerId,
+        layersByFrame
+      );
       
       // Update all frames in the mock data array
       updatedGifFrames.forEach((frame, index) => {

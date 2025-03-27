@@ -43,12 +43,15 @@ export function parseGifFrameId(frameId: string): ParsedFrameId {
 
 /**
  * Translates a layer ID from one ad size to another
- * Handles the specific format of layer IDs in different ad sizes
+ * Uses layer name lookup when available to find equivalent layers
  */
 export function translateLayerId(
   layerId: string, 
   sourceAdSizeId: string, 
-  targetAdSizeId: string
+  targetAdSizeId: string,
+  // We'll add optional parameters for accessing layer name data
+  sourceLayerName?: string,
+  allLayers?: Record<string, AnimationLayer[]>
 ): string {
   // If ad sizes are the same, no translation needed
   if (sourceAdSizeId === targetAdSizeId) {
@@ -70,67 +73,59 @@ export function translateLayerId(
     return layerId; // Return original ID as fallback
   }
 
-  // We need to identify the format pattern of the layer ID
   let targetLayerId = '';
-  
-  // First, try matching the common pattern like "layer-2-3", where
-  // 2 is the ad size number and 3 is the layer index
   const sourceAdSizeNumber = sourceAdSizeId.split('-')[1];
   const targetAdSizeNumber = targetAdSizeId.split('-')[1];
   
-  if (layerIdParts.length === 3) {
-    // This appears to be the pattern like "layer-2-3"
-    // Check if the second segment matches the source ad size number
-    if (layerIdParts[1] === sourceAdSizeNumber) {
-      // This is most likely a match! Keep the last part (layer index/position)
-      // and just replace the ad size number
-      const layerPosition = layerIdParts[2];
-      targetLayerId = `layer-${targetAdSizeNumber}-${layerPosition}`;
-      console.log(`translateLayerId: Common format match. Keeping layer position ${layerPosition}`);
-    } else {
-      // Try other approaches below
-      console.log(`translateLayerId: Layer ID ${layerId} has 3 parts but second part ${layerIdParts[1]} doesn't match source ad size number ${sourceAdSizeNumber}`);
+  // STRATEGY 1: If we have the layer name and all layers, find the equivalent layer by name
+  if (sourceLayerName && allLayers && allLayers[targetAdSizeId]) {
+    // Find a layer in the target ad size with the same name
+    const targetLayer = allLayers[targetAdSizeId].find(layer => layer.name === sourceLayerName);
+    if (targetLayer) {
+      console.log(`translateLayerId: Found layer with matching name "${sourceLayerName}" in target ad size`);
+      return targetLayer.id;
     }
   }
   
-  // If we haven't found a match yet, try other patterns
-  if (!targetLayerId) {
-    const sourceAdSizeParts = sourceAdSizeId.split('-');
-    const targetAdSizeParts = targetAdSizeId.split('-');
-    
-    // Check if the ad size segment in layer ID matches the source ad size pattern
-    if (layerIdParts[1] === sourceAdSizeParts[0] && 
-        layerIdParts[2] === sourceAdSizeParts[1]) {
-      // Standard format where ad size is split into two parts in the layer ID
-      // e.g., "layer-frame-1-header" -> "layer-frame-2-header"
-      
-      // Extract the layer specific part (after the ad size parts)
-      const layerSpecificPart = layerIdParts.slice(3).join('-');
-      
-      // Reconstruct with target ad size
-      targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
-    } else if (layerIdParts[1] === sourceAdSizeId) {
-      // Format where ad size is a single segment in the layer ID
-      // e.g., "layer-frame1-header" -> "layer-frame2-header"
-      
-      // Extract the layer specific part
-      const layerSpecificPart = layerIdParts.slice(2).join('-');
-      
-      // Reconstruct with target ad size
-      targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
-    } else {
-      // Special case for layer names with semantic meaning
-      // Try to keep the same component name (last part) across frames
-      // For example, match "layer-2-headline" to "layer-3-headline"
-      const lastPart = layerIdParts[layerIdParts.length - 1];
-      if (['headline', 'background', 'button', 'logo', 'subhead', 'cta'].includes(lastPart.toLowerCase())) {
-        targetLayerId = `layer-${targetAdSizeNumber}-${lastPart}`;
-      } else {
-        // If layer ID doesn't match any known patterns, log a warning and use original
-        console.warn(`translateLayerId: Unable to translate layer ID ${layerId} from ${sourceAdSizeId} to ${targetAdSizeId}`);
-        targetLayerId = layerId;
-      }
+  // STRATEGY 2: Check for semantic naming patterns in the layer ID itself
+  const lastPart = layerIdParts[layerIdParts.length - 1].toLowerCase();
+  if (['headline', 'background', 'button', 'logo', 'subhead', 'cta', 'image', 'icon'].includes(lastPart)) {
+    // This is a semantically named layer - keep the name and just change the ad size
+    targetLayerId = `layer-${targetAdSizeNumber}-${lastPart}`;
+    console.log(`translateLayerId: Semantic match found for "${lastPart}"`);
+    return targetLayerId;
+  }
+  
+  // STRATEGY 3: If layer ID has the pattern "layer-X-Y" where X is ad size and Y is position
+  if (layerIdParts.length === 3) {
+    // Check if the second segment matches the source ad size number
+    if (layerIdParts[1] === sourceAdSizeNumber) {
+      // This is most likely a match! Keep the last part (layer index/position)
+      const layerPosition = layerIdParts[2];
+      targetLayerId = `layer-${targetAdSizeNumber}-${layerPosition}`;
+      console.log(`translateLayerId: Position-based match. Keeping layer position ${layerPosition}`);
+      return targetLayerId;
     }
+  }
+  
+  // STRATEGY 4: Try other ID patterns
+  const sourceAdSizeParts = sourceAdSizeId.split('-');
+  const targetAdSizeParts = targetAdSizeId.split('-');
+  
+  // Check for complex ID patterns
+  if (layerIdParts[1] === sourceAdSizeParts[0] && 
+      layerIdParts[2] === sourceAdSizeParts[1]) {
+    // Format: "layer-frame-1-header" -> "layer-frame-2-header"
+    const layerSpecificPart = layerIdParts.slice(3).join('-');
+    targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
+  } else if (layerIdParts[1] === sourceAdSizeId) {
+    // Format: "layer-frame1-header" -> "layer-frame2-header"
+    const layerSpecificPart = layerIdParts.slice(2).join('-');
+    targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
+  } else {
+    // If nothing worked, use the original ID as fallback
+    console.warn(`translateLayerId: Unable to translate layer ID ${layerId} from ${sourceAdSizeId} to ${targetAdSizeId}`);
+    targetLayerId = layerId;
   }
   
   console.log(`translateLayerId: Translated ${layerId} from ${sourceAdSizeId} to ${targetAdSizeId} -> ${targetLayerId}`);
@@ -567,12 +562,14 @@ export function setSyncMode(
  * @param gifFrames Array of all GIF frames
  * @param sourceFrameId ID of the GIF frame that was modified
  * @param layerId ID of the layer that was toggled
+ * @param allLayers Optional map of all layers by frame ID to help with name-based matching
  * @returns Updated GIF frames with synchronized layer visibility
  */
 export function syncGifFramesByNumber(
   gifFrames: GifFrame[],
   sourceFrameId: string,
-  layerId: string
+  layerId: string,
+  allLayers?: Record<string, AnimationLayer[]>
 ): GifFrame[] {
   try {
     console.log(`syncGifFramesByNumber - START - Source frame: ${sourceFrameId}, Layer: ${layerId}`);
@@ -604,6 +601,16 @@ export function syncGifFramesByNumber(
     const isHiddenInSource = sourceFrame.hiddenLayers && sourceFrame.hiddenLayers.includes(layerId);
     console.log(`syncGifFramesByNumber - Source layer ${layerId} is hidden: ${isHiddenInSource}`);
     
+    // Find the source layer name if we have all layers data
+    let sourceLayerName: string | undefined;
+    if (allLayers && allLayers[sourceAdSize]) {
+      const sourceLayer = allLayers[sourceAdSize].find(layer => layer.id === layerId);
+      if (sourceLayer) {
+        sourceLayerName = sourceLayer.name;
+        console.log(`syncGifFramesByNumber - Found source layer name: "${sourceLayerName}"`);
+      }
+    }
+    
     // Find all frames with the same frame number across all ad sizes
     const matchingFrames = findFramesWithSameNumber(updatedGifFrames, frameNumber);
     console.log(`syncGifFramesByNumber - Found ${matchingFrames.length} frames with number ${frameNumber}`);
@@ -626,7 +633,14 @@ export function syncGifFramesByNumber(
       console.log(`syncGifFramesByNumber - Processing target frame ${frame.id} with ad size ${targetAdSize}`);
       
       // Translate the source layer ID to the target ad size
-      const targetLayerId = translateLayerId(layerId, sourceAdSize, targetAdSize);
+      // Use the enhanced version with name-based lookup if available
+      const targetLayerId = translateLayerId(
+        layerId, 
+        sourceAdSize, 
+        targetAdSize,
+        sourceLayerName,
+        allLayers
+      );
       
       // Check if this layer has an override in this frame
       // Override format: frame.overrides.layerVisibility[layerId].overridden
