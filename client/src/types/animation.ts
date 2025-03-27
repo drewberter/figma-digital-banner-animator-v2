@@ -104,6 +104,16 @@ export interface AnimationFrame {
   adSizeId?: string; // Reference to the parent ad size
 }
 
+export interface GifFrame {
+  id: string;
+  name: string;
+  selected: boolean;
+  delay: number; // Delay in seconds for this GIF frame
+  adSizeId: string; // Reference to the parent ad size this GIF frame is based on
+  hiddenLayers: string[]; // IDs of layers that should be hidden in this frame
+  visibleLayerCount?: number; // Count of visible layers (for UI display)
+}
+
 export interface Preset {
   id: string;
   name: string;

@@ -1,4 +1,4 @@
-import { AnimationType, EasingType, AnimationLayer, AnimationFrame } from '../types/animation';
+import { AnimationType, EasingType, AnimationLayer, AnimationFrame, GifFrame } from '../types/animation';
 
 // Define entrance, emphasis, and exit animation groups for reuse
 const entranceAnimations = {
@@ -117,6 +117,37 @@ export const mockFrames: AnimationFrame[] = [
 ];
 
 // Mock animation layers data
+// Mock GIF frames data - based on the first ad size (frame-1)
+export const mockGifFrames: GifFrame[] = [
+  {
+    id: 'gif-frame-1',
+    name: 'Frame 1',
+    selected: true,
+    delay: 2.5,
+    adSizeId: 'frame-1', // Reference to the 300x250 Banner
+    hiddenLayers: [], // No hidden layers - all visible
+    visibleLayerCount: 5
+  },
+  {
+    id: 'gif-frame-2',
+    name: 'Frame 2',
+    selected: false,
+    delay: 2.5,
+    adSizeId: 'frame-1', // Reference to the 300x250 Banner
+    hiddenLayers: ['layer-1-3'], // Hide Subhead
+    visibleLayerCount: 4
+  },
+  {
+    id: 'gif-frame-3',
+    name: 'Frame 3',
+    selected: false,
+    delay: 2.5,
+    adSizeId: 'frame-1', // Reference to the 300x250 Banner
+    hiddenLayers: ['layer-1-3', 'layer-1-5'], // Hide Subhead and Logo
+    visibleLayerCount: 3
+  }
+];
+
 export const mockLayers: Record<string, AnimationLayer[]> = {
   // 300x250 Banner
   'frame-1': [

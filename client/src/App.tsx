@@ -10,6 +10,7 @@ import AutoSaveIndicator from "./components/AutoSaveIndicator";
 import { AnimationProvider, useAnimationContext } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
 import { TimelineMode } from "./types/animation";
+import { mockGifFrames } from "./mock/animationData";
 
 function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -18,7 +19,7 @@ function App() {
   const [selectedAdSizeId, setSelectedAdSizeId] = useState('frame-1');
   
   // This is for selecting which GIF frame to focus on in GifFrames mode
-  const [selectedGifFrameId, setSelectedGifFrameId] = useState('frame-1');
+  const [selectedGifFrameId, setSelectedGifFrameId] = useState('gif-frame-1');
   
   // Current frame ID based on the current mode - for timeline, preview, etc.
   const [currentTime, setCurrentTime] = useState(0);
@@ -123,8 +124,8 @@ function App() {
     // Only update in GIF Frames mode - this will now get data from mock objects instead of context
     if (timelineMode !== TimelineMode.GifFrames) return;
     
-    // Hardcode frame IDs for development (in real app, would use context)
-    const frameIds = ['frame-1', 'frame-2', 'frame-3', 'frame-4'];
+    // Use mockGifFrames for GIF frame data
+    const frameIds = mockGifFrames.map(frame => frame.id);
     
     // Calculate frame durations including their delay
     const frameTotalDurations = new Map<string, number>();
@@ -132,8 +133,9 @@ function App() {
     
     let cumulativeTime = 0;
     frameIds.forEach(frameId => {
-      // Use 2.5s delays as shown in the screenshot
-      const frameDelay = 2.5; // Match the delay shown in the screenshot
+      // Get the delay from the mockGifFrames data
+      const gifFrame = mockGifFrames.find(frame => frame.id === frameId);
+      const frameDelay = gifFrame ? gifFrame.delay : 2.5; // Use frame delay or fallback to 2.5s
       
       // Start time is the cumulative time before this frame
       frameStartTimes.set(frameId, cumulativeTime);
@@ -238,8 +240,9 @@ function App() {
               }
               
               // Set time within this frame (accounting for this frame's delay)
-              // Use 2.5s delay as shown in the screenshot
-              const frameDelay = 2.5;
+              // Get the delay from the mockGifFrames data
+              const gifFrame = mockGifFrames.find(frame => frame.id === frameId);
+              const frameDelay = gifFrame ? gifFrame.delay : 2.5; // Use frame delay or fallback to 2.5s
               
               // Calculate time relative to this frame's start
               framePositionTime = newTime - frameStartTime;

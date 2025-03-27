@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useReducer } from 'react';
 import { Play, Pause, SkipBack, Clock, LogIn, LogOut, Eye, EyeOff, Layers, Zap, Plus } from 'lucide-react';
-import { mockLayers, mockFrames } from '../mock/animationData';
+import { mockLayers, mockFrames, mockGifFrames } from '../mock/animationData';
 import FrameEditDialog from './FrameEditDialog';
 import FrameCardGrid from './FrameCardGrid';
 import { 
@@ -1046,15 +1046,17 @@ const Timeline = ({
             ) : (
               // GIF Frames Mode - Show card grid for frame management
               <FrameCardGrid
-                frames={Object.keys(mockLayers).reduce((acc, frameId) => {
-                  // Create frame objects from mockLayers keys
-                  acc[frameId] = {
-                    id: frameId,
-                    name: `Frame ${frameId.split('-')[1] || ''}`, // Extract frame number from ID
-                    selected: frameId === localSelectedFrameId,
-                    width: 300, // Default width
-                    height: 250, // Default height
-                    delay: 2.5 // Default delay 2.5s as seen in screenshot
+                frames={mockGifFrames.reduce((acc, gifFrame) => {
+                  // Convert GifFrame to AnimationFrame for compatibility with FrameCardGrid
+                  const adSize = mockFrames.find(f => f.id === gifFrame.adSizeId);
+                  acc[gifFrame.id] = {
+                    id: gifFrame.id,
+                    name: gifFrame.name,
+                    selected: gifFrame.id === localSelectedFrameId,
+                    width: adSize ? adSize.width : 300, // Use parent ad size dimensions
+                    height: adSize ? adSize.height : 250,
+                    delay: gifFrame.delay,
+                    hiddenLayers: gifFrame.hiddenLayers
                   };
                   return acc;
                 }, {} as Record<string, AnimationFrame>)}
