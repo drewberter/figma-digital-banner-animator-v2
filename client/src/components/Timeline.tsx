@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect, useReducer } from 'react';
+import { useState, useRef, useEffect, useReducer, useCallback } from 'react';
 import { Play, Pause, SkipBack, Clock } from 'lucide-react';
-import { Animation, AnimationType, EasingType } from '../types/animation';
+import { Animation, AnimationType, EasingType, AnimationLayer } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { useAnimationContext } from '../context/AnimationContext';
 
 interface TimelineProps {
   onTimeUpdate: (time: number) => void;
@@ -10,34 +9,98 @@ interface TimelineProps {
   isPlaying: boolean;
   currentTime: number;
   selectedFrameId?: string | null;
+  updateLayerAnimation?: (layerId: string, animation: Animation) => void;
 }
+
+// Mock data for frames and layers when no frame is selected
+const mockLayers: AnimationLayer[] = [
+  {
+    id: 'layer-1-1',
+    name: 'Text Layer',
+    type: 'text',
+    visible: true,
+    locked: false,
+    animations: [],
+    keyframes: []
+  },
+  {
+    id: 'layer-1-2',
+    name: 'Image Layer',
+    type: 'image',
+    visible: true,
+    locked: false,
+    animations: [],
+    keyframes: []
+  }
+];
 
 const Timeline = ({
   onTimeUpdate,
   onPlayPauseToggle,
   isPlaying,
   currentTime,
-  selectedFrameId = null // Default to null if no frame ID is provided
+  selectedFrameId = null, // Default to null if no frame ID is provided
+  updateLayerAnimation: propsUpdateLayerAnimation
 }: TimelineProps) => {
   // Create a forceUpdate function for timeline component
   const [, forceUpdate] = useReducer(x => x + 1, 0);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   
-  // Get animation context
-  const animationContext = useAnimationContext();
-  const duration = animationContext.duration || 5; // Fixed duration or from context
+  // Fixed duration for timeline
+  const duration = 5; // Fixed duration
   
   const [isDragging, setIsDragging] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   
-  // Get the layers for the current frame
-  const currentFrameId = animationContext.currentFrame?.id || 'frame-1';
+  // Use mock layers for this simplified version
+  // In a real implementation, this would be received from props or AnimationContext
+  const currentFrameId = selectedFrameId || 'frame-1';
   const frameNumber = currentFrameId.split('-')[1];
-  // Filter layers to only show those belonging to the current frame
-  const frameLayers = animationContext.layers.filter(layer => 
-    layer.id.startsWith(`layer-${frameNumber}-`)
-  );
+  
+  // Layer state management (would be from context in a real implementation)
+  const [layersState, setLayersState] = useState<AnimationLayer[]>(mockLayers);
+  
+  // Function to update layer animations without using context
+  const updateLayerAnimation = useCallback((layerId: string, animation: Animation) => {
+    if (propsUpdateLayerAnimation) {
+      // If provided via props, use that implementation 
+      propsUpdateLayerAnimation(layerId, animation);
+      return;
+    }
+    
+    // Find the layer to update
+    const layerIndex = layersState.findIndex(l => l.id === layerId);
+    if (layerIndex === -1) {
+      console.log('Layer not found:', layerId);
+      return;
+    }
+    
+    // Create a copy of the layers array
+    const updatedLayers = [...layersState];
+    
+    // Either update an existing animation or add a new one
+    const existingAnimIndex = updatedLayers[layerIndex].animations.findIndex(
+      anim => animation.startTime === anim.startTime
+    );
+    
+    if (existingAnimIndex !== -1) {
+      // Update existing animation
+      updatedLayers[layerIndex].animations[existingAnimIndex] = animation;
+    } else {
+      // Add new animation
+      updatedLayers[layerIndex].animations.push(animation);
+    }
+    
+    // Sort animations by start time
+    updatedLayers[layerIndex].animations.sort((a, b) => 
+      (a.startTime || 0) - (b.startTime || 0)
+    );
+    
+    // Update the layers state
+    setLayersState(updatedLayers);
+    console.log('Layer animation updated:', layerId, animation);
+  }, [layersState, propsUpdateLayerAnimation]);
   
   // Reference objects for drag state and positioning
   const dragState = useRef({
@@ -51,22 +114,24 @@ const Timeline = ({
     animationIndex: -1
   });
   
-  // Force an update after the component mounts to ensure timeline renders correctly
+  // Force an update after the component mounts or when the current frame changes
   useEffect(() => {
     // Give the timeline a small delay to fully render
     const timer = setTimeout(() => {
       forceUpdate();
+      console.log("Timeline rerendering for frame:", currentFrameId);
     }, 100);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [currentFrameId]); // Update when the current frame changes
 
-  // Update selected layer in context when it changes
+  // Update selected layer when it changes (would communicate with context in a real implementation)
   useEffect(() => {
     if (selectedLayerId) {
-      animationContext.selectLayer(selectedLayerId);
+      console.log('Selected layer:', selectedLayerId);
+      // In a real implementation, this would update the context
     }
-  }, [selectedLayerId, animationContext]);
+  }, [selectedLayerId]);
   
   // Calculate time marker positions
   const timeMarkers = [];
@@ -145,7 +210,7 @@ const Timeline = ({
     action: 'move' | 'resize-left' | 'resize-right'
   ) => {
     e.stopPropagation();
-    const layer = frameLayers.find(l => l.id === layerId);
+    const layer = layersState.find(l => l.id === layerId);
     if (!layer) return;
     
     const animation = layer.animations[animIndex];
@@ -176,7 +241,7 @@ const Timeline = ({
       
       if (!layerId) return;
       
-      const layer = frameLayers.find(l => l.id === layerId);
+      const layer = layersState.find(l => l.id === layerId);
       if (!layer) return;
       
       // Clone the animation for modification
@@ -217,8 +282,8 @@ const Timeline = ({
         updatedAnimation.duration = newDuration;
       }
       
-      // Update the animation in the context
-      animationContext.updateLayerAnimation(layerId, updatedAnimation);
+      // Update the animation
+      updateLayerAnimation(layerId, updatedAnimation);
       
       // Force a re-render
       forceUpdate();
@@ -231,8 +296,8 @@ const Timeline = ({
       document.removeEventListener('mousemove', handleAnimationDragMove);
       document.removeEventListener('mouseup', handleAnimationDragEnd);
       
-      // Save animation state after changes
-      animationContext.saveAnimationState();
+      // Log to indicate we would save in a real implementation
+      console.log('Animation changes would be saved');
     };
     
     document.addEventListener('mousemove', handleAnimationDragMove);
@@ -241,7 +306,7 @@ const Timeline = ({
 
   // Handle adding a new animation to a layer
   const handleAddAnimationToLayer = (layerId: string, type: AnimationType) => {
-    const layer = frameLayers.find(l => l.id === layerId);
+    const layer = layersState.find(l => l.id === layerId);
     if (!layer) return;
     
     // Create a new animation
@@ -252,40 +317,47 @@ const Timeline = ({
       easing: EasingType.EaseOut, // Default easing
     };
     
-    // Add the animation to the layer using context
-    animationContext.updateLayerAnimation(layerId, newAnimation);
+    // Add the animation to the layer
+    updateLayerAnimation(layerId, newAnimation);
     
     // Force a re-render
     forceUpdate();
     
-    // Save animation state after adding new animation
-    animationContext.saveAnimationState();
+    // Log to indicate we would save in a real implementation
+    console.log('Animation state would be saved');
   };
 
   // Handle deleting an animation from a layer
   const handleDeleteAnimation = (layerId: string, animIndex: number) => {
-    const layer = frameLayers.find(l => l.id === layerId);
+    const layer = layersState.find(l => l.id === layerId);
     if (!layer) return;
     
     // Make a copy of the layer's animations array
-    const updatedAnimations = [...layer.animations];
+    const updatedLayer = { ...layer };
+    const updatedAnimations = [...updatedLayer.animations];
     
     // Remove the animation
     updatedAnimations.splice(animIndex, 1);
+    updatedLayer.animations = updatedAnimations;
     
     // Update the layer with the modified animations array
-    animationContext.updateLayer(layerId, { animations: updatedAnimations });
+    const updatedLayers = layersState.map(l => 
+      l.id === layerId ? updatedLayer : l
+    );
+    
+    // Update the state
+    setLayersState(updatedLayers);
     
     // Force a re-render
     forceUpdate();
     
-    // Save animation state after deletion
-    animationContext.saveAnimationState();
+    // Log to indicate we would save in a real implementation
+    console.log('Animation state would be saved after deletion');
   };
 
   // Handle changing an animation's type
   const handleChangeAnimationType = (layerId: string, animIndex: number, type: AnimationType) => {
-    const layer = frameLayers.find(l => l.id === layerId);
+    const layer = layersState.find(l => l.id === layerId);
     if (!layer) return;
     
     // Create updated animation with new type
@@ -294,14 +366,14 @@ const Timeline = ({
       type
     };
     
-    // Update the animation using context
-    animationContext.updateLayerAnimation(layerId, updatedAnimation);
+    // Update the animation type
+    updateLayerAnimation(layerId, updatedAnimation);
     
     // Force a re-render
     forceUpdate();
     
-    // Save animation state after type change
-    animationContext.saveAnimationState();
+    // Log to indicate we would save in a real implementation
+    console.log('Animation type change would be saved');
   };
 
   return (
@@ -344,7 +416,7 @@ const Timeline = ({
             Layers
           </div>
           
-          {frameLayers.map(layer => (
+          {layersState.map(layer => (
             <div 
               key={layer.id}
               onClick={() => setSelectedLayerId(layer.id)}
@@ -399,7 +471,7 @@ const Timeline = ({
             ref={timelineRef}
           >
             {/* Display multiple animation tracks - one for each layer */}
-            {frameLayers.map((layer, layerIndex) => (
+            {layersState.map((layer, layerIndex) => (
               <div 
                 key={layer.id}
                 className={`h-10 relative ${selectedLayerId === layer.id ? 'bg-[#1A1A1A]' : ''}`}

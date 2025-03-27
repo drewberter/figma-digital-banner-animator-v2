@@ -7,10 +7,11 @@ import PropertiesPanel from "./components/PropertiesPanel";
 import ExportModal from "./components/ExportModal";
 import PresetsPanel from "./components/PresetsPanel";
 import AutoSaveIndicator from "./components/AutoSaveIndicator";
-import { AnimationProvider } from "./context/AnimationContext";
+import { AnimationProvider, useAnimationContext } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
 import { initializePlugin } from "./lib/figmaPlugin";
 
+// Main App component
 function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPresetsPanelOpen, setIsPresetsPanelOpen] = useState(false);
@@ -79,46 +80,59 @@ function App() {
     setIsPlaying(playing);
   };
 
+  // Wrapper component that uses the context
+  const AppContent = () => {
+    const animationContext = useAnimationContext();
+    
+    return (
+      <div className="bg-[#0A0A0A] text-white h-screen flex flex-col">
+        <Toolbar onExport={handleExport} onPreview={handlePreview} />
+        
+        <div className="flex-1 flex overflow-hidden">
+          <LeftSidebar 
+            onOpenPresets={handleOpenPresets} 
+            onSelectFrame={handleFrameSelect}
+          />
+          
+          <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden">
+            <PreviewCanvas 
+              selectedFrameId={selectedFrameId} 
+              currentTime={currentTime}
+              frames={animationContext.frames}
+              layers={animationContext.layers}
+            />
+            <Timeline 
+              key={selectedFrameId} // Force re-render when frame changes
+              onTimeUpdate={handleTimeUpdate}
+              onPlayPauseToggle={handlePlayPauseToggle}
+              isPlaying={isPlaying}
+              currentTime={currentTime}
+              selectedFrameId={selectedFrameId}
+              updateLayerAnimation={animationContext.updateLayerAnimation}
+            />
+          </div>
+          
+          <PropertiesPanel />
+        </div>
+
+        {isExportModalOpen && (
+          <ExportModal onClose={() => setIsExportModalOpen(false)} />
+        )}
+
+        {isPresetsPanelOpen && (
+          <PresetsPanel onClose={() => setIsPresetsPanelOpen(false)} />
+        )}
+        
+        {/* Auto-save indicator */}
+        <AutoSaveIndicator saving={saving} lastSaved={lastSaved} />
+      </div>
+    );
+  };
+
   return (
     <PluginProvider>
       <AnimationProvider>
-        <div className="bg-[#0A0A0A] text-white h-screen flex flex-col">
-          <Toolbar onExport={handleExport} onPreview={handlePreview} />
-          
-          <div className="flex-1 flex overflow-hidden">
-            <LeftSidebar 
-              onOpenPresets={handleOpenPresets} 
-              onSelectFrame={handleFrameSelect}
-            />
-            
-            <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden">
-              <PreviewCanvas 
-                selectedFrameId={selectedFrameId} 
-                currentTime={currentTime} 
-              />
-              <Timeline 
-                onTimeUpdate={handleTimeUpdate}
-                onPlayPauseToggle={handlePlayPauseToggle}
-                isPlaying={isPlaying}
-                currentTime={currentTime}
-                selectedFrameId={selectedFrameId}
-              />
-            </div>
-            
-            <PropertiesPanel />
-          </div>
-
-          {isExportModalOpen && (
-            <ExportModal onClose={() => setIsExportModalOpen(false)} />
-          )}
-
-          {isPresetsPanelOpen && (
-            <PresetsPanel onClose={() => setIsPresetsPanelOpen(false)} />
-          )}
-          
-          {/* Auto-save indicator */}
-          <AutoSaveIndicator saving={saving} lastSaved={lastSaved} />
-        </div>
+        <AppContent />
       </AnimationProvider>
     </PluginProvider>
   );

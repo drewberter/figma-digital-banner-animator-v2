@@ -11,6 +11,7 @@ import { AnimationProvider } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
 import { initializePlugin } from "./lib/figmaPlugin";
 
+// Main App component
 function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPresetsPanelOpen, setIsPresetsPanelOpen] = useState(false);
@@ -97,6 +98,7 @@ function App() {
                 currentTime={currentTime} 
               />
               <Timeline 
+                key={selectedFrameId} // Force re-render when frame changes
                 onTimeUpdate={handleTimeUpdate}
                 onPlayPauseToggle={handlePlayPauseToggle}
                 isPlaying={isPlaying}
