@@ -975,11 +975,11 @@ const Timeline = ({
             <div className="flex space-x-2">
               <button 
                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-md flex items-center text-sm font-medium"
-                onClick={() => setIsFrameDialogOpen(true)}
-                title="Add new frame"
+                onClick={handleAddBlankFrame} // Call handleAddBlankFrame directly instead of opening the dialog
+                title="Add new GIF frame"
               >
                 <Plus size={16} className="mr-1" />
-                Add Frame
+                Add GIF Frame
               </button>
               <button 
                 className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-md flex items-center text-sm font-medium"
