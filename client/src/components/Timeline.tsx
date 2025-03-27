@@ -17,7 +17,7 @@ const Timeline = ({
   currentTime,
   selectedFrameId = 'frame-1' // Default to frame-1 if no frame ID is provided
 }: TimelineProps) => {
-  // Add forceUpdate functionality using useReducer
+  // Create a forceUpdate function for timeline component
   const [, forceUpdate] = useReducer(x => x + 1, 0);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const duration = 5; // Fixed duration for now
@@ -28,6 +28,18 @@ const Timeline = ({
   
   // Get the layers for the current frame
   const frameLayers = mockLayers[selectedFrameId] || [];
+  
+  // Reference objects for drag state and positioning
+  const dragState = useRef({
+    isDraggingAnimation: false,
+    isResizingLeft: false,
+    isResizingRight: false,
+    startX: 0,
+    originalStartTime: 0,
+    originalDuration: 0,
+    layerId: null as string | null,
+    animationIndex: -1
+  });
   
   // Force an update after the component mounts to ensure timeline renders correctly
   useEffect(() => {
@@ -54,7 +66,7 @@ const Timeline = ({
     if (!timelineRef.current) {
       // Use a fallback width calculation when the timeline isn't rendered yet
       // This ensures animation blocks display with reasonable sizes on initial load
-      const fallbackWidth = 800 - 16; // Default width - playhead width
+      const fallbackWidth = 400 - 16; // Default width - playhead width
       return (time / duration) * fallbackWidth;
     }
     
@@ -84,6 +96,129 @@ const Timeline = ({
   const handlePlayheadMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
+  };
+  
+  // Handle animation block drag start (left resize, right resize, or move)
+  const handleAnimationDragStart = (
+    e: React.MouseEvent, 
+    layerId: string, 
+    animationIndex: number, 
+    mode: 'move' | 'resize-left' | 'resize-right'
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    const layer = frameLayers.find(l => l.id === layerId);
+    if (!layer) return;
+    
+    const animation = layer.animations[animationIndex];
+    
+    // Set drag state
+    dragState.current = {
+      isDraggingAnimation: mode === 'move',
+      isResizingLeft: mode === 'resize-left',
+      isResizingRight: mode === 'resize-right',
+      startX: e.clientX,
+      originalStartTime: animation.startTime || 0,
+      originalDuration: animation.duration,
+      layerId,
+      animationIndex
+    };
+    
+    console.log(`Starting ${mode} drag for animation ${animationIndex} on layer ${layerId}`);
+    
+    // Add event listeners for drag and release
+    document.addEventListener('mousemove', handleAnimationDragMove);
+    document.addEventListener('mouseup', handleAnimationDragEnd);
+  };
+  
+  // Handle animation drag movement
+  const handleAnimationDragMove = (e: MouseEvent) => {
+    const { 
+      isDraggingAnimation, 
+      isResizingLeft, 
+      isResizingRight,
+      startX, 
+      originalStartTime, 
+      originalDuration,
+      layerId,
+      animationIndex 
+    } = dragState.current;
+    
+    // If not dragging or no ref, return
+    if ((!isDraggingAnimation && !isResizingLeft && !isResizingRight) || !timelineRef.current) return;
+    
+    // Find the layer and animation
+    const layer = frameLayers.find(l => l.id === layerId);
+    if (!layer) return;
+    
+    // Calculate position change
+    const dx = e.clientX - startX;
+    const dxTime = positionToTime(dx);
+    
+    // Clone the animations for immutability
+    const animations = [...layer.animations];
+    
+    if (isDraggingAnimation) {
+      // Moving the entire animation
+      let newStartTime = Math.max(0, originalStartTime + dxTime);
+      
+      // Create a new animation object with the updated start time
+      animations[animationIndex] = {
+        ...animations[animationIndex],
+        startTime: newStartTime
+      };
+      
+      console.log(`Moving animation: ${layerId}, new start: ${newStartTime}`);
+    } 
+    else if (isResizingLeft) {
+      // Resizing from the left handle
+      let newStartTime = Math.max(0, originalStartTime + dxTime);
+      // Make sure duration stays positive
+      let newDuration = Math.max(0.1, originalDuration - (newStartTime - originalStartTime));
+      
+      // Create a new animation object with the updated values
+      animations[animationIndex] = {
+        ...animations[animationIndex],
+        startTime: newStartTime,
+        duration: newDuration
+      };
+      
+      console.log(`Resizing animation start: ${layerId}, new start: ${newStartTime}, new duration: ${newDuration}`);
+    }
+    else if (isResizingRight) {
+      // Resizing from the right handle
+      let newDuration = Math.max(0.1, originalDuration + dxTime);
+      
+      // Create a new animation object with the updated duration
+      animations[animationIndex] = {
+        ...animations[animationIndex],
+        duration: newDuration
+      };
+      
+      console.log(`Resizing animation duration: ${layerId}, new duration: ${newDuration}`);
+    }
+    
+    // Update the layer's animations
+    layer.animations = animations;
+    forceUpdate();
+  };
+  
+  // Handle animation drag end
+  const handleAnimationDragEnd = () => {
+    console.log('Animation drag/resize ended');
+    
+    // Reset drag state
+    dragState.current = {
+      ...dragState.current,
+      isDraggingAnimation: false,
+      isResizingLeft: false,
+      isResizingRight: false
+    };
+    
+    // Remove event listeners
+    document.removeEventListener('mousemove', handleAnimationDragMove);
+    document.removeEventListener('mouseup', handleAnimationDragEnd);
   };
   
   // Handle playhead drag
@@ -133,8 +268,6 @@ const Timeline = ({
     console.log(`Toggling playback to: ${newIsPlaying}`);
     onPlayPauseToggle(newIsPlaying);
   };
-  
-  // Animation loop is now defined inside the useEffect
   
   // Handle animation playback when isPlaying changes
   useEffect(() => {
@@ -292,8 +425,8 @@ const Timeline = ({
           
           {/* Timeline Track */}
           <div 
-            className="flex-1 bg-neutral-900 rounded cursor-pointer relative"
-            style={{ minWidth: '800px' }} /* Ensure a minimum width for consistent scaling */
+            className="flex-1 bg-neutral-900 rounded cursor-pointer relative overflow-auto"
+            style={{ minWidth: '400px', maxWidth: '100%' }} /* Ensure a reasonable size with scrolling */
             onClick={handleTimelineClick}
             ref={timelineRef}
           >
@@ -304,183 +437,44 @@ const Timeline = ({
                 className={`h-10 relative ${selectedLayerId === layer.id ? 'bg-[#1A1A1A]' : ''}`}
               >
                 {/* Animation blocks with drag handles */}
-                {layer.animations.map((animation: any, index: number) => {
-                  // Track dragging state for each animation
-                  const [isDraggingLeft, setIsDraggingLeft] = useState(false);
-                  const [isDraggingRight, setIsDraggingRight] = useState(false);
-                  const [isDraggingBlock, setIsDraggingBlock] = useState(false);
-                  
-                  // References to track mouse positions during drag
-                  const startPositionRef = useRef(0);
-                  const originalStartTimeRef = useRef(0);
-                  const originalDurationRef = useRef(0);
-                  
-                  // Handle start drag for left resize handle
-                  const handleLeftDragStart = (e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    setIsDraggingLeft(true);
-                    startPositionRef.current = e.clientX;
-                    originalStartTimeRef.current = animation.startTime || 0;
-                    originalDurationRef.current = animation.duration;
-                    
-                    // Add event listeners for drag and release
-                    document.addEventListener('mousemove', handleLeftDragMove);
-                    document.addEventListener('mouseup', handleLeftDragEnd);
-                  };
-                  
-                  // Handle drag move for left resize handle
-                  const handleLeftDragMove = (e: MouseEvent) => {
-                    if (!isDraggingLeft || !timelineRef.current) return;
-                    
-                    const rect = timelineRef.current.getBoundingClientRect();
-                    const dx = e.clientX - startPositionRef.current;
-                    const dxTime = positionToTime(dx);
-                    
-                    // Calculate new start time and duration
-                    let newStartTime = Math.max(0, originalStartTimeRef.current + dxTime);
-                    let newDuration = Math.max(0.1, originalDurationRef.current - (newStartTime - originalStartTimeRef.current));
-                    
-                    // Update the animation on the layer
-                    if (layer && layer.id) {
-                      console.log(`Resizing animation start: ${layer.id}, new start: ${newStartTime}, new duration: ${newDuration}`);
-                      // This would update the animation in the context in a real implementation
-                      animation.startTime = newStartTime;
-                      animation.duration = newDuration;
-                      // Force a re-render
-                      forceUpdate();
-                    }
-                  };
-                  
-                  // Handle drag end for left resize handle
-                  const handleLeftDragEnd = () => {
-                    setIsDraggingLeft(false);
-                    document.removeEventListener('mousemove', handleLeftDragMove);
-                    document.removeEventListener('mouseup', handleLeftDragEnd);
-                  };
-                  
-                  // Handle start drag for right resize handle
-                  const handleRightDragStart = (e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    setIsDraggingRight(true);
-                    startPositionRef.current = e.clientX;
-                    originalDurationRef.current = animation.duration;
-                    
-                    // Add event listeners for drag and release
-                    document.addEventListener('mousemove', handleRightDragMove);
-                    document.addEventListener('mouseup', handleRightDragEnd);
-                  };
-                  
-                  // Handle drag move for right resize handle
-                  const handleRightDragMove = (e: MouseEvent) => {
-                    if (!isDraggingRight || !timelineRef.current) return;
-                    
-                    const rect = timelineRef.current.getBoundingClientRect();
-                    const dx = e.clientX - startPositionRef.current;
-                    const dxTime = positionToTime(dx);
-                    
-                    // Calculate new duration
-                    let newDuration = Math.max(0.1, originalDurationRef.current + dxTime);
-                    
-                    // Update the animation on the layer
-                    if (layer && layer.id) {
-                      console.log(`Resizing animation duration: ${layer.id}, new duration: ${newDuration}`);
-                      // This would update the animation in the context in a real implementation
-                      animation.duration = newDuration;
-                      // Force a re-render
-                      forceUpdate();
-                    }
-                  };
-                  
-                  // Handle drag end for right resize handle
-                  const handleRightDragEnd = () => {
-                    setIsDraggingRight(false);
-                    document.removeEventListener('mousemove', handleRightDragMove);
-                    document.removeEventListener('mouseup', handleRightDragEnd);
-                  };
-                  
-                  // Handle block drag for moving the entire animation
-                  const handleBlockDragStart = (e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    setIsDraggingBlock(true);
-                    startPositionRef.current = e.clientX;
-                    originalStartTimeRef.current = animation.startTime || 0;
-                    
-                    // Add event listeners for drag and release
-                    document.addEventListener('mousemove', handleBlockDragMove);
-                    document.addEventListener('mouseup', handleBlockDragEnd);
-                  };
-                  
-                  // Handle drag move for moving the entire animation
-                  const handleBlockDragMove = (e: MouseEvent) => {
-                    if (!isDraggingBlock || !timelineRef.current) return;
-                    
-                    const rect = timelineRef.current.getBoundingClientRect();
-                    const dx = e.clientX - startPositionRef.current;
-                    const dxTime = positionToTime(dx);
-                    
-                    // Calculate new start time, ensuring it doesn't go below 0
-                    let newStartTime = Math.max(0, originalStartTimeRef.current + dxTime);
-                    
-                    // Update the animation on the layer
-                    if (layer && layer.id) {
-                      console.log(`Moving animation: ${layer.id}, new start: ${newStartTime}`);
-                      // This would update the animation in the context in a real implementation
-                      animation.startTime = newStartTime;
-                      // Force a re-render
-                      forceUpdate();
-                    }
-                  };
-                  
-                  // Handle drag end for moving the entire animation
-                  const handleBlockDragEnd = () => {
-                    setIsDraggingBlock(false);
-                    document.removeEventListener('mousemove', handleBlockDragMove);
-                    document.removeEventListener('mouseup', handleBlockDragEnd);
-                  };
-                  
-                  // Force update utility
-                  const [, updateState] = useState({});
-                  const forceUpdate = () => updateState({});
-                  
-                  return (
+                {layer.animations.map((animation, animIndex) => (
+                  <div 
+                    key={animIndex}
+                    className={`absolute h-6 top-2 rounded ${selectedLayerId === layer.id ? 'bg-[#2A5BFF] bg-opacity-70 border border-[#4A7CFF]' : 'bg-[#2A5BFF] bg-opacity-30 border border-[#4A7CFF]'} cursor-move`}
+                    style={{
+                      left: `${timeToPosition(animation.startTime || 0)}px`,
+                      width: `${timeToPosition(animation.duration)}px`
+                    }}
+                    onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'move')}
+                  >
+                    {/* Left resize handle */}
                     <div 
-                      key={index}
-                      className={`absolute h-6 top-2 rounded ${selectedLayerId === layer.id ? 'bg-[#2A5BFF] bg-opacity-70 border border-[#4A7CFF]' : 'bg-[#2A5BFF] bg-opacity-30 border border-[#4A7CFF]'} cursor-move`}
-                      style={{
-                        left: `${timeToPosition(animation.startTime || 0)}px`,
-                        width: `${timeToPosition(animation.duration)}px`
-                      }}
-                      onMouseDown={handleBlockDragStart}
-                    >
-                      {/* Left resize handle */}
-                      <div 
-                        className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize" 
-                        onMouseDown={handleLeftDragStart}
-                      ></div>
-                      
-                      {/* Animation content */}
-                      <div className="px-2 text-xs text-white truncate flex items-center justify-between w-full h-full pointer-events-none">
-                        <span>{animation.type}</span>
-                        {animation.duration >= 0.5 && (
-                          <span className="text-xs opacity-75 ml-1">
-                            {animation.duration.toFixed(1)}s
-                          </span>
-                        )}
-                      </div>
-                      
-                      {/* Right resize handle */}
-                      <div 
-                        className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize" 
-                        onMouseDown={handleRightDragStart}
-                      ></div>
+                      className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize" 
+                      onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'resize-left')}
+                    ></div>
+                    
+                    {/* Animation content */}
+                    <div className="px-2 text-xs text-white truncate flex items-center justify-between w-full h-full pointer-events-none">
+                      <span>{animation.type}</span>
+                      {animation.duration >= 0.5 && (
+                        <span className="text-xs opacity-75 ml-1">
+                          {animation.duration.toFixed(1)}s
+                        </span>
+                      )}
                     </div>
-                  );
-                })}
+                    
+                    {/* Right resize handle */}
+                    <div 
+                      className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize" 
+                      onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'resize-right')}
+                    ></div>
+                  </div>
+                ))}
                 
                 {/* Only show keyframes for selected layer */}
-                {selectedLayerId === layer.id && keyframes.map((keyframe: any, index: number) => (
+                {selectedLayerId === layer.id && keyframes.map((keyframe, keyIndex) => (
                   <div 
-                    key={index}
+                    key={keyIndex}
                     className="absolute w-3 h-3 top-3.5 -ml-1.5 rounded-sm bg-yellow-500 border border-yellow-600"
                     style={{ left: `${timeToPosition(keyframe.time)}px` }}
                   ></div>
