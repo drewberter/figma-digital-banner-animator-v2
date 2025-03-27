@@ -59,27 +59,46 @@ const Timeline = ({
         // Extract the ad size ID if we're looking at a GIF frame already
         let adSizeId = localSelectedFrameId;
         
-        // If it's a GIF frame ID (format: "gif-frame-1-1" or "gif-frame-frameX-Y")
+        // If it's a GIF frame ID, extract the parent ad size using our improved extraction logic
         if (localSelectedFrameId.startsWith('gif-frame-')) {
-          // Check if it's the old format (gif-frame-1-1) or new format (gif-frame-frameX-Y)
-          const parts = localSelectedFrameId.split('-');
-          if (parts.length > 2) {
-            // Check if the third part is numeric or starts with "frame"
-            if (parts[2] === '1' || parts[2] === '2' || parts[2] === '3' || parts[2] === '4') {
-              // Old format: gif-frame-1-1 (where 1 is the frame number)
-              adSizeId = `frame-${parts[2]}`;
-            } else {
-              // New format: gif-frame-frameX-Y
-              adSizeId = parts[2];
-            }
-          } else {
-            adSizeId = 'frame-1'; // Fallback
-          }
-          console.log("Extracted adSizeId from GIF frame:", adSizeId);
-        }
+          console.log("TimelineModeChange: Extracting ad size ID from GIF frame:", localSelectedFrameId);
           
+          // Extract ad size ID using more robust logic
+          const parts = localSelectedFrameId.split('-');
+          
+          if (parts.length >= 4) {
+            if (parts[2] === 'frame') {
+              // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
+              adSizeId = `${parts[2]}-${parts[3]}`;
+            } else {
+              // Format is gif-frame-X-Y, so we need to determine if X is a frame number or part of the ad size ID
+              adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+            }
+          } else if (parts.length === 4) {
+            // Old style - number-based
+            adSizeId = `frame-${parts[2]}`;
+          } else {
+            // Fallback
+            adSizeId = 'frame-1';
+          }
+          
+          console.log("TimelineModeChange: Extracted adSizeId:", adSizeId);
+        }
+        
+        // Check if the extracted adSizeId exists in mockLayers
+        if (!mockLayers[adSizeId]) {
+          console.warn("TimelineModeChange: Ad size not found in mockLayers:", adSizeId);
+          adSizeId = 'frame-1'; // Fallback to default frame
+        }
+        
         // Generate GIF frames for the current ad size
         const gifFrames = generateGifFramesForAdSize(adSizeId);
+        
+        if (gifFrames.length === 0) {
+          console.warn("TimelineModeChange: No GIF frames were generated for ad size", adSizeId);
+        } else {
+          console.log("TimelineModeChange: Generated GIF frames for ad size", adSizeId, "first frame:", gifFrames[0].id);
+        }
         
         // If frames were generated, select the first one
         if (gifFrames.length > 0 && onFrameSelect) {
@@ -590,20 +609,33 @@ const Timeline = ({
       
       // If it's already a GIF frame ID, extract the parent ad size
       if (localSelectedFrameId.startsWith('gif-frame-')) {
-        // Extract ad size ID using our improved extraction logic
+        console.log("Extracting ad size ID from GIF frame:", localSelectedFrameId);
+        
+        // More robust extraction logic
+        // Format could be either:
+        // 1. gif-frame-frame-1-1 (new format: gif-frame-[adSizeId]-[frameNumber])
+        // 2. gif-frame-1-1 (old format: gif-frame-[frameNumber]-[frameNumber])
+        
         const parts = localSelectedFrameId.split('-');
-        if (parts.length > 2) {
-          // Check if it's the old format (gif-frame-1-1) or new format (gif-frame-frameX-Y)
-          if (parts[2] === '1' || parts[2] === '2' || parts[2] === '3' || parts[2] === '4') {
-            // Old format: gif-frame-1-1 (where 1 is the frame number)
-            selectedAdSizeId = `frame-${parts[2]}`;
+        
+        if (parts.length >= 4) { // New format: gif-frame-frame-1-1
+          if (parts[2] === 'frame') {
+            // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
+            selectedAdSizeId = `${parts[2]}-${parts[3]}`;
           } else {
-            // New format: gif-frame-frameX-Y
-            selectedAdSizeId = parts[2];
+            // Format is gif-frame-X-Y, so we need to determine if X is a frame number or part of the ad size ID
+            selectedAdSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
           }
+        } else if (parts.length === 4) { // Old format: gif-frame-1-1
+          // Old style - number-based
+          selectedAdSizeId = `frame-${parts[2]}`;
         } else {
-          selectedAdSizeId = 'frame-1'; // Fallback
+          // If we can't determine the format, use frame-1 as fallback
+          console.warn("Could not parse GIF frame ID format:", localSelectedFrameId);
+          selectedAdSizeId = 'frame-1';
         }
+        
+        console.log("Extracted ad size ID:", selectedAdSizeId);
       }
       
       console.log("Adding new GIF frame for ad size:", selectedAdSizeId);
@@ -615,11 +647,17 @@ const Timeline = ({
       const newGifFrameNumber = currentGifFrames.length + 1;
       const newGifFrameId = `gif-frame-${selectedAdSizeId}-${newGifFrameNumber}`;
       
-      // Find the base ad size to get its layers
+      // Check if the selected ad size exists in mockLayers first
+      if (!mockLayers[selectedAdSizeId]) {
+        console.error("Could not find ad size in mockLayers:", selectedAdSizeId);
+        return;
+      }
+      
+      // Optionally also check in mockFrames
       const adSize = mockFrames.find(f => f.id === selectedAdSizeId);
       if (!adSize) {
-        console.error("Could not find ad size:", selectedAdSizeId);
-        return;
+        console.log("Ad size not found in mockFrames, but exists in mockLayers:", selectedAdSizeId);
+        // We can still continue since we have the layers
       }
       
       // Get layers for this ad size
