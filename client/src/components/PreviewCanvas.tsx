@@ -343,7 +343,7 @@ const PreviewCanvas = ({
                     ref={buttonRef}
                     className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-medium transition-all duration-300"
                   >
-                    Shop Now
+                    {selectedFrame.buttonText || "Shop Now"}
                   </button>
                 )}
               </div>
@@ -352,7 +352,7 @@ const PreviewCanvas = ({
               <div className="absolute bottom-2 left-0 right-0 flex justify-center">
                 {logoLayer && logoLayer.visible && (
                   <div ref={logoRef} className="text-white text-xs bg-white text-black px-2 py-1 rounded-full transition-all duration-300">
-                    LOGO
+                    {selectedFrame.logoText || "LOGO"}
                   </div>
                 )}
               </div>

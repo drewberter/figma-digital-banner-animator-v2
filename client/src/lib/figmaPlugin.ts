@@ -96,6 +96,9 @@ export function exportGif(options: any): void {
     // In development mode, fake a download by creating a demo GIF for testing
     console.log('Dev mode: Creating demo GIF download');
     try {
+      // Log full options for debugging
+      console.log('DEBUG: Full export options:', JSON.stringify(options));
+      
       // Create a simple canvas with the frame content
       const canvas = document.createElement('canvas');
       canvas.width = options.width || 300;

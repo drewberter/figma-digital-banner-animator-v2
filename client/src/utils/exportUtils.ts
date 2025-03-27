@@ -55,12 +55,22 @@ interface WebmExportOptions {
 // Export animation as GIF
 export async function exportGif(options: GifExportOptions): Promise<void> {
   try {
+    console.log('exportGif called with options:', options);
     const { frames, useCustomContent, ...otherOptions } = options;
+    
+    // Make sure frames is always an array
+    const frameArray = Array.isArray(frames) ? frames : [];
+    
+    if (frameArray.length === 0) {
+      console.error('No frames provided for GIF export');
+      alert('Error: No frames available for export. Please make sure you have frames selected.');
+      return;
+    }
     
     // If frames are custom content frames, we need to modify them for export
     if (useCustomContent) {
       // Create a modified version of frames that includes the custom content
-      const processedFrames = frames.map(frame => {
+      const processedFrames = frameArray.map(frame => {
         // Generate a frame with custom content from the original frame data
         return {
           ...frame,
@@ -81,12 +91,15 @@ export async function exportGif(options: GifExportOptions): Promise<void> {
         hasCustomContent: true
       });
     } else {
-      // Standard animation frames, forward as is
-      pluginExportGif(options);
+      // Standard animation frames, forward as is but make sure we're passing the array
+      pluginExportGif({
+        ...otherOptions,
+        frames: frameArray
+      });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error exporting GIF:', error);
-    throw error;
+    alert(`Export failed: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -95,9 +108,9 @@ export async function exportHtml(options: HtmlExportOptions): Promise<void> {
   try {
     // Forward the export request to the plugin
     pluginExportHtml(options);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error exporting HTML5:', error);
-    throw error;
+    alert(`HTML5 export failed: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -173,9 +186,9 @@ export async function exportMp4(options: Mp4ExportOptions): Promise<void> {
   try {
     // Forward the export request to the plugin
     pluginExportMp4(options);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error exporting MP4:', error);
-    throw error;
+    alert(`MP4 export failed: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -184,8 +197,8 @@ export async function exportWebm(options: WebmExportOptions): Promise<void> {
   try {
     // Forward the export request to the plugin
     pluginExportWebm(options);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error exporting WebM:', error);
-    throw error;
+    alert(`WebM export failed: ${error.message || 'Unknown error'}`);
   }
 }
