@@ -16,7 +16,9 @@ interface FrameCardGridProps {
 }
 
 // Helper function to get layers for a frame (handles GIF frames by using parent ad size layers)
-const getLayersForFrame = (frameId: string, layersMap: Record<string, AnimationLayer[]>): AnimationLayer[] => {
+const getLayersForFrame = (frameId: string, layersMap: Record<string, AnimationLayer[]>, frames?: Record<string, AnimationFrame>): AnimationLayer[] => {
+  const frame = frames ? frames[frameId] : undefined;
+  
   // Check if this is a GIF frame
   if (frameId.startsWith('gif-frame-')) {
     // Extract the parent ad size ID from the GIF frame ID
@@ -34,7 +36,25 @@ const getLayersForFrame = (frameId: string, layersMap: Record<string, AnimationL
     }
     
     console.log("FrameCardGrid - Extracted adSizeId from GIF frame:", adSizeId);
-    return layersMap[adSizeId] || [];
+    
+    // Get the parent ad size's layers
+    const parentLayers = layersMap[adSizeId] || [];
+    
+    // Apply the GIF frame's hidden layers to create new layer objects with correct visibility
+    if (frame && frame.hiddenLayers) {
+      return parentLayers.map(layer => {
+        // Check if this layer is hidden in this GIF frame
+        const isHidden = frame.hiddenLayers?.includes(layer.id);
+        
+        // Create a new layer object with the correct visibility
+        return {
+          ...layer,
+          visible: !isHidden
+        };
+      });
+    }
+    
+    return parentLayers;
   }
   
   // Regular ad size frame, return its layers directly
@@ -64,7 +84,7 @@ const FrameCardGrid = ({
         <FrameCard 
           key={frame.id}
           frame={frame}
-          layers={getLayersForFrame(frame.id, layers)}
+          layers={getLayersForFrame(frame.id, layers, frames)}
           isSelected={frame.id === selectedFrameId}
           onSelect={() => onFrameSelect(frame.id)}
           onToggleLayerVisibility={(layerId) => onToggleLayerVisibility(frame.id, layerId)}
