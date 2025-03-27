@@ -1,15 +1,17 @@
 import { useRef, useEffect, useState } from 'react';
-import { mockFrames, mockLayers } from '../mock/animationData';
-import { AnimationType, EasingType, AnimationMode } from '../types/animation';
+import { mockFrames, mockLayers, mockGifFrames } from '../mock/animationData';
+import { AnimationType, EasingType, AnimationMode, TimelineMode } from '../types/animation';
 
 interface PreviewCanvasProps {
   selectedFrameId?: string;
   currentTime?: number;
+  timelineMode?: TimelineMode;
 }
 
 const PreviewCanvas = ({ 
   selectedFrameId = 'frame-1',
-  currentTime = 0
+  currentTime = 0,
+  timelineMode = TimelineMode.Animation
 }: PreviewCanvasProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -288,13 +290,35 @@ const PreviewCanvas = ({
   
   // Update animations when currentTime changes
   useEffect(() => {
-    // Process animations for each element
-    // Use '1' as the default opacity to make elements visible by default
-    processAnimations(headlineRef.current, headlineLayer, '1', 'translateY(0)');
-    processAnimations(subtitleRef.current, subtitleLayer, '1', 'translateY(0)');
-    processAnimations(buttonRef.current, buttonLayer, '1', 'scale(1)');
-    processAnimations(logoRef.current, logoLayer, '1', 'rotate(0deg)');
-  }, [currentTime, selectedFrameId]);
+    // Only process animations in Animation mode
+    // In GIF frame mode, show static frames without animations
+    if (timelineMode === TimelineMode.Animation) {
+      // Process animations for each element
+      // Use '1' as the default opacity to make elements visible by default
+      processAnimations(headlineRef.current, headlineLayer, '1', 'translateY(0)');
+      processAnimations(subtitleRef.current, subtitleLayer, '1', 'translateY(0)');
+      processAnimations(buttonRef.current, buttonLayer, '1', 'scale(1)');
+      processAnimations(logoRef.current, logoLayer, '1', 'rotate(0deg)');
+    } else {
+      // In GIF frame mode, all elements are fully visible without animations
+      if (headlineRef.current) {
+        headlineRef.current.style.opacity = '1';
+        headlineRef.current.style.transform = 'translateY(0)';
+      }
+      if (subtitleRef.current) {
+        subtitleRef.current.style.opacity = '1';
+        subtitleRef.current.style.transform = 'translateY(0)';
+      }
+      if (buttonRef.current) {
+        buttonRef.current.style.opacity = '1';
+        buttonRef.current.style.transform = 'scale(1)';
+      }
+      if (logoRef.current) {
+        logoRef.current.style.opacity = '1';
+        logoRef.current.style.transform = 'rotate(0deg)';
+      }
+    }
+  }, [currentTime, selectedFrameId, timelineMode]);
 
   // Calculate scaling factor to fit the frame within the preview area
   const calculateScaleFactor = () => {

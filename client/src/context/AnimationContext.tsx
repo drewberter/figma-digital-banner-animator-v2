@@ -34,7 +34,7 @@ interface AnimationContextType {
   addLayer: (layer: AnimationLayer) => void;
   removeLayer: (layerId: string) => void;
   updateLayer: (layerId: string, updates: Partial<AnimationLayer>) => void;
-  toggleLayerVisibility: (layerId: string) => void;
+  toggleLayerVisibility: (frameId: string, layerId: string) => void;
   toggleLayerLock: (layerId: string) => void;
   
   // Frames
@@ -228,12 +228,68 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // Toggle layer visibility
-  const toggleLayerVisibility = useCallback((layerId: string) => {
-    setLayers(prev => 
-      prev.map(layer => 
-        layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
-      )
-    );
+  const toggleLayerVisibility = useCallback((frameId: string, layerId: string) => {
+    // Check if this is a GIF frame
+    if (frameId.startsWith('gif-frame-')) {
+      // Extract the parent ad size ID from the GIF frame ID
+      const parts = frameId.split('-');
+      let adSizeId = 'frame-1'; // Default fallback
+      
+      if (parts.length >= 4) {
+        if (parts[2] === 'frame') {
+          // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
+          adSizeId = `${parts[2]}-${parts[3]}`;
+        } else {
+          // Format is gif-frame-X-Y, determine if X is a frame number or part of the ad size ID
+          adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+        }
+      } else if (parts.length === 4) {
+        // Old format: gif-frame-1-1
+        adSizeId = `frame-${parts[2]}`;
+      }
+      
+      console.log("AnimationContext - For GIF frame:", frameId, "using parent ad size:", adSizeId);
+      
+      // Toggle visibility for the layer in its parent ad size
+      setFramesLayers(prev => {
+        const updatedFramesLayers = {...prev};
+        
+        if (updatedFramesLayers[adSizeId]) {
+          updatedFramesLayers[adSizeId] = updatedFramesLayers[adSizeId].map(layer => 
+            layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
+          );
+        }
+        
+        return updatedFramesLayers;
+      });
+      
+      // Update current layers if they're from the same ad size
+      setLayers(prev => 
+        prev.map(layer => 
+          layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
+        )
+      );
+    } else {
+      // Regular frame - just update the layers directly
+      setLayers(prev => 
+        prev.map(layer => 
+          layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
+        )
+      );
+      
+      // Also update in framesLayers map
+      setFramesLayers(prev => {
+        const updatedFramesLayers = {...prev};
+        
+        if (updatedFramesLayers[frameId]) {
+          updatedFramesLayers[frameId] = updatedFramesLayers[frameId].map(layer => 
+            layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
+          );
+        }
+        
+        return updatedFramesLayers;
+      });
+    }
   }, []);
 
   // Toggle layer lock

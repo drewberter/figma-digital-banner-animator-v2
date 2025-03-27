@@ -184,18 +184,69 @@ const Timeline = ({
   const handleToggleLayerVisibilityInFrame = (frameId: string, layerId: string) => {
     console.log("Toggling visibility for layer", layerId, "in frame", frameId);
     
-    // Find the frame
-    const frame = mockLayers[frameId];
-    if (!frame) return;
-    
-    const layerIndex = frame.findIndex(l => l.id === layerId);
-    if (layerIndex === -1) return;
-    
-    // Toggle the layer's visibility
-    frame[layerIndex].visible = !frame[layerIndex].visible;
-    
-    // Update the layers for the frame
-    mockLayers[frameId] = [...frame];
+    // If this is a GIF frame, we need to handle it differently
+    if (frameId.startsWith('gif-frame-')) {
+      // Extract the parent ad size ID
+      let adSizeId = '';
+      const parts = frameId.split('-');
+      
+      if (parts.length >= 4) {
+        if (parts[2] === 'frame') {
+          // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
+          adSizeId = `${parts[2]}-${parts[3]}`;
+        } else {
+          // Format is gif-frame-X-Y
+          adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+        }
+      } else if (parts.length === 4) {
+        // Old format: gif-frame-1-1
+        adSizeId = `frame-${parts[2]}`;
+      }
+      
+      console.log("Toggling visibility in GIF frame. Using parent ad size:", adSizeId);
+      
+      // Find the GIF frame
+      const gifFrame = mockGifFrames.find(frame => frame.id === frameId);
+      if (!gifFrame) {
+        console.error("GIF frame not found:", frameId);
+        return;
+      }
+      
+      // Update the hiddenLayers array in the GIF frame
+      if (gifFrame.hiddenLayers.includes(layerId)) {
+        // Make the layer visible by removing it from hiddenLayers
+        gifFrame.hiddenLayers = gifFrame.hiddenLayers.filter(id => id !== layerId);
+      } else {
+        // Hide the layer by adding it to hiddenLayers
+        gifFrame.hiddenLayers.push(layerId);
+      }
+      
+      // Update the visibleLayerCount
+      const totalLayers = mockLayers[adSizeId]?.length || 0;
+      gifFrame.visibleLayerCount = totalLayers - gifFrame.hiddenLayers.length;
+      
+      console.log("Updated GIF frame:", gifFrame);
+    } else {
+      // Regular ad size frame - toggle layer visibility directly
+      // Find the frame
+      const frame = mockLayers[frameId];
+      if (!frame) {
+        console.error("Frame layers not found:", frameId);
+        return;
+      }
+      
+      const layerIndex = frame.findIndex(l => l.id === layerId);
+      if (layerIndex === -1) {
+        console.error("Layer not found:", layerId, "in frame", frameId);
+        return;
+      }
+      
+      // Toggle the layer's visibility
+      frame[layerIndex].visible = !frame[layerIndex].visible;
+      
+      // Update the layers for the frame
+      mockLayers[frameId] = [...frame];
+    }
     
     // Force a re-render
     forceUpdate();
@@ -589,11 +640,15 @@ const Timeline = ({
   
   // Handle adding a blank frame
   const handleAddBlankFrame = () => {
+    console.log("handleAddBlankFrame called with timelineMode:", timelineMode);
+    
     // Different behavior based on the timeline mode
     if (timelineMode === TimelineMode.Animation) {
       // In Animation mode, add a new ad size
       const frameCount = Object.keys(mockLayers).length;
       const newFrameNumber = frameCount + 1;
+      
+      console.log("Adding new animation frame (ad size):", `Frame ${newFrameNumber}`);
       
       handleAddFrame({
         name: `Frame ${newFrameNumber}`,
@@ -602,6 +657,7 @@ const Timeline = ({
       });
     } else if (timelineMode === TimelineMode.GifFrames) {
       // In GIF Frames mode, add a new GIF frame to the current ad size
+      console.log("Adding new GIF frame. Current selection:", localSelectedFrameId);
       
       // Get the selected ad size ID (using the "frame-X" format)
       // This is the parent ad size for which we want to add a GIF frame
@@ -617,6 +673,7 @@ const Timeline = ({
         // 2. gif-frame-1-1 (old format: gif-frame-[frameNumber]-[frameNumber])
         
         const parts = localSelectedFrameId.split('-');
+        console.log("Parts from split:", parts);
         
         if (parts.length >= 4) { // New format: gif-frame-frame-1-1
           if (parts[2] === 'frame') {
@@ -639,18 +696,30 @@ const Timeline = ({
       }
       
       console.log("Adding new GIF frame for ad size:", selectedAdSizeId);
+      console.log("Available mockLayers keys:", Object.keys(mockLayers));
       
       // Get current GIF frames for this ad size
       const currentGifFrames = generateGifFramesForAdSize(selectedAdSizeId);
+      console.log("Current GIF frames for this ad size:", currentGifFrames);
       
       // Create a new GIF frame
       const newGifFrameNumber = currentGifFrames.length + 1;
       const newGifFrameId = `gif-frame-${selectedAdSizeId}-${newGifFrameNumber}`;
+      console.log("New GIF frame ID:", newGifFrameId);
       
       // Check if the selected ad size exists in mockLayers first
       if (!mockLayers[selectedAdSizeId]) {
         console.error("Could not find ad size in mockLayers:", selectedAdSizeId);
-        return;
+        
+        // Emergency fallback - use the first available ad size
+        const availableAdSizes = Object.keys(mockLayers);
+        if (availableAdSizes.length > 0) {
+          selectedAdSizeId = availableAdSizes[0];
+          console.log("Using fallback ad size:", selectedAdSizeId);
+        } else {
+          console.error("No available ad sizes found in mockLayers");
+          return;
+        }
       }
       
       // Optionally also check in mockFrames
@@ -662,6 +731,7 @@ const Timeline = ({
       
       // Get layers for this ad size
       const layers = mockLayers[selectedAdSizeId] || [];
+      console.log("Layers for this ad size:", layers.length);
       
       // Create the new GIF frame
       const newGifFrame: GifFrame = {
@@ -675,16 +745,24 @@ const Timeline = ({
         frameIndex: currentGifFrames.length
       };
       
+      console.log("Created new GIF frame:", newGifFrame);
+      
       // Add the new GIF frame to the mock data
       mockGifFrames.push(newGifFrame);
+      console.log("Added new GIF frame to mockGifFrames. Current count:", mockGifFrames.length);
       
       // If frames were generated, select the new one
       if (onFrameSelect) {
+        console.log("Selecting new GIF frame:", newGifFrameId);
         onFrameSelect(newGifFrameId);
+      } else {
+        console.warn("onFrameSelect callback is not available");
       }
       
       // Force a re-render
       forceUpdate();
+    } else {
+      console.error("Unknown timeline mode:", timelineMode);
     }
   };
   

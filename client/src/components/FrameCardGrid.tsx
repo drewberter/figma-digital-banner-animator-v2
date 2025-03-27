@@ -259,7 +259,7 @@ const FrameCard = ({
                 <span className="text-xs text-neutral-300">{layer.name}</span>
                 <button
                   className={`p-1 rounded ${layer.visible ? 'text-green-400' : 'text-neutral-500'}`}
-                  onClick={() => onToggleLayerVisibility(layer.id)}
+                  onClick={() => onToggleLayerVisibility(frame.id, layer.id)}
                   title={layer.visible ? 'Hide layer' : 'Show layer'}
                 >
                   {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}

@@ -429,7 +429,8 @@ function App() {
               <div className="min-h-[250px]">
                 <PreviewCanvas 
                   selectedFrameId={timelineMode === TimelineMode.GifFrames ? selectedGifFrameId : selectedAdSizeId} 
-                  currentTime={currentTime} 
+                  currentTime={currentTime}
+                  timelineMode={timelineMode}
                 />
               </div>
               <Timeline 
