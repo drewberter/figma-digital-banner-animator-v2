@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Download } from 'lucide-react';
+import { X, Download, ChevronUp, ChevronDown } from 'lucide-react';
 import { exportGif, exportHtml, exportMp4, exportWebm } from '../utils/exportUtils';
 import { useAnimationContext } from '../context/AnimationContext';
 
@@ -27,6 +27,14 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
   const [videoFormat, setVideoFormat] = useState<'h264' | 'vp9'>('h264'); // Codec selection
   const [transparent, setTransparent] = useState(false); // For WebM transparency
   const [specialGifFormat, setSpecialGifFormat] = useState(false); // Special client GIF format
+  
+  // Advanced GIF options
+  const [showAdvancedGifOptions, setShowAdvancedGifOptions] = useState(false);
+  const [frameCount, setFrameCount] = useState(0); // 0 = all frames, otherwise specific count
+  const [frameDelay, setFrameDelay] = useState(100); // in milliseconds
+  const [disposalMethod, setDisposalMethod] = useState<'none' | 'background' | 'previous'>('none');
+  const [dithering, setDithering] = useState<'none' | 'pattern' | 'diffusion'>('diffusion');
+  const [compression, setCompression] = useState(7); // 1-10 scale
   
   // Common banner sizes
   const sizes: ExportSize[] = [
@@ -82,16 +90,42 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
         console.log('Exporting as Special Client GIF Format:', specialGifOptions);
         exportGif(specialGifOptions);
       } else {
+        // Select frames if frameCount is specified in advanced options
+        let selectedFrames = [...frames];
+        if (showAdvancedGifOptions && frameCount > 0 && frameCount < frames.length) {
+          // Calculate frames to include with even distribution
+          const step = frames.length / frameCount;
+          selectedFrames = [];
+          
+          for (let i = 0; i < frameCount; i++) {
+            const index = Math.min(Math.floor(i * step), frames.length - 1);
+            selectedFrames.push(frames[index]);
+          }
+        }
+        
         const gifOptions = {
-          frames,
+          frames: selectedFrames,
           ...commonOptions,
           quality: quality === 'high' ? 1 : quality === 'medium' ? 0.6 : 0.3,
-          dithering: (quality === 'high' ? 'diffusion' : quality === 'medium' ? 'pattern' : 'none') as 'diffusion' | 'pattern' | 'none',
+          dithering: showAdvancedGifOptions ? dithering : 
+                    (quality === 'high' ? 'diffusion' : 
+                     quality === 'medium' ? 'pattern' : 'none') as 'diffusion' | 'pattern' | 'none',
           colorDepth: (quality === 'high' ? 24 : quality === 'medium' ? 16 : 8) as 8 | 16 | 24,
-          loop: true
+          loop: true,
+          // Add advanced options if they're visible
+          ...(showAdvancedGifOptions && {
+            delay: frameDelay,
+            disposal: disposalMethod,
+            // Apply compression by adjusting quality
+            quality: quality === 'high' ? 
+                     (1 - (compression - 1) * 0.05) : // Scale from 0.95 (compression=1) to 0.5 (compression=10)
+                     quality === 'medium' ? 
+                     (0.6 - (compression - 1) * 0.03) : // Scale medium quality
+                     (0.3 - (compression - 1) * 0.02)  // Scale low quality
+          })
         };
         
-        console.log('Exporting as GIF:', gifOptions);
+        console.log('Exporting as GIF with advanced options:', gifOptions);
         exportGif(gifOptions);
       }
     } 
@@ -266,6 +300,129 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
                     3 frames, 2.5s between frames, no disposal
                   </p>
                 </div>
+              </div>
+              
+              <div className="mt-5">
+                <button
+                  onClick={() => setShowAdvancedGifOptions(!showAdvancedGifOptions)}
+                  className="flex items-center text-sm text-neutral-300 hover:text-white"
+                >
+                  <span className="mr-1">Advanced Options</span>
+                  {showAdvancedGifOptions ? (
+                    <ChevronUp size={16} className="text-neutral-500" />
+                  ) : (
+                    <ChevronDown size={16} className="text-neutral-500" />
+                  )}
+                </button>
+                
+                {showAdvancedGifOptions && !specialGifFormat && (
+                  <div className="mt-4 space-y-4 rounded-md bg-[#1a1a1a] p-4 border border-neutral-700">
+                    <div>
+                      <label className="block text-sm text-neutral-300 mb-2">Frame Count</label>
+                      <div className="flex items-center">
+                        <input
+                          type="range"
+                          min="0"
+                          max={Math.max(20, frames.length)}
+                          step="1"
+                          value={frameCount}
+                          onChange={(e) => setFrameCount(parseInt(e.target.value))}
+                          className="flex-1 mr-3"
+                        />
+                        <div className="w-16 text-center text-sm text-neutral-300">
+                          {frameCount === 0 ? 'All' : frameCount}
+                        </div>
+                      </div>
+                      <p className="text-xs text-neutral-500 mt-1">Set to 0 to use all frames</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm text-neutral-300 mb-2">Frame Delay (ms)</label>
+                      <div className="flex items-center">
+                        <input
+                          type="range"
+                          min="10"
+                          max="3000"
+                          step="10"
+                          value={frameDelay}
+                          onChange={(e) => setFrameDelay(parseInt(e.target.value))}
+                          className="flex-1 mr-3"
+                        />
+                        <div className="w-16 text-center text-sm text-neutral-300">
+                          {frameDelay} ms
+                        </div>
+                      </div>
+                      <p className="text-xs text-neutral-500 mt-1">Time between frames</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm text-neutral-300 mb-2">Disposal Method</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          className={`py-2 px-1 rounded ${disposalMethod === 'none' ? 'bg-[#2a2a2a] text-white' : 'bg-[#191919] text-neutral-400'}`}
+                          onClick={() => setDisposalMethod('none')}
+                        >
+                          None
+                        </button>
+                        <button
+                          className={`py-2 px-1 rounded ${disposalMethod === 'background' ? 'bg-[#2a2a2a] text-white' : 'bg-[#191919] text-neutral-400'}`}
+                          onClick={() => setDisposalMethod('background')}
+                        >
+                          Background
+                        </button>
+                        <button
+                          className={`py-2 px-1 rounded ${disposalMethod === 'previous' ? 'bg-[#2a2a2a] text-white' : 'bg-[#191919] text-neutral-400'}`}
+                          onClick={() => setDisposalMethod('previous')}
+                        >
+                          Previous
+                        </button>
+                      </div>
+                      <p className="text-xs text-neutral-500 mt-1">How frames are cleared</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm text-neutral-300 mb-2">Dithering</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          className={`py-2 px-1 rounded ${dithering === 'none' ? 'bg-[#2a2a2a] text-white' : 'bg-[#191919] text-neutral-400'}`}
+                          onClick={() => setDithering('none')}
+                        >
+                          None
+                        </button>
+                        <button
+                          className={`py-2 px-1 rounded ${dithering === 'pattern' ? 'bg-[#2a2a2a] text-white' : 'bg-[#191919] text-neutral-400'}`}
+                          onClick={() => setDithering('pattern')}
+                        >
+                          Pattern
+                        </button>
+                        <button
+                          className={`py-2 px-1 rounded ${dithering === 'diffusion' ? 'bg-[#2a2a2a] text-white' : 'bg-[#191919] text-neutral-400'}`}
+                          onClick={() => setDithering('diffusion')}
+                        >
+                          Diffusion
+                        </button>
+                      </div>
+                      <p className="text-xs text-neutral-500 mt-1">Color blending technique</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm text-neutral-300 mb-2">Compression ({compression})</label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        step="1"
+                        value={compression}
+                        onChange={(e) => setCompression(parseInt(e.target.value))}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-neutral-500">
+                        <span>Low (Larger file)</span>
+                        <span>High (Smaller file)</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
