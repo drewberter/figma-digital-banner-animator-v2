@@ -14,7 +14,13 @@ import { TimelineMode } from "./types/animation";
 function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPresetsPanelOpen, setIsPresetsPanelOpen] = useState(false);
-  const [selectedFrameId, setSelectedFrameId] = useState('frame-1');
+  // This is for selecting which ad size to preview
+  const [selectedAdSizeId, setSelectedAdSizeId] = useState('frame-1');
+  
+  // This is for selecting which GIF frame to focus on in GifFrames mode
+  const [selectedGifFrameId, setSelectedGifFrameId] = useState('frame-1');
+  
+  // Current frame ID based on the current mode - for timeline, preview, etc.
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timelineDuration, setTimelineDuration] = useState(5); // Default 5 seconds
@@ -63,10 +69,16 @@ function App() {
     setIsPresetsPanelOpen(true);
   };
   
-  // Handle frame selection from left sidebar
+  // Handle frame selection from left sidebar (ad size selection)
   const handleFrameSelect = (frameId: string) => {
-    console.log('App: Selected frame:', frameId);
-    setSelectedFrameId(frameId);
+    console.log('App: Selected ad size:', frameId);
+    setSelectedAdSizeId(frameId);
+  };
+  
+  // Handle GIF frame selection in GIF frames mode
+  const handleGifFrameSelect = (frameId: string) => {
+    console.log('App: Selected GIF frame:', frameId);
+    setSelectedGifFrameId(frameId);
   };
   
   // Handle timeline updates
@@ -135,13 +147,13 @@ function App() {
     });
     
     setFrameSequenceData({
-      currentFrameIndex: frameIds.indexOf(selectedFrameId),
+      currentFrameIndex: frameIds.indexOf(selectedGifFrameId),
       frameIds,
       frameTotalDurations,
       frameStartTimes
     });
     
-  }, [timelineMode, selectedFrameId, timelineDuration]);
+  }, [timelineMode, selectedGifFrameId, timelineDuration]);
 
   // Handle play/pause toggle
   const handlePlayPauseToggle = (playing: boolean) => {
@@ -202,7 +214,7 @@ function App() {
           // If we've completed the sequence, start over
           if (newTime >= totalSequenceDuration) {
             setCurrentTime(0);
-            setSelectedFrameId(frameIds[0]);
+            setSelectedGifFrameId(frameIds[0]);
             animationFrameIdRef.current = requestAnimationFrame(animationFrame);
             return;
           }
@@ -221,8 +233,8 @@ function App() {
               foundCurrentFrame = true;
               
               // If we need to switch frames
-              if (frameId !== selectedFrameId) {
-                setSelectedFrameId(frameId);
+              if (frameId !== selectedGifFrameId) {
+                setSelectedGifFrameId(frameId);
               }
               
               // Set time within this frame (accounting for this frame's delay)
@@ -288,12 +300,13 @@ function App() {
             <LeftSidebar 
               onOpenPresets={handleOpenPresets} 
               onSelectFrame={handleFrameSelect}
+              selectedAdSizeId={selectedAdSizeId}
             />
             
             <div className="flex-1 flex flex-col bg-neutral-900 overflow-auto">
               <div className="min-h-[250px]">
                 <PreviewCanvas 
-                  selectedFrameId={selectedFrameId} 
+                  selectedFrameId={timelineMode === TimelineMode.GifFrames ? selectedGifFrameId : selectedAdSizeId} 
                   currentTime={currentTime} 
                 />
               </div>
@@ -302,13 +315,13 @@ function App() {
                 onPlayPauseToggle={handlePlayPauseToggle}
                 isPlaying={isPlaying}
                 currentTime={currentTime}
-                selectedFrameId={selectedFrameId}
+                selectedFrameId={timelineMode === TimelineMode.GifFrames ? selectedGifFrameId : selectedAdSizeId}
                 onDurationChange={setTimelineDuration}
                 onLinkLayers={handleLinkLayers}
                 onUnlinkLayer={handleUnlinkLayer}
                 timelineMode={timelineMode}
                 onTimelineModeChange={handleTimelineModeChange}
-                onFrameSelect={handleFrameSelect}
+                onFrameSelect={timelineMode === TimelineMode.GifFrames ? handleGifFrameSelect : handleFrameSelect}
               />
             </div>
             

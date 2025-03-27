@@ -6,13 +6,13 @@ import { AdSize, AnimationFrame } from '../types/animation';
 interface LeftSidebarProps {
   onOpenPresets: () => void;
   onSelectFrame?: (frameId: string) => void;
+  selectedAdSizeId?: string;
 }
 
-const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
+const LeftSidebar = ({ onOpenPresets, onSelectFrame, selectedAdSizeId = 'frame-1' }: LeftSidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [frameListExpanded, setFrameListExpanded] = useState(true);
   const [layerListExpanded, setLayerListExpanded] = useState(true);
-  const [selectedFrameId, setSelectedFrameId] = useState('frame-1');
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(
     mockLayers['frame-1']?.length > 0 ? mockLayers['frame-1'][0].id : null
   );
@@ -51,8 +51,6 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
     }
   ]);
   
-  const [selectedAdSizeId, setSelectedAdSizeId] = useState<string>('adsize-300x250');
-  
   // Mock add ad size function
   const addAdSize = (adSizeData: { name: string, width: number, height: number }) => {
     const newAdSize: AdSize = {
@@ -70,23 +68,14 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
       return [...updatedAdSizes, { ...newAdSize, selected: true }];
     });
     
-    setSelectedAdSizeId(newAdSize.id);
+    // Update the app's state through the provided callback
+    if (onSelectFrame) {
+      onSelectFrame(newAdSize.id);
+    }
   };
   
-  // Mock select ad size function
-  const selectAdSize = (adSizeId: string) => {
-    setAdSizes(prev =>
-      prev.map(size => ({
-        ...size,
-        selected: size.id === adSizeId
-      }))
-    );
-    
-    setSelectedAdSizeId(adSizeId);
-  };
-  
-  // Get the current layers for the selected frame
-  const currentLayers = mockLayers[selectedFrameId] || [];
+  // Get the current layers for the selected ad size
+  const currentLayers = mockLayers[selectedAdSizeId] || [];
   
   // Toggle sidebar collapsed state
   const toggleCollapsed = () => {
@@ -96,7 +85,6 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
   // Select a frame and pass the event to parent
   const handleSelectFrame = (frameId: string) => {
     console.log('Selected frame:', frameId);
-    setSelectedFrameId(frameId);
     
     // Reset selected layer when changing frames
     const frameLayers = mockLayers[frameId] || [];
@@ -165,7 +153,7 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
           {mockFrames.map((frame) => (
             <div 
               key={frame.id}
-              className={`w-6 h-6 mb-1 rounded-sm flex items-center justify-center cursor-pointer ${selectedFrameId === frame.id ? 'bg-[#4A7CFF]' : 'bg-neutral-800 hover:bg-neutral-700'}`}
+              className={`w-6 h-6 mb-1 rounded-sm flex items-center justify-center cursor-pointer ${selectedAdSizeId === frame.id ? 'bg-[#4A7CFF]' : 'bg-neutral-800 hover:bg-neutral-700'}`}
               onClick={() => handleSelectFrame(frame.id)}
               title={`${frame.name} (${frame.width}×${frame.height})`}
             >
@@ -248,7 +236,6 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
                 };
                 
                 // For the demo, just notify the parent component
-                setSelectedFrameId(newAdSize.id);
                 if (onSelectFrame) {
                   onSelectFrame(newAdSize.id);
                 }
@@ -263,7 +250,7 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
           <div className="max-h-60 overflow-y-auto">
             {/* Use mockFrames directly since frames ARE ad sizes */}
             {mockFrames.map((adSize) => {
-              const isAdSizeSelected = selectedFrameId === adSize.id;
+              const isAdSizeSelected = selectedAdSizeId === adSize.id;
               
               return (
                 <div key={adSize.id} className="mb-1">
