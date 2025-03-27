@@ -1314,19 +1314,19 @@ const Timeline = ({
                         try {
                           // We need to check the current mode and handle appropriately
                           if (timelineMode === TimelineMode.GifFrames) {
-                            // In GIF Frames mode, we should handle layer linking differently
-                            console.log(`🔗 In GIF Frames mode - we can't unlink from here yet.`);
-                            alert(`Layer unlinking is not available in GIF Frames mode.\nPlease switch to Animation mode to unlink layers.`);
+                            // In GIF Frames mode, the link icon does nothing
+                            console.log(`🔗 In GIF Frames mode - link icon does nothing.`);
                             // No actual unlinking happens in GIF Frames mode
                           } else {
-                            // In Animation mode, proceed with the unlinking
-                            alert(`LINK ICON CLICKED: Unlinking layer ${layer.id} in Animation mode`);
+                            // In Animation mode, proceed with the unlinking without alert
+                            console.log(`🔗 Unlinking layer ${layer.id} in Animation mode`);
                             // Call the handler
                             handleUnlinkLayer(layer.id);
                           }
                           console.log("🔗 Unlink handler completed successfully");
                         } catch (error) {
                           console.error("🔗 ERROR in link icon click handler:", error);
+                          // Keep error alert in case something goes wrong
                           alert(`Error unlinking layer: ${error}`);
                         }
                       }}
