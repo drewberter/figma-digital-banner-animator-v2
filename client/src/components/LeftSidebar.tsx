@@ -191,67 +191,6 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
         </div>
       </div>
       
-      {/* Ad Sizes Section */}
-      <div className="border-b border-neutral-800">
-        <div 
-          className="p-2 flex items-center justify-between cursor-pointer hover:bg-neutral-800"
-          onClick={() => setAdSizeListExpanded(!adSizeListExpanded)}
-        >
-          {adSizeListExpanded ? 
-            <ChevronDown size={16} className="text-neutral-400 mr-1" /> : 
-            <ChevronRight size={16} className="text-neutral-400 mr-1" />
-          }
-          <span className="text-xs font-medium text-neutral-300 flex-1">AD SIZES</span>
-          <button 
-            className="text-[#4A7CFF] hover:text-[#3A6CEE] p-1 rounded hover:bg-neutral-700"
-            title="Add new ad size"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Open a dialog to add new ad size (in production, would have a modal)
-              const width = window.prompt('Enter width in pixels:', '300');
-              const height = window.prompt('Enter height in pixels:', '250');
-              if (width && height) {
-                addAdSize({
-                  name: `${width} × ${height}`,
-                  width: parseInt(width),
-                  height: parseInt(height)
-                });
-              }
-            }}
-          >
-            <Plus size={16} />
-          </button>
-        </div>
-        
-        {adSizeListExpanded && (
-          <div className="max-h-40 overflow-y-auto">
-            {adSizes.map((adSize) => (
-              <div 
-                key={adSize.id}
-                className={`pl-4 pr-2 py-1 flex items-center cursor-pointer hover:bg-neutral-800 ${selectedAdSizeId === adSize.id ? 'bg-neutral-800' : ''}`}
-                onClick={() => selectAdSize(adSize.id)}
-              >
-                <div className="mr-2">
-                  {selectedAdSizeId === adSize.id ? (
-                    <CheckSquare size={16} className="text-[#4A7CFF]" />
-                  ) : (
-                    <Square size={16} className="text-neutral-500" />
-                  )}
-                </div>
-                <div className="flex-1 text-sm truncate">
-                  <span className={selectedAdSizeId === adSize.id ? "text-white" : "text-neutral-300"}>
-                    {adSize.name}
-                  </span>
-                </div>
-                <div className="text-xs text-neutral-500">
-                  {adSize.frames.length} frame{adSize.frames.length !== 1 ? 's' : ''}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      
       {/* Frames Section */}
       <div className="border-b border-neutral-800">
         <div 
@@ -263,73 +202,126 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
             <ChevronRight size={16} className="text-neutral-400 mr-1" />
           }
           <span className="text-xs font-medium text-neutral-300 flex-1">FRAMES</span>
-          <button 
-            className="text-[#4A7CFF] hover:text-[#3A6CEE] p-1 rounded hover:bg-neutral-700"
-            title="Add new frame"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Simplified frame creation - in production would use a modal
-              const name = window.prompt('Enter frame name:', 'New Frame');
-              if (name) {
-                const adSize = adSizes.find(size => size.id === selectedAdSizeId);
-                if (adSize) {
-                  // Create a new frame with the adSize dimensions
-                  const newFrame: AnimationFrame = {
-                    id: `frame-${Date.now()}`,
-                    name,
-                    selected: false,
-                    width: adSize.width,
-                    height: adSize.height,
-                    adSizeId: adSize.id,
-                    headlineText: 'Edit this headline',
-                    description: 'Add a description',
-                    buttonText: 'Learn More',
-                    hiddenLayers: []
-                  };
-                  
-                  // In a real implementation, we would update the adSize frames array
-                  // and use context or a state management system
-                  console.log('Creating new frame:', newFrame);
-                  
-                  // For the demo, just mark it as selected and notify the parent component
-                  setSelectedFrameId(newFrame.id);
-                  if (onSelectFrame) {
-                    onSelectFrame(newFrame.id);
+          <div className="flex">
+            {/* Ad Size Selector dropdown */}
+            <select 
+              className="mr-1 bg-neutral-800 text-neutral-300 text-xs border border-neutral-700 rounded px-1"
+              value={selectedAdSizeId}
+              onChange={(e) => selectAdSize(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {adSizes.map(size => (
+                <option key={size.id} value={size.id}>
+                  {size.width}×{size.height}
+                </option>
+              ))}
+            </select>
+            
+            {/* Add Ad Size button */}
+            <button 
+              className="text-[#4A7CFF] hover:text-[#3A6CEE] p-1 mr-1 rounded hover:bg-neutral-700"
+              title="Add new ad size"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Open a dialog to add new ad size
+                const width = window.prompt('Enter width in pixels:', '300');
+                const height = window.prompt('Enter height in pixels:', '250');
+                if (width && height) {
+                  addAdSize({
+                    name: `${width}×${height}`,
+                    width: parseInt(width),
+                    height: parseInt(height)
+                  });
+                }
+              }}
+            >
+              <Layers size={14} />
+            </button>
+            
+            {/* Add Frame button */}
+            <button 
+              className="text-[#4A7CFF] hover:text-[#3A6CEE] p-1 rounded hover:bg-neutral-700"
+              title="Add new frame"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Simplified frame creation 
+                const name = window.prompt('Enter frame name:', 'New Frame');
+                if (name) {
+                  const adSize = adSizes.find(size => size.id === selectedAdSizeId);
+                  if (adSize) {
+                    // Create a new frame with the adSize dimensions
+                    const newFrame: AnimationFrame = {
+                      id: `frame-${Date.now()}`,
+                      name,
+                      selected: false,
+                      width: adSize.width,
+                      height: adSize.height,
+                      adSizeId: adSize.id,
+                      headlineText: 'Edit this headline',
+                      description: 'Add a description',
+                      buttonText: 'Learn More',
+                      hiddenLayers: []
+                    };
+                    
+                    // In a real implementation, we would update the adSize frames array
+                    // and use context or a state management system
+                    console.log('Creating new frame:', newFrame);
+                    
+                    // For the demo, just mark it as selected and notify the parent component
+                    setSelectedFrameId(newFrame.id);
+                    if (onSelectFrame) {
+                      onSelectFrame(newFrame.id);
+                    }
                   }
                 }
-              }
-            }}
-          >
-            <Plus size={16} />
-          </button>
+              }}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
         </div>
         
         {frameListExpanded && (
           <div className="max-h-48 overflow-y-auto">
-            {/* Show frames filtered by the selected ad size */}
-            {mockFrames.map((frame) => (
-              <div 
-                key={frame.id}
-                className={`pl-4 pr-2 py-1 flex items-center cursor-pointer hover:bg-neutral-800 ${selectedFrameId === frame.id ? 'bg-neutral-800' : ''}`}
-                onClick={() => handleSelectFrame(frame.id)}
-              >
-                <div className="mr-2">
-                  {selectedFrameId === frame.id ? (
-                    <CheckSquare size={16} className="text-[#4A7CFF]" />
-                  ) : (
-                    <Square size={16} className="text-neutral-500" />
-                  )}
+            {/* Group frames by ad size */}
+            {adSizes.map((adSize) => {
+              // Filter frames that belong to this ad size
+              // For now, use mock frames and pretend they belong to the first ad size
+              const adSizeFrames = mockFrames;
+              
+              if (adSizeFrames.length === 0) return null;
+              
+              return (
+                <div key={adSize.id} className={`mb-2 ${selectedAdSizeId === adSize.id ? '' : 'opacity-60'}`}>
+                  {/* Ad size header */}
+                  <div className="pl-2 pr-2 py-1 text-xs font-medium text-neutral-400 bg-neutral-800/30">
+                    {adSize.width}×{adSize.height}
+                  </div>
+                  
+                  {/* Frames for this ad size */}
+                  {adSizeFrames.map((frame) => (
+                    <div 
+                      key={frame.id}
+                      className={`pl-4 pr-2 py-1 flex items-center cursor-pointer hover:bg-neutral-800 ${selectedFrameId === frame.id ? 'bg-neutral-800' : ''}`}
+                      onClick={() => handleSelectFrame(frame.id)}
+                    >
+                      <div className="mr-2">
+                        {selectedFrameId === frame.id ? (
+                          <CheckSquare size={16} className="text-[#4A7CFF]" />
+                        ) : (
+                          <Square size={16} className="text-neutral-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 text-sm truncate">
+                        <span className={selectedFrameId === frame.id ? "text-white" : "text-neutral-300"}>
+                          {frame.name}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex-1 text-sm truncate">
-                  <span className={selectedFrameId === frame.id ? "text-white" : "text-neutral-300"}>
-                    {frame.name}
-                  </span>
-                </div>
-                <div className="text-xs text-neutral-500">
-                  {frame.width}×{frame.height}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
