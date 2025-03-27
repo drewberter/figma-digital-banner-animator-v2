@@ -67,6 +67,7 @@ function App() {
                 onPlayPauseToggle={handlePlayPauseToggle}
                 isPlaying={isPlaying}
                 currentTime={currentTime}
+                selectedFrameId={selectedFrameId}
               />
             </div>
             

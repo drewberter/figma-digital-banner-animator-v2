@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useReducer } from 'react';
 import { Play, Pause, SkipBack, Clock } from 'lucide-react';
 import { mockLayers } from '../mock/animationData';
 
@@ -7,14 +7,18 @@ interface TimelineProps {
   onPlayPauseToggle: (playing: boolean) => void;
   isPlaying: boolean;
   currentTime: number;
+  selectedFrameId?: string;
 }
 
 const Timeline = ({
   onTimeUpdate,
   onPlayPauseToggle,
   isPlaying,
-  currentTime
+  currentTime,
+  selectedFrameId = 'frame-1' // Default to frame-1 if no frame ID is provided
 }: TimelineProps) => {
+  // Add forceUpdate functionality using useReducer
+  const [, forceUpdate] = useReducer(x => x + 1, 0);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const duration = 5; // Fixed duration for now
   
@@ -23,7 +27,6 @@ const Timeline = ({
   const playheadRef = useRef<HTMLDivElement>(null);
   
   // Get the layers for the current frame
-  const selectedFrameId = 'frame-1';
   const frameLayers = mockLayers[selectedFrameId] || [];
   
   // Generate time markers (every 0.5 seconds)
