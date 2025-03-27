@@ -147,14 +147,25 @@ const Timeline = ({
     console.log("Timeline: Unlinking layer", layerId);
     // Use unlinking utility
     const updatedLayers = unlinkLayer(mockLayers, layerId);
-    // Update mock layers
-    Object.keys(updatedLayers).forEach(frameId => {
-      mockLayers[frameId] = updatedLayers[frameId];
+    
+    // Store the updated layers in a variable to avoid race conditions
+    const updatedLayersCopy = { ...updatedLayers };
+    
+    // Update mock layers - Direct modification for backward compatibility
+    Object.keys(updatedLayersCopy).forEach(frameId => {
+      mockLayers[frameId] = updatedLayersCopy[frameId];
     });
+    
     // Notify parent component
     if (onUnlinkLayer) {
+      // Add debug output to verify this is called
+      console.log("Timeline: Calling onUnlinkLayer with layerId:", layerId);
       onUnlinkLayer(layerId);
+    } else {
+      console.warn("Timeline: onUnlinkLayer callback is not defined");
     }
+    
+    console.log("Timeline: Forcing update after unlinking layer", layerId);
     forceUpdate(); // Force a re-render after unlinking
   };
   

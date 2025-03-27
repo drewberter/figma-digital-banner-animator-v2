@@ -946,14 +946,53 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
   }, [frames, layers]);
   
   const unlinkLayer = useCallback((layerId: string) => {
+    console.log("AnimationContext: Unlinking layer", layerId);
+    
     // First, organize layers by frame for our utility function
     const frameLayersMap: Record<string, AnimationLayer[]> = {};
     frames.forEach(frame => {
-      frameLayersMap[frame.id] = layers.filter(layer => frame.selected); // Simplification
+      // Get all layers for this frame
+      const frameLayers = layers.filter(layer => 
+        // Extract frame ID from layer ID
+        // Assuming layer IDs are in format "layer-{frameNumber}-{layerNumber}"
+        // For example: "layer-1-3" belongs to "frame-1"
+        layer.id.startsWith(`layer-${frame.id.split('-')[1]}`)
+      );
+      frameLayersMap[frame.id] = frameLayers;
     });
+    
+    // Log the frame layers map for debugging
+    console.log("AnimationContext: Frame layers map:", Object.keys(frameLayersMap).map(frameId => ({
+      frameId,
+      layerCount: frameLayersMap[frameId].length,
+      layerIds: frameLayersMap[frameId].map(l => l.id)
+    })));
     
     // Apply the unlink operation
     const updatedFramesLayers = unlinkLayerUtil(frameLayersMap, layerId);
+    
+    // Log the updated frames layers
+    console.log("AnimationContext: Updated frames layers:", Object.keys(updatedFramesLayers).map(frameId => ({
+      frameId,
+      layerCount: updatedFramesLayers[frameId].length,
+      modifiedLayers: updatedFramesLayers[frameId]
+        .filter(layer => {
+          // Check if this is the layer we are updating
+          if (layer.id === layerId) return true;
+          
+          // Check if this layer is linked to the layer we're updating
+          if (layer.linkedLayer) {
+            // Return true if this layer is in the same group
+            return true;
+          }
+          
+          return false;
+        })
+        .map(l => ({ 
+          id: l.id, 
+          hasLink: !!l.linkedLayer
+        }))
+    })));
     
     // Now flatten the updated frame layers back to our layer state
     const updatedLayers: AnimationLayer[] = [];
@@ -966,13 +1005,21 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       });
     });
     
+    // Log the layers that will be updated
+    console.log("AnimationContext: Updating layers:", updatedLayers.map(l => ({ 
+      id: l.id, 
+      linkedTo: l.linkedLayer 
+    })));
+    
     // Update only the layers that changed
-    setLayers(prev => 
-      prev.map(layer => {
+    setLayers(prev => {
+      const newLayers = prev.map(layer => {
         const updatedLayer = updatedLayers.find(l => l.id === layer.id);
         return updatedLayer || layer;
-      })
-    );
+      });
+      console.log("AnimationContext: Layer update complete");
+      return newLayers;
+    });
   }, [frames, layers]);
   
   const handleSyncModeChange = useCallback((layerId: string, mode: LinkSyncMode) => {

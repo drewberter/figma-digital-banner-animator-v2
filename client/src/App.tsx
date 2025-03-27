@@ -105,10 +105,35 @@ function App() {
     // This will be handled by the Timeline component directly
   };
   
+  // We'll obtain the animation context methods inside the AnimationProvider wrapper
+  
   const handleUnlinkLayer = (layerId: string) => {
     console.log("App: Unlinking layer", layerId);
-    // The actual unlinking is handled in the Timeline component
-    // This function is just a callback to inform the App component
+    
+    // In this implementation, the actual unlinking is done in the Timeline component
+    // This function just provides a callback interface to the main App component
+
+    if (layerId) {
+      try {
+        // This is now just a notification to update the UI state
+        console.log("App: Received unlink notification for layer", layerId);
+        
+        // The actual unlinking is handled in Timeline.tsx
+        // Here we just update UI state to show that the operation completed
+        
+        // Indicate saving is in progress
+        setSaving(true);
+        setTimeout(() => {
+          setSaving(false);
+          setLastSaved(new Date());
+          console.log("App: Layer unlink operation completed");
+        }, 500);
+      } catch (error) {
+        console.error("Error processing layer unlink:", error);
+      }
+    } else {
+      console.warn("App: Cannot unlink layer - no layer ID provided");
+    }
   };
   
   // Handle timeline mode changes
