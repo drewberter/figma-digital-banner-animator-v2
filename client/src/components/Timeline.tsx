@@ -206,26 +206,43 @@ const Timeline = ({
       console.log("Toggling visibility in GIF frame. Using parent ad size:", adSizeId);
       
       // Find the GIF frame
-      const gifFrame = mockGifFrames.find(frame => frame.id === frameId);
-      if (!gifFrame) {
+      const gifFrameIndex = mockGifFrames.findIndex(frame => frame.id === frameId);
+      if (gifFrameIndex === -1) {
         console.error("GIF frame not found:", frameId);
         return;
       }
       
+      const gifFrame = mockGifFrames[gifFrameIndex];
+      
       // Update the hiddenLayers array in the GIF frame
-      if (gifFrame.hiddenLayers.includes(layerId)) {
+      const newHiddenLayers = [...gifFrame.hiddenLayers];
+      
+      if (newHiddenLayers.includes(layerId)) {
         // Make the layer visible by removing it from hiddenLayers
-        gifFrame.hiddenLayers = gifFrame.hiddenLayers.filter(id => id !== layerId);
+        const index = newHiddenLayers.indexOf(layerId);
+        newHiddenLayers.splice(index, 1);
       } else {
         // Hide the layer by adding it to hiddenLayers
-        gifFrame.hiddenLayers.push(layerId);
+        newHiddenLayers.push(layerId);
       }
+      
+      // Create a new GIF frame object with updated hiddenLayers to ensure reactivity
+      const updatedGifFrame = {
+        ...gifFrame,
+        hiddenLayers: newHiddenLayers
+      };
       
       // Update the visibleLayerCount
       const totalLayers = mockLayers[adSizeId]?.length || 0;
-      gifFrame.visibleLayerCount = totalLayers - gifFrame.hiddenLayers.length;
+      updatedGifFrame.visibleLayerCount = totalLayers - updatedGifFrame.hiddenLayers.length;
       
-      console.log("Updated GIF frame:", gifFrame);
+      // Replace the frame in the array
+      mockGifFrames[gifFrameIndex] = updatedGifFrame;
+      
+      console.log("Updated GIF frame:", updatedGifFrame);
+      
+      // Force a re-render to ensure the UI updates
+      forceUpdate();
     } else {
       // Regular ad size frame - toggle layer visibility directly
       // Find the frame
