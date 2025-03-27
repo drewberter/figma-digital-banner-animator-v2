@@ -112,7 +112,7 @@ function App() {
     if (timelineMode !== TimelineMode.FrameStyle) return;
     
     // Hardcode frame IDs for development (in real app, would use context)
-    const frameIds = ['frame-1', 'frame-2', 'frame-3'];
+    const frameIds = ['frame-1', 'frame-2', 'frame-3', 'frame-4'];
     
     // Calculate frame durations including their delay
     const frameTotalDurations = new Map<string, number>();
@@ -120,8 +120,8 @@ function App() {
     
     let cumulativeTime = 0;
     frameIds.forEach(frameId => {
-      // Just use default delays for development
-      const frameDelay = 0.5; // Default delay
+      // Use 2.5s delays as shown in the screenshot
+      const frameDelay = 2.5; // Match the delay shown in the screenshot
       
       // Start time is the cumulative time before this frame
       frameStartTimes.set(frameId, cumulativeTime);
@@ -226,8 +226,8 @@ function App() {
               }
               
               // Set time within this frame (accounting for this frame's delay)
-              // We're using a standard delay of 0.5s for all frames in the mock implementation
-              const frameDelay = 0.5;
+              // Use 2.5s delay as shown in the screenshot
+              const frameDelay = 2.5;
               
               // Calculate time relative to this frame's start
               framePositionTime = newTime - frameStartTime;
@@ -290,11 +290,13 @@ function App() {
               onSelectFrame={handleFrameSelect}
             />
             
-            <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden">
-              <PreviewCanvas 
-                selectedFrameId={selectedFrameId} 
-                currentTime={currentTime} 
-              />
+            <div className="flex-1 flex flex-col bg-neutral-900 overflow-auto">
+              <div className="min-h-[250px]">
+                <PreviewCanvas 
+                  selectedFrameId={selectedFrameId} 
+                  currentTime={currentTime} 
+                />
+              </div>
               <Timeline 
                 onTimeUpdate={handleTimeUpdate}
                 onPlayPauseToggle={handlePlayPauseToggle}

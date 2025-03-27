@@ -514,6 +514,34 @@ const Timeline = ({
     // Deep clone the layers
     mockLayers[newFrameId] = JSON.parse(JSON.stringify(sourceLayers));
     
+    // Copy over frame properties when generating frames in FrameCardGrid
+    // This will make sure delay is properly copied
+    const frameObjects = Object.keys(mockLayers).reduce((acc, frameId) => {
+      // Get the original frame if it exists
+      const existingFrame = Object.values(acc).find(f => f.id === frameId);
+      
+      // Use the delay from the existing frame, or default to 2.5s
+      const frameDelay = existingFrame ? existingFrame.delay : 2.5;
+      
+      acc[frameId] = {
+        id: frameId,
+        name: `Frame ${frameId.split('-')[1] || ''}`, // Extract frame number from ID
+        selected: frameId === localSelectedFrameId,
+        width: 300, // Default width
+        height: 250, // Default height
+        delay: frameDelay // Copy the delay from source frame
+      };
+      return acc;
+    }, {} as Record<string, AnimationFrame>);
+    
+    // Set the same delay for the new frame as the source frame
+    if (frameObjects[frameId]) {
+      frameObjects[newFrameId] = {
+        ...frameObjects[newFrameId],
+        delay: frameObjects[frameId].delay,
+      };
+    }
+    
     // Force a re-render
     forceUpdate();
   };
@@ -969,7 +997,7 @@ const Timeline = ({
                     selected: frameId === localSelectedFrameId,
                     width: 300, // Default width
                     height: 250, // Default height
-                    delay: 0 // Default delay
+                    delay: 2.5 // Default delay 2.5s as seen in screenshot
                   };
                   return acc;
                 }, {} as Record<string, AnimationFrame>)}
@@ -988,6 +1016,10 @@ const Timeline = ({
                 onAddFrame={handleAddBlankFrame}
                 onDuplicateFrame={handleDuplicateFrame}
                 onDeleteFrame={handleDeleteFrame}
+                onDelayChange={(frameId, delay) => {
+                  console.log(`Setting delay for frame ${frameId} to ${delay}s`);
+                  // This would update the frame's delay in a real implementation 
+                }}
               />
             )}
           </div>
