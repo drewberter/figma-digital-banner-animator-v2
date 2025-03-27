@@ -250,27 +250,41 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       
       console.log("AnimationContext - For GIF frame:", frameId, "using parent ad size:", adSizeId);
       
-      // Toggle visibility for the layer in its parent ad size
-      setFramesLayers(prev => {
-        const updatedFramesLayers = {...prev};
+      // For GIF frames, we update the hiddenLayers array instead of modifying the parent layer's visibility
+      // Find the GIF frame in mockGifFrames
+      const gifFrameIndex = mockGifFrames.findIndex(f => f.id === frameId);
+      if (gifFrameIndex !== -1) {
+        // Create a copy of the frame
+        const updatedGifFrame = { ...mockGifFrames[gifFrameIndex] };
         
-        if (updatedFramesLayers[adSizeId]) {
-          updatedFramesLayers[adSizeId] = updatedFramesLayers[adSizeId].map(layer => 
-            layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
-          );
+        // Update the hiddenLayers array
+        const hiddenIndex = updatedGifFrame.hiddenLayers.indexOf(layerId);
+        if (hiddenIndex >= 0) {
+          // Layer is hidden, make it visible by removing from hiddenLayers
+          updatedGifFrame.hiddenLayers = updatedGifFrame.hiddenLayers.filter(id => id !== layerId);
+        } else {
+          // Layer is visible, hide it by adding to hiddenLayers
+          updatedGifFrame.hiddenLayers = [...updatedGifFrame.hiddenLayers, layerId];
         }
         
-        return updatedFramesLayers;
-      });
-      
-      // Update current layers if they're from the same ad size
-      setLayers(prev => 
-        prev.map(layer => 
-          layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
-        )
-      );
+        // Update the visibleLayerCount
+        const totalLayers = mockLayers[adSizeId]?.length || 0;
+        updatedGifFrame.visibleLayerCount = totalLayers - updatedGifFrame.hiddenLayers.length;
+        
+        // Replace the frame in the array
+        mockGifFrames[gifFrameIndex] = updatedGifFrame;
+        
+        console.log("Updated GIF frame:", updatedGifFrame);
+        
+        // DO NOT update the parent ad size's layer visibility
+        // Just update the current visible layers for UI purposes
+        setLayers(prev => [...prev]);
+      } else {
+        console.error("GIF frame not found:", frameId);
+      }
     } else {
-      // Regular frame - just update the layers directly
+      // Regular frame - update the layers directly
+      // This works with linked layers
       setLayers(prev => 
         prev.map(layer => 
           layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
