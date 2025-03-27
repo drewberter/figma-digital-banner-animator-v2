@@ -95,10 +95,61 @@ const Timeline = () => {
   const selectedLayer = getSelectedLayer();
   const keyframes = selectedLayer?.keyframes || [];
   
-  // Toggle playback
+  // Animation frame handling
+  const animationFrameRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number>(0);
+  
+  // Toggle playback with animation loop
   const togglePlayback = () => {
-    setIsPlaying(!isPlaying);
+    const newIsPlaying = !isPlaying;
+    setIsPlaying(newIsPlaying);
+    
+    if (newIsPlaying) {
+      // Start animation frame loop
+      lastTimeRef.current = performance.now();
+      startAnimationLoop();
+    } else {
+      // Stop animation frame loop
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    }
   };
+  
+  // Animation loop function
+  const startAnimationLoop = () => {
+    const animate = (now: number) => {
+      // Calculate time difference
+      const deltaTime = (now - lastTimeRef.current) / 1000; // convert to seconds
+      lastTimeRef.current = now;
+      
+      // Update current time
+      setCurrentTime(prevTime => {
+        const newTime = prevTime + deltaTime;
+        // Loop back to start if we've reached the end
+        if (newTime >= duration) {
+          return 0;
+        }
+        return newTime;
+      });
+      
+      // Continue the loop
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+    
+    // Start the loop
+    animationFrameRef.current = requestAnimationFrame(animate);
+  };
+  
+  // Clean up animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
   
   return (
     <div className="h-full bg-[#111111] flex flex-col">
@@ -196,26 +247,35 @@ const Timeline = () => {
             onClick={handleTimelineClick}
             ref={timelineRef}
           >
-            {selectedLayer && (
-              <div className="h-10 relative">
+            {/* Display multiple animation tracks - one for each layer */}
+            {frameLayers.map((layer, layerIndex) => (
+              <div 
+                key={layer.id}
+                className={`h-10 relative ${selectedLayerId === layer.id ? 'bg-[#1A1A1A]' : ''}`}
+              >
                 {/* Animation blocks */}
-                {selectedLayer.animations.map((animation: any, index: number) => (
+                {layer.animations.map((animation: any, index: number) => (
                   <div 
                     key={index}
-                    className="absolute h-6 top-2 rounded bg-[#2A5BFF] bg-opacity-70 border border-[#4A7CFF]"
+                    className={`absolute h-6 top-2 rounded ${selectedLayerId === layer.id ? 'bg-[#2A5BFF] bg-opacity-70 border border-[#4A7CFF]' : 'bg-[#2A5BFF] bg-opacity-30 border border-[#4A7CFF]'}`}
                     style={{
                       left: `${timeToPosition(animation.startTime || 0)}px`,
                       width: `${timeToPosition(animation.duration)}px`
                     }}
                   >
-                    <div className="px-2 text-xs text-white truncate">
-                      {animation.type}
+                    <div className="px-2 text-xs text-white truncate flex items-center justify-between w-full">
+                      <span>{animation.type}</span>
+                      {animation.duration >= 0.5 && (
+                        <span className="text-xs opacity-75 ml-1">
+                          {animation.duration.toFixed(1)}s
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
                 
-                {/* Keyframes */}
-                {keyframes.map((keyframe: any, index: number) => (
+                {/* Only show keyframes for selected layer */}
+                {selectedLayerId === layer.id && keyframes.map((keyframe: any, index: number) => (
                   <div 
                     key={index}
                     className="absolute w-3 h-3 top-3.5 -ml-1.5 rounded-sm bg-yellow-500 border border-yellow-600"
@@ -223,7 +283,7 @@ const Timeline = () => {
                   ></div>
                 ))}
               </div>
-            )}
+            ))}
           </div>
         </div>
       </div>
