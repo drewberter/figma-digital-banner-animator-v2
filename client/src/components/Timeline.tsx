@@ -681,7 +681,7 @@ const Timeline = ({
                           ${timelineMode === TimelineMode.GifFrames ? 'bg-blue-600 text-white' : 'text-neutral-300 hover:text-white'}`}
               >
                 <Layers className="w-4 h-4 mr-1.5" />
-                Frame Style
+                GIF Frames
               </Tabs.Trigger>
             </Tabs.List>
           </Tabs.Root>
@@ -739,7 +739,7 @@ const Timeline = ({
               </div>
             </>
           ) : (
-            // Frame Style mode controls
+            // GIF Frames mode controls
             <div className="flex space-x-2">
               <button 
                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-md flex items-center text-sm font-medium"
