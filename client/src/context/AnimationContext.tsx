@@ -111,6 +111,9 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
   const [layers, setLayers] = useState<AnimationLayer[]>(savedData.layers);
   const [frames, setFrames] = useState<AnimationFrame[]>(savedData.frames);
   
+  // Add state for GIF frames to properly track changes
+  const [gifFrames, setGifFrames] = useState<GifFrame[]>(mockGifFrames);
+  
   // Initialize AdSizes state by grouping existing frames by dimensions
   const [adSizes, setAdSizes] = useState<AdSize[]>(() => {
     // Create initial ad sizes from existing frames
@@ -246,15 +249,15 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       const { adSizeId, frameNumber } = parsedFrameId;
       console.log(`AnimationContext - For GIF frame: ${frameId}, using parent ad size: ${adSizeId}, frame number: ${frameNumber}`);
       
-      // Find the GIF frame index
-      const gifFrameIndex = mockGifFrames.findIndex((f: GifFrame) => f.id === frameId);
+      // Find the GIF frame index using the state variable
+      const gifFrameIndex = gifFrames.findIndex((f: GifFrame) => f.id === frameId);
       if (gifFrameIndex === -1) {
         console.error("GIF frame not found:", frameId);
         return;
       }
       
       // Create a copy of the frame
-      const updatedGifFrame = { ...mockGifFrames[gifFrameIndex] };
+      const updatedGifFrame = { ...gifFrames[gifFrameIndex] };
       
       // Ensure hiddenLayers is initialized
       if (!updatedGifFrame.hiddenLayers) {
@@ -277,8 +280,10 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       const totalLayers = mockLayers[adSizeId]?.length || 0;
       updatedGifFrame.visibleLayerCount = totalLayers - updatedGifFrame.hiddenLayers.length;
       
-      // Replace the frame in the array (this modifies the mock data directly)
-      mockGifFrames[gifFrameIndex] = updatedGifFrame;
+      // Update the state with the modified frame
+      const newGifFrames = [...gifFrames];
+      newGifFrames[gifFrameIndex] = updatedGifFrame;
+      setGifFrames(newGifFrames);
       
       console.log("AnimationContext - Updated GIF frame:", updatedGifFrame);
       
@@ -308,7 +313,7 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       // ENHANCED CROSS-AD-SIZE SYNCING:
       // First update all GIF frames with the same number in this ad size
       let updatedGifFrames = syncGifFramesByNumber(
-        mockGifFrames, 
+        gifFrames, 
         frameId, 
         layerId,
         layersByFrame
@@ -408,10 +413,8 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
         }
       });
       
-      // Update all frames in the mock data array
-      updatedGifFrames.forEach((frame, index) => {
-        mockGifFrames[index] = frame;
-      });
+      // Update the gifFrames state with the synced frames
+      setGifFrames(updatedGifFrames);
       
       // Trigger a complete re-render of the UI by forcing an update
       // This ensures that all components using the GIF frames data get refreshed
@@ -479,14 +482,14 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
     console.log(`AnimationContext - toggleLayerOverride for GIF frame: ${frameId}, ad size: ${adSizeId}, frame number: ${frameNumber}`);
     
     // Find the GIF frame index
-    const gifFrameIndex = mockGifFrames.findIndex((f: GifFrame) => f.id === frameId);
+    const gifFrameIndex = gifFrames.findIndex((f: GifFrame) => f.id === frameId);
     if (gifFrameIndex === -1) {
       console.error("GIF frame not found:", frameId);
       return;
     }
     
     // Create a copy of the frame
-    const updatedGifFrame = { ...mockGifFrames[gifFrameIndex] };
+    const updatedGifFrame = { ...gifFrames[gifFrameIndex] };
     
     // Ensure hiddenLayers array is initialized
     if (!updatedGifFrame.hiddenLayers) {
@@ -555,8 +558,10 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       })
     );
     
-    // Update the GIF frame
-    mockGifFrames[gifFrameIndex] = updatedGifFrame;
+    // Update the GIF frame state
+    const newGifFrames = [...gifFrames];
+    newGifFrames[gifFrameIndex] = updatedGifFrame;
+    setGifFrames(newGifFrames);
     
     // If we're turning off the override, we should sync this layer with other frames
     if (!hasOverride) {
@@ -570,16 +575,14 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       
       // Pass the layer data to the sync function for better layer matching
       const updatedGifFrames = syncGifFramesByNumber(
-        mockGifFrames,
+        newGifFrames, // Use the updated frames array
         frameId,
         layerId,
         layersByFrame
       );
       
-      // Update all frames in the mock data array
-      updatedGifFrames.forEach((frame, index) => {
-        mockGifFrames[index] = frame;
-      });
+      // Update the gifFrames state with the synced frames
+      setGifFrames(updatedGifFrames);
     }
     
     // Force a UI refresh
