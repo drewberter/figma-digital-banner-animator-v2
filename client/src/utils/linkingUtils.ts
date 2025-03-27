@@ -13,10 +13,12 @@ interface ParsedFrameId {
 
 export function parseGifFrameId(frameId: string): ParsedFrameId {
   if (!frameId.startsWith('gif-frame-')) {
+    console.warn(`parseGifFrameId: Invalid frame ID format: ${frameId}, expected 'gif-frame-' prefix`);
     return { frameNumber: '', adSizeId: '', isValid: false };
   }
   
   const parts = frameId.split('-');
+  console.log(`parseGifFrameId: Parsing frame ID ${frameId} with ${parts.length} parts: ${parts.join(', ')}`);
   
   // Different formats to handle:
   // 1. gif-frame-frame-X-Y (new format)
@@ -28,16 +30,21 @@ export function parseGifFrameId(frameId: string): ParsedFrameId {
     // Format: gif-frame-frame-X-Y
     frameNumber = parts[parts.length - 1];
     adSizeId = `${parts[2]}-${parts[3]}`;
+    console.log(`parseGifFrameId: Using new format - adSizeId: ${adSizeId}, frameNumber: ${frameNumber}`);
   } else if (parts.length >= 4) {
     // Format: gif-frame-X-Y
     frameNumber = parts[parts.length - 1];
     adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+    console.log(`parseGifFrameId: Using old format - adSizeId: ${adSizeId}, frameNumber: ${frameNumber}`);
   }
+  
+  const isValid = frameNumber !== '' && adSizeId !== '';
+  console.log(`parseGifFrameId: Result - adSizeId: ${adSizeId}, frameNumber: ${frameNumber}, isValid: ${isValid}`);
   
   return { 
     frameNumber, 
     adSizeId,
-    isValid: frameNumber !== '' && adSizeId !== ''
+    isValid
   };
 }
 
@@ -84,8 +91,9 @@ export function translateLayerId(
   const sourceFrameNumber = parseInt(layerIdParts[1], 10);
   const layerPosition = layerIdParts[2];
   
-  // Extract the target frame number
-  const targetFrameNumber = parseInt(targetAdSizeId.split('-')[1], 10);
+  // Extract the target frame number - this should be from the ad size (e.g., "frame-1" -> 1)
+  const targetAdSizeParts = targetAdSizeId.split('-');
+  const targetFrameNumber = targetAdSizeParts.length > 1 ? parseInt(targetAdSizeParts[1], 10) : NaN;
   
   if (isNaN(sourceFrameNumber) || isNaN(targetFrameNumber)) {
     console.warn(`translateLayerId: Could not parse frame numbers - source: ${sourceFrameNumber}, target: ${targetFrameNumber}`);
@@ -118,10 +126,24 @@ export function findFramesWithSameNumber(
   gifFrames: GifFrame[], 
   frameNumber: string
 ): GifFrame[] {
-  return gifFrames.filter(frame => {
+  console.log(`findFramesWithSameNumber: Looking for all frames with number ${frameNumber}`);
+  
+  // Make sure we're working with a string for comparison
+  const targetFrameNumber = String(frameNumber);
+  
+  const matches = gifFrames.filter(frame => {
     const parsedId = parseGifFrameId(frame.id);
-    return parsedId.isValid && parsedId.frameNumber === frameNumber;
+    const isMatch = parsedId.isValid && parsedId.frameNumber === targetFrameNumber;
+    
+    if (isMatch) {
+      console.log(`findFramesWithSameNumber: Frame ${frame.id} matches frame number ${targetFrameNumber}`);
+    }
+    
+    return isMatch;
   });
+  
+  console.log(`findFramesWithSameNumber: Found ${matches.length} matching frames`);
+  return matches;
 }
 
 /**
