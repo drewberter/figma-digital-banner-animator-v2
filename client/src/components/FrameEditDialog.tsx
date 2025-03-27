@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { AnimationFrame } from '../types/animation';
+import { X, Eye, EyeOff } from 'lucide-react';
+import { AnimationFrame, AnimationLayer } from '../types/animation';
 
 interface FrameEditDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (frameData: { name: string, headlineText: string, description?: string }) => void;
+  onSave: (frameData: { 
+    name: string, 
+    headlineText: string, 
+    description?: string,
+    hiddenLayers?: string[] 
+  }) => void;
   frame?: AnimationFrame;
   isEditing: boolean;
+  availableLayers?: AnimationLayer[]; // Pass layers from parent
 }
 
 const FrameEditDialog = ({
@@ -15,24 +21,36 @@ const FrameEditDialog = ({
   onClose,
   onSave,
   frame,
-  isEditing
+  isEditing,
+  availableLayers = []
 }: FrameEditDialogProps) => {
   const [name, setName] = useState('');
   const [headlineText, setHeadlineText] = useState('');
   const [description, setDescription] = useState('');
+  const [hiddenLayers, setHiddenLayers] = useState<string[]>([]);
 
   useEffect(() => {
     if (frame) {
       setName(frame.name);
       setHeadlineText(frame.headlineText || '');
       setDescription(frame.description || '');
+      setHiddenLayers(frame.hiddenLayers || []);
     } else {
       // Reset form for a new frame
       setName('');
       setHeadlineText('');
       setDescription('');
+      setHiddenLayers([]);
     }
   }, [frame, isOpen]);
+
+  const toggleLayerVisibility = (layerId: string) => {
+    setHiddenLayers(prevHidden => 
+      prevHidden.includes(layerId)
+        ? prevHidden.filter(id => id !== layerId)
+        : [...prevHidden, layerId]
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +58,8 @@ const FrameEditDialog = ({
     onSave({
       name: name.trim() || 'Untitled Frame',
       headlineText: headlineText.trim(),
-      description: description.trim() || undefined
+      description: description.trim() || undefined,
+      hiddenLayers: hiddenLayers.length > 0 ? hiddenLayers : undefined
     });
   };
 
@@ -103,6 +122,40 @@ const FrameEditDialog = ({
               className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700 focus:border-[#4A7CFF] focus:outline-none resize-none"
             />
           </div>
+          
+          {/* Layer Visibility Controls */}
+          {availableLayers.length > 0 && (
+            <div>
+              <label className="block text-sm text-neutral-300 mb-2">
+                Layer Visibility
+              </label>
+              <div className="bg-[#191919] rounded border border-neutral-700 p-1 max-h-[150px] overflow-y-auto">
+                {availableLayers.map(layer => (
+                  <div 
+                    key={layer.id}
+                    className="flex items-center justify-between p-2 hover:bg-[#222] rounded"
+                  >
+                    <div className="text-sm text-neutral-300">{layer.name}</div>
+                    <button
+                      type="button"
+                      onClick={() => toggleLayerVisibility(layer.id)}
+                      className={`p-1 rounded ${hiddenLayers.includes(layer.id) ? 'text-neutral-500' : 'text-[#4A7CFF]'}`}
+                    >
+                      {hiddenLayers.includes(layer.id) ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                ))}
+                {availableLayers.length === 0 && (
+                  <div className="p-2 text-sm text-neutral-500">No layers available</div>
+                )}
+              </div>
+              <p className="text-xs text-neutral-500 mt-1">
+                {hiddenLayers.length > 0 
+                  ? `${hiddenLayers.length} layer${hiddenLayers.length > 1 ? 's' : ''} hidden in this frame` 
+                  : `All layers visible in this frame`}
+              </p>
+            </div>
+          )}
           
           <div className="flex justify-end space-x-3 pt-3">
             <button

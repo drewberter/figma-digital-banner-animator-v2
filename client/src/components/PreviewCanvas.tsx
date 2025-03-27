@@ -65,12 +65,21 @@ const PreviewCanvas = ({
   // Get the animation data for the current frame
   const frameLayers = mockLayers[selectedFrameId] || [];
   
+  // Get the hidden layers for the current frame
+  const hiddenLayerIds = selectedFrame.hiddenLayers || [];
+  
   // Find animation layers that correspond to our preview elements
-  const backgroundLayer = frameLayers.find(layer => layer.name === 'Background');
-  const headlineLayer = frameLayers.find(layer => layer.name === 'Headline' || layer.name === 'Title');
-  const subtitleLayer = frameLayers.find(layer => layer.name === 'Subhead' || layer.name === 'Tagline' || layer.name === 'Description');
-  const buttonLayer = frameLayers.find(layer => layer.name === 'CTA Button');
-  const logoLayer = frameLayers.find(layer => layer.name === 'Logo');
+  // Filter out layers that are hidden for this specific frame
+  const backgroundLayer = frameLayers.find(layer => 
+    layer.name === 'Background' && !hiddenLayerIds.includes(layer.id));
+  const headlineLayer = frameLayers.find(layer => 
+    (layer.name === 'Headline' || layer.name === 'Title') && !hiddenLayerIds.includes(layer.id));
+  const subtitleLayer = frameLayers.find(layer => 
+    (layer.name === 'Subhead' || layer.name === 'Tagline' || layer.name === 'Description') && !hiddenLayerIds.includes(layer.id));
+  const buttonLayer = frameLayers.find(layer => 
+    layer.name === 'CTA Button' && !hiddenLayerIds.includes(layer.id));
+  const logoLayer = frameLayers.find(layer => 
+    layer.name === 'Logo' && !hiddenLayerIds.includes(layer.id));
   
   // Helper function to find and apply animations for a layer
   const processAnimations = (

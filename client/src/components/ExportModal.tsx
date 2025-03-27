@@ -13,7 +13,7 @@ interface ExportModalProps {
 type ExportType = 'gif' | 'html' | 'mp4' | 'webm';
 
 const ExportModal = ({ onClose }: ExportModalProps) => {
-  const { frames, currentFrame } = useAnimationContext();
+  const { frames, currentFrame, layers } = useAnimationContext();
   const [exportType, setExportType] = useState<ExportType>('gif');
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const [fps, setFps] = useState(30);
@@ -65,7 +65,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
     setSelectedGifFrameId(frameId);
   };
   
-  const handleSaveFrame = (frameData: { name: string, headlineText: string, description?: string }) => {
+  const handleSaveFrame = (frameData: { name: string, headlineText: string, description?: string, hiddenLayers?: string[] }) => {
     if (editingFrameId) {
       // Update existing frame
       setGifFrames(gifFrames.map(frame => 
@@ -74,7 +74,8 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
               ...frame, 
               name: frameData.name, 
               headlineText: frameData.headlineText,
-              description: frameData.description
+              description: frameData.description,
+              hiddenLayers: frameData.hiddenLayers
             }
           : frame
       ));
@@ -87,7 +88,8 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
         width: currentFrame?.width || 300,
         height: currentFrame?.height || 250,
         headlineText: frameData.headlineText,
-        description: frameData.description
+        description: frameData.description,
+        hiddenLayers: frameData.hiddenLayers
       };
       
       const updatedFrames = [...gifFrames, newFrame];
@@ -454,6 +456,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
               {/* Frame Content Selector for creating multi-frame banners */}
               <FrameSelector 
                 frames={gifFrames}
+                layers={layers}
                 onFrameAdd={handleAddFrame}
                 onFrameEdit={handleEditFrame}
                 onFrameDelete={handleDeleteFrame}
@@ -732,6 +735,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
         onSave={handleSaveFrame}
         frame={editingFrameId ? gifFrames.find(f => f.id === editingFrameId) : undefined}
         isEditing={!!editingFrameId}
+        availableLayers={layers}
       />
     </div>
   );

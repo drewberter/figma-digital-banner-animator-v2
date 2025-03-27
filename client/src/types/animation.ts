@@ -82,6 +82,8 @@ export interface AnimationFrame {
   headlineText?: string;
   description?: string;
   imageUrl?: string;
+  hiddenLayers?: string[]; // IDs of layers that should be hidden in this frame
+  size?: string; // Identifier for frame size category (e.g., '300x250', '728x90')
 }
 
 export interface Preset {
