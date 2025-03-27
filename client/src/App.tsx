@@ -7,26 +7,19 @@ import PropertiesPanel from "./components/PropertiesPanel";
 import ExportModal from "./components/ExportModal";
 import PresetsPanel from "./components/PresetsPanel";
 import AutoSaveIndicator from "./components/AutoSaveIndicator";
-import { AnimationProvider, useAnimationContext } from "./context/AnimationContext";
+import { AnimationProvider } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
 
-// Wrap the main app content in this component to access the animation context
-function AppContent() {
+function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPresetsPanelOpen, setIsPresetsPanelOpen] = useState(false);
   const [selectedFrameId, setSelectedFrameId] = useState('frame-1');
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
   
   // Track auto-save state for notifications
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  
-  // Get context values that we need
-  const {
-    currentTime,
-    isPlaying,
-    setCurrentTime,
-    togglePlayback
-  } = useAnimationContext();
   
   // Listen for auto-save events
   useEffect(() => {
@@ -80,55 +73,49 @@ function AppContent() {
   
   // Handle play/pause toggle
   const handlePlayPauseToggle = (playing: boolean) => {
-    togglePlayback();
+    setIsPlaying(playing);
   };
 
   return (
-    <div className="bg-[#0A0A0A] text-white h-screen flex flex-col">
-      <Toolbar onExport={handleExport} onPreview={handlePreview} />
-      
-      <div className="flex-1 flex overflow-hidden">
-        <LeftSidebar 
-          onOpenPresets={handleOpenPresets} 
-          onSelectFrame={handleFrameSelect}
-        />
-        
-        <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden">
-          <PreviewCanvas 
-            selectedFrameId={selectedFrameId} 
-            currentTime={currentTime} 
-          />
-          <Timeline 
-            onTimeUpdate={handleTimeUpdate}
-            onPlayPauseToggle={handlePlayPauseToggle}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            selectedFrameId={selectedFrameId}
-          />
-        </div>
-        
-        <PropertiesPanel />
-      </div>
-
-      {isExportModalOpen && (
-        <ExportModal onClose={() => setIsExportModalOpen(false)} />
-      )}
-
-      {isPresetsPanelOpen && (
-        <PresetsPanel onClose={() => setIsPresetsPanelOpen(false)} />
-      )}
-      
-      {/* Auto-save indicator */}
-      <AutoSaveIndicator saving={saving} lastSaved={lastSaved} />
-    </div>
-  );
-}
-
-function App() {
-  return (
     <PluginProvider>
       <AnimationProvider>
-        <AppContent />
+        <div className="bg-[#0A0A0A] text-white h-screen flex flex-col">
+          <Toolbar onExport={handleExport} onPreview={handlePreview} />
+          
+          <div className="flex-1 flex overflow-hidden">
+            <LeftSidebar 
+              onOpenPresets={handleOpenPresets} 
+              onSelectFrame={handleFrameSelect}
+            />
+            
+            <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden">
+              <PreviewCanvas 
+                selectedFrameId={selectedFrameId} 
+                currentTime={currentTime} 
+              />
+              <Timeline 
+                onTimeUpdate={handleTimeUpdate}
+                onPlayPauseToggle={handlePlayPauseToggle}
+                isPlaying={isPlaying}
+                currentTime={currentTime}
+                selectedFrameId={selectedFrameId}
+              />
+            </div>
+            
+            <PropertiesPanel />
+          </div>
+
+          {isExportModalOpen && (
+            <ExportModal onClose={() => setIsExportModalOpen(false)} />
+          )}
+
+          {isPresetsPanelOpen && (
+            <PresetsPanel onClose={() => setIsPresetsPanelOpen(false)} />
+          )}
+          
+          {/* Auto-save indicator */}
+          <AutoSaveIndicator saving={saving} lastSaved={lastSaved} />
+        </div>
       </AnimationProvider>
     </PluginProvider>
   );

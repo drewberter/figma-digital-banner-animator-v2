@@ -48,10 +48,11 @@ const Timeline = ({
     // Give the timeline a small delay to fully render
     const timer = setTimeout(() => {
       forceUpdate();
+      console.log("Timeline rerendering for frame:", selectedFrameId);
     }, 100);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [selectedFrameId]);
   
   // Calculate time marker positions
   const timeMarkers = [];
@@ -130,6 +131,8 @@ const Timeline = ({
     action: 'move' | 'resize-left' | 'resize-right'
   ) => {
     e.stopPropagation();
+    e.preventDefault(); // Prevent context menu from showing up
+    
     const layer = frameLayers.find(l => l.id === layerId);
     if (!layer) return;
     
@@ -262,6 +265,46 @@ const Timeline = ({
     forceUpdate();
   };
 
+  // Render animation block with drag handles
+  const renderAnimationBlock = (layer: any, animation: any, animIndex: number) => {
+    return (
+      <div 
+        key={animIndex}
+        className={`absolute h-6 top-2 rounded
+          ${selectedLayerId === layer.id ? 'bg-[#2A5BFF] hover:bg-[#3A6BFF] bg-opacity-70 border border-[#4A7CFF]' : 
+            'bg-[#2A5BFF] hover:bg-[#3A6BFF] bg-opacity-30 border border-[#4A7CFF]'} 
+          cursor-move`}
+        style={{
+          left: `${timeToPosition(animation.startTime || 0)}px`,
+          width: `${timeToPosition(animation.duration)}px`
+        }}
+        onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'move')}
+      >
+        {/* Left resize handle */}
+        <div 
+          className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize hover:bg-[#5A8CFF]" 
+          onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'resize-left')}
+        ></div>
+        
+        {/* Animation content */}
+        <div className="px-2 text-xs text-white truncate flex items-center justify-between w-full h-full pointer-events-none">
+          <span>{animation.type}</span>
+          {animation.duration >= 0.5 && (
+            <span className="text-xs opacity-75 ml-1">
+              {animation.duration.toFixed(1)}s
+            </span>
+          )}
+        </div>
+        
+        {/* Right resize handle */}
+        <div 
+          className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize hover:bg-[#5A8CFF]" 
+          onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'resize-right')}
+        ></div>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full h-full flex flex-col bg-neutral-900 overflow-hidden">
       {/* Top controls */}
@@ -357,127 +400,95 @@ const Timeline = ({
             ref={timelineRef}
           >
             {/* Display multiple animation tracks - one for each layer */}
-            {frameLayers.map((layer, layerIndex) => (
-              <div 
-                key={layer.id}
-                className={`h-10 relative ${selectedLayerId === layer.id ? 'bg-[#1A1A1A]' : ''}`}
-              >
-                {/* Animation blocks with drag handles and context menu */}
-                {layer.animations.map((animation, animIndex) => (
-                  <ContextMenu.Root key={animIndex}>
-                    <ContextMenu.Trigger asChild>
-                      <div 
-                        className={`absolute h-6 top-2 rounded ${selectedLayerId === layer.id ? 'bg-[#2A5BFF] bg-opacity-70 border border-[#4A7CFF]' : 'bg-[#2A5BFF] bg-opacity-30 border border-[#4A7CFF]'} cursor-move`}
-                        style={{
-                          left: `${timeToPosition(animation.startTime || 0)}px`,
-                          width: `${timeToPosition(animation.duration)}px`
-                        }}
-                        onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'move')}
-                      >
-                        {/* Left resize handle */}
-                        <div 
-                          className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize" 
-                          onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'resize-left')}
-                        ></div>
-                        
-                        {/* Animation content */}
-                        <div className="px-2 text-xs text-white truncate flex items-center justify-between w-full h-full pointer-events-none">
-                          <span>{animation.type}</span>
-                          {animation.duration >= 0.5 && (
-                            <span className="text-xs opacity-75 ml-1">
-                              {animation.duration.toFixed(1)}s
-                            </span>
-                          )}
-                        </div>
-                        
-                        {/* Right resize handle */}
-                        <div 
-                          className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize" 
-                          onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'resize-right')}
-                        ></div>
-                      </div>
-                    </ContextMenu.Trigger>
-
-                    {/* Right-click context menu */}
-                    <ContextMenu.Portal>
-                      <ContextMenu.Content 
-                        className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50"
-                      >
-                        <ContextMenu.Item 
-                          className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                          onClick={() => handleDeleteAnimation(layer.id, animIndex)}
-                        >
-                          Delete Animation
-                        </ContextMenu.Item>
-                        
-                        <ContextMenu.Separator className="h-px bg-neutral-700 my-1" />
-                        
-                        <ContextMenu.Sub>
-                          <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
-                            <span>Change Type</span>
-                            <span>▶</span>
-                          </ContextMenu.SubTrigger>
-                          <ContextMenu.Portal>
-                            <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
-                              {Object.values(AnimationType).map((type) => (
-                                <ContextMenu.Item 
-                                  key={type}
-                                  className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                                  onClick={() => handleChangeAnimationType(layer.id, animIndex, type)}
-                                >
-                                  {type}
-                                </ContextMenu.Item>
-                              ))}
-                            </ContextMenu.SubContent>
-                          </ContextMenu.Portal>
-                        </ContextMenu.Sub>
-                      </ContextMenu.Content>
-                    </ContextMenu.Portal>
-                  </ContextMenu.Root>
-                ))}
-                
-                {/* Create a right-click context menu for empty areas to add new animations */}
-                <ContextMenu.Root>
-                  <ContextMenu.Trigger asChild>
-                    {/* Empty area span to capture right-click */}
-                    <span className="absolute inset-0" />
-                  </ContextMenu.Trigger>
-                  <ContextMenu.Portal>
-                    <ContextMenu.Content 
-                      className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50"
-                    >
-                      <ContextMenu.Sub>
-                        <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
-                          <span>Add Animation</span>
-                          <span>▶</span>
-                        </ContextMenu.SubTrigger>
-                        <ContextMenu.Portal>
-                          <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
-                            {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
-                              <ContextMenu.Item 
-                                key={type}
-                                className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                                onClick={() => handleAddAnimationToLayer(layer.id, type)}
-                              >
-                                {type}
-                              </ContextMenu.Item>
-                            ))}
-                          </ContextMenu.SubContent>
-                        </ContextMenu.Portal>
-                      </ContextMenu.Sub>
-                    </ContextMenu.Content>
-                  </ContextMenu.Portal>
-                </ContextMenu.Root>
-                
-                {/* Only show keyframes for selected layer */}
-                {selectedLayerId === layer.id && keyframes.map((keyframe, keyIndex) => (
+            {frameLayers.map((layer) => (
+              <ContextMenu.Root key={layer.id}>
+                <ContextMenu.Trigger asChild>
                   <div 
-                    key={keyIndex}
-                    className="absolute w-3 h-3 top-3.5 -ml-1.5 rounded-sm bg-yellow-500 border border-yellow-600"
-                    style={{ left: `${timeToPosition(keyframe.time)}px` }}
-                  ></div>
-                ))}
-              </div>
+                    className={`h-10 relative ${selectedLayerId === layer.id ? 'bg-[#1A1A1A]' : ''}`}
+                  >
+                    {/* Animation blocks with drag handles */}
+                    {layer.animations.map((animation, animIndex) => (
+                      <ContextMenu.Root key={animIndex}>
+                        <ContextMenu.Trigger asChild>
+                          {renderAnimationBlock(layer, animation, animIndex)}
+                        </ContextMenu.Trigger>
+                        
+                        {/* Context menu for individual animation blocks */}
+                        <ContextMenu.Portal>
+                          <ContextMenu.Content 
+                            className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50"
+                          >
+                            <ContextMenu.Item 
+                              className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                              onClick={() => handleDeleteAnimation(layer.id, animIndex)}
+                            >
+                              Delete Animation
+                            </ContextMenu.Item>
+                            
+                            <ContextMenu.Separator className="h-px bg-neutral-700 my-1" />
+                            
+                            <ContextMenu.Sub>
+                              <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
+                                <span>Change Type</span>
+                                <span>▶</span>
+                              </ContextMenu.SubTrigger>
+                              <ContextMenu.Portal>
+                                <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
+                                  {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
+                                    <ContextMenu.Item 
+                                      key={type}
+                                      className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                                      onClick={() => handleChangeAnimationType(layer.id, animIndex, type)}
+                                    >
+                                      {type}
+                                    </ContextMenu.Item>
+                                  ))}
+                                </ContextMenu.SubContent>
+                              </ContextMenu.Portal>
+                            </ContextMenu.Sub>
+                          </ContextMenu.Content>
+                        </ContextMenu.Portal>
+                      </ContextMenu.Root>
+                    ))}
+                    
+                    {/* Only show keyframes for selected layer */}
+                    {selectedLayerId === layer.id && keyframes.map((keyframe, keyIndex) => (
+                      <div 
+                        key={keyIndex}
+                        className="absolute w-3 h-3 top-3.5 -ml-1.5 rounded-sm bg-yellow-500 border border-yellow-600"
+                        style={{ left: `${timeToPosition(keyframe.time)}px` }}
+                      ></div>
+                    ))}
+                  </div>
+                </ContextMenu.Trigger>
+                
+                {/* Context menu for layer track (empty area) */}
+                <ContextMenu.Portal>
+                  <ContextMenu.Content 
+                    className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50"
+                  >
+                    <ContextMenu.Sub>
+                      <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
+                        <span>Add Animation</span>
+                        <span>▶</span>
+                      </ContextMenu.SubTrigger>
+                      <ContextMenu.Portal>
+                        <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
+                          {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
+                            <ContextMenu.Item 
+                              key={type}
+                              className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                              onClick={() => handleAddAnimationToLayer(layer.id, type)}
+                            >
+                              {type}
+                            </ContextMenu.Item>
+                          ))}
+                        </ContextMenu.SubContent>
+                      </ContextMenu.Portal>
+                    </ContextMenu.Sub>
+                  </ContextMenu.Content>
+                </ContextMenu.Portal>
+              </ContextMenu.Root>
             ))}
           </div>
         </div>
