@@ -144,7 +144,10 @@ const FrameCard = ({
   onDelayChange,
   onToggleLayerOverride
 }: FrameCardProps) => {
-  const [isLayerListOpen, setIsLayerListOpen] = useState(false);
+  // If this is a GIF frame, we want to collapse properties by default
+  const [isLayerListOpen, setIsLayerListOpen] = useState(
+    frame.id.startsWith('gif-frame-') ? false : false
+  );
   const [showDelayInput, setShowDelayInput] = useState(false);
   const [delay, setDelay] = useState(frame.delay || 0);
 

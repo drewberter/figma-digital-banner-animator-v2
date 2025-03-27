@@ -11,10 +11,19 @@ export function autoLinkLayers(frames: Record<string, AnimationLayer[]>): Record
   // Make a deep copy of the frames to avoid mutating the original
   const updatedFrames = JSON.parse(JSON.stringify(frames));
   
+  console.log("autoLinkLayers: Starting auto-linking for frames", Object.keys(updatedFrames).join(", "));
+  
   // Step 1: Collect all layer names across frames
   const layersByName: Record<string, { frameId: string, layer: AnimationLayer }[]> = {};
   
   Object.keys(updatedFrames).forEach(frameId => {
+    if (!updatedFrames[frameId]) {
+      console.log(`autoLinkLayers: No layers found for frame ${frameId}`);
+      return;
+    }
+    
+    console.log(`autoLinkLayers: Processing ${updatedFrames[frameId].length} layers for frame ${frameId}`);
+    
     updatedFrames[frameId].forEach((layer: AnimationLayer) => {
       if (!layersByName[layer.name]) {
         layersByName[layer.name] = [];
@@ -29,6 +38,7 @@ export function autoLinkLayers(frames: Record<string, AnimationLayer[]>): Record
     
     // Only process if there are at least 2 layers with the same name
     if (layers.length >= 2) {
+      console.log(`autoLinkLayers: Creating link group for ${layerName} with ${layers.length} layers`);
       const groupId = uuidv4(); // Generate a unique group ID
       
       // Set the first layer as the main one in the group
@@ -51,6 +61,8 @@ export function autoLinkLayers(frames: Record<string, AnimationLayer[]>): Record
         // Update the layer with linking info
         item.layer.linkedLayer = linkedLayer;
         
+        console.log(`autoLinkLayers: Linked layer ${item.layer.id} in frame ${item.frameId}`);
+        
         // Update the frame's layers
         const layerIndex = updatedFrames[item.frameId].findIndex(
           (l: AnimationLayer) => l.id === item.layer.id
@@ -62,6 +74,7 @@ export function autoLinkLayers(frames: Record<string, AnimationLayer[]>): Record
     }
   });
   
+  console.log("autoLinkLayers: Finished auto-linking layers");
   return updatedFrames;
 }
 
@@ -213,7 +226,7 @@ export function setAnimationOverride(
   });
   
   // If layer not found or not linked, return unchanged
-  if (!targetLayer || !targetLayer.linkedLayer || layerIndex === -1 || !frameId) {
+  if (!targetLayer || !("linkedLayer" in targetLayer) || layerIndex === -1 || !frameId) {
     return frames;
   }
   
@@ -284,7 +297,7 @@ export function unlinkLayer(
   });
   
   // If layer not found or not linked, return unchanged
-  if (!targetLayer || !targetLayer.linkedLayer || layerIndex === -1 || !frameId) {
+  if (!targetLayer || !('linkedLayer' in targetLayer) || layerIndex === -1 || !frameId) {
     return frames;
   }
   
@@ -362,7 +375,7 @@ export function setSyncMode(
   });
   
   // If layer not found or not linked, return unchanged
-  if (!targetLayer || !targetLayer.linkedLayer || layerIndex === -1 || !frameId) {
+  if (!targetLayer || !("linkedLayer" in targetLayer) || layerIndex === -1 || !frameId) {
     return frames;
   }
   
@@ -425,7 +438,7 @@ export function syncGifFramesByNumber(
   console.log(`syncGifFramesByNumber - Syncing frames with number ${frameNumber}, layer ${layerId}, layerName: ${layerName}`);
   
   // Check if the layer is hidden in the source frame
-  const isHiddenInSource = sourceFrame.hiddenLayers.includes(layerId);
+  const isHiddenInSource = sourceFrame.hiddenLayers && sourceFrame.hiddenLayers.includes(layerId);
   console.log(`syncGifFramesByNumber - Layer ${layerId} is hidden in source frame: ${isHiddenInSource}`);
   
   // Find frames with the same number across all ad sizes
@@ -465,6 +478,11 @@ export function syncGifFramesByNumber(
       
       // Only sync if there's no override
       if (!hasOverride) {
+        // Ensure hiddenLayers is initialized
+        if (!frame.hiddenLayers) {
+          frame.hiddenLayers = [];
+        }
+        
         // Get current hidden state
         const isCurrentlyHidden = frame.hiddenLayers.includes(targetLayerId);
         
