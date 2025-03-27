@@ -7,7 +7,7 @@ import PropertiesPanel from "./components/PropertiesPanel";
 import ExportModal from "./components/ExportModal";
 import PresetsPanel from "./components/PresetsPanel";
 import AutoSaveIndicator from "./components/AutoSaveIndicator";
-import { AnimationProvider } from "./context/AnimationContext";
+import { AnimationProvider, useAnimationContext } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
 
 function App() {
@@ -33,7 +33,7 @@ function App() {
     
     // Also listen for console logs of auto-save
     const originalConsoleLog = console.log;
-    console.log = function(...args) {
+    console.log = function(...args: any[]) {
       if (args[0] && typeof args[0] === 'string' && args[0].includes('auto-saved')) {
         setLastSaved(new Date());
         setSaving(false);
@@ -140,6 +140,19 @@ function App() {
     };
   }, []);
 
+  // Create a wrapper component that connects with the context
+  const ExportModalWrapper = () => {
+    const { frames, currentFrame, layers } = useAnimationContext();
+    return (
+      <ExportModal 
+        onClose={() => setIsExportModalOpen(false)} 
+        frames={frames}
+        currentFrame={currentFrame}
+        layers={layers}
+      />
+    );
+  };
+
   return (
     <PluginProvider>
       <AnimationProvider>
@@ -172,9 +185,7 @@ function App() {
             <PropertiesPanel />
           </div>
 
-          {isExportModalOpen && (
-            <ExportModal onClose={() => setIsExportModalOpen(false)} />
-          )}
+          {isExportModalOpen && <ExportModalWrapper />}
 
           {isPresetsPanelOpen && (
             <PresetsPanel onClose={() => setIsPresetsPanelOpen(false)} />

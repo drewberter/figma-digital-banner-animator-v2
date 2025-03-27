@@ -1,19 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Download, ChevronUp, ChevronDown, Play, Pause } from 'lucide-react';
 import { exportGif, exportHtml, exportMp4, exportWebm } from '../utils/exportUtils';
-import { useAnimationContext } from '../context/AnimationContext';
-import { AnimationFrame } from '../types/animation';
+import { AnimationFrame, AnimationLayer } from '../types/animation';
 import FrameSelector from './FrameSelector';
 import FrameEditDialog from './FrameEditDialog';
 
 interface ExportModalProps {
   onClose: () => void;
+  frames: AnimationFrame[];
+  currentFrame: AnimationFrame | null;
+  layers: AnimationLayer[];
 }
 
 type ExportType = 'gif' | 'html' | 'mp4' | 'webm';
 
-const ExportModal = ({ onClose }: ExportModalProps) => {
-  const { frames, currentFrame, layers } = useAnimationContext();
+const ExportModal = ({ onClose, frames, currentFrame, layers }: ExportModalProps) => {
   const [exportType, setExportType] = useState<ExportType>('gif');
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const [fps, setFps] = useState(30);
