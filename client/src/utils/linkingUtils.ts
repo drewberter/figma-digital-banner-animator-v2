@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { AnimationLayer, Animation, LinkSyncMode, LinkedLayerInfo } from '../types/animation';
+import { AnimationLayer, Animation, LinkSyncMode, LinkedLayerInfo, AnimationFrame, GifFrame } from '../types/animation';
 
 /**
  * Automatically links layers with the same name across different frames
@@ -85,10 +85,10 @@ export function syncLinkedLayerAnimations(
   
   Object.keys(updatedFrames).forEach(frameId => {
     const layerIndex = updatedFrames[frameId].findIndex(
-      (layer) => layer.id === sourceLayerId
+      (layer: AnimationLayer) => layer.id === sourceLayerId
     );
     if (layerIndex !== -1) {
-      sourceLayer = updatedFrames[frameId][layerIndex];
+      sourceLayer = updatedFrames[frameId][layerIndex] as AnimationLayer;
       sourceFrameId = frameId;
     }
   });
@@ -107,7 +107,7 @@ export function syncLinkedLayerAnimations(
   
   // Find all layers in the same group
   Object.keys(updatedFrames).forEach(frameId => {
-    updatedFrames[frameId].forEach((layer, layerIndex: number) => {
+    updatedFrames[frameId].forEach((layer: AnimationLayer, layerIndex: number) => {
       // Skip the source layer
       if (layer.id === sourceLayerId) {
         return;
@@ -199,7 +199,7 @@ export function setAnimationOverride(
       (layer: AnimationLayer) => layer.id === layerId
     );
     if (lIndex !== -1) {
-      targetLayer = updatedFrames[fId][lIndex];
+      targetLayer = updatedFrames[fId][lIndex] as AnimationLayer;
       frameId = fId;
       layerIndex = lIndex;
     }
@@ -216,10 +216,10 @@ export function setAnimationOverride(
   
   if (isCurrentlyOverridden) {
     // Remove from overrides
-    targetLayer.linkedLayer.overrides = overrides.filter(id => id !== animationId);
+    targetLayer.linkedLayer.overrides = overrides.filter((id: string) => id !== animationId);
     
     // Find the animation and update its override status
-    const animIndex = targetLayer.animations.findIndex(anim => anim.id === animationId);
+    const animIndex = targetLayer.animations.findIndex((anim: Animation) => anim.id === animationId);
     if (animIndex !== -1) {
       targetLayer.animations[animIndex].isOverridden = false;
     }
@@ -228,7 +228,7 @@ export function setAnimationOverride(
     targetLayer.linkedLayer.overrides.push(animationId);
     
     // Find the animation and update its override status
-    const animIndex = targetLayer.animations.findIndex(anim => anim.id === animationId);
+    const animIndex = targetLayer.animations.findIndex((anim: Animation) => anim.id === animationId);
     if (animIndex !== -1) {
       targetLayer.animations[animIndex].isOverridden = true;
     }
@@ -264,7 +264,7 @@ export function unlinkLayer(
       (layer: AnimationLayer) => layer.id === layerId
     );
     if (lIndex !== -1) {
-      targetLayer = updatedFrames[fId][lIndex];
+      targetLayer = updatedFrames[fId][lIndex] as AnimationLayer;
       frameId = fId;
       layerIndex = lIndex;
     }
@@ -335,7 +335,7 @@ export function setSyncMode(
       (layer: AnimationLayer) => layer.id === layerId
     );
     if (lIndex !== -1) {
-      targetLayer = updatedFrames[fId][lIndex];
+      targetLayer = updatedFrames[fId][lIndex] as AnimationLayer;
       frameId = fId;
       layerIndex = lIndex;
     }
@@ -353,4 +353,99 @@ export function setSyncMode(
   updatedFrames[frameId][layerIndex] = targetLayer;
   
   return updatedFrames;
+}
+
+/**
+ * Synchronizes GIF frame layer visibility across different ad sizes by frame number
+ * For example, all frame #1 in different ad sizes will have the same layers toggled on/off
+ * 
+ * @param gifFrames Array of all GIF frames
+ * @param sourceFrameId ID of the GIF frame that was modified
+ * @param layerId ID of the layer that was toggled
+ * @returns Updated GIF frames with synchronized layer visibility
+ */
+export function syncGifFramesByNumber(
+  gifFrames: GifFrame[],
+  sourceFrameId: string,
+  layerId: string
+): GifFrame[] {
+  // Make a deep copy of the frames to avoid mutating the original
+  const updatedGifFrames = JSON.parse(JSON.stringify(gifFrames));
+  
+  // Find the source frame and its frame number
+  const sourceFrame = updatedGifFrames.find((frame: GifFrame) => frame.id === sourceFrameId);
+  if (!sourceFrame) {
+    console.error("Source GIF frame not found:", sourceFrameId);
+    return gifFrames;
+  }
+  
+  // Extract the frame number from the source frame ID
+  // GIF frame IDs follow format: gif-frame-[adSizeId]-[frameNumber]
+  const parts = sourceFrameId.split('-');
+  let frameNumber: string | null = null;
+  
+  // Extract frame number based on ID format
+  if (parts.length >= 4) {
+    // If format is gif-frame-frame-X-Y, frameNumber is Y
+    // If format is gif-frame-X-Y, frameNumber is Y
+    frameNumber = parts[parts.length - 1];
+  }
+  
+  if (!frameNumber) {
+    console.error("Could not extract frame number from source frame ID:", sourceFrameId);
+    return gifFrames;
+  }
+  
+  console.log(`Syncing GIF frames with frame number ${frameNumber}, layer ${layerId}`);
+  
+  // Check if the layer is hidden in the source frame
+  const isHiddenInSource = sourceFrame.hiddenLayers.includes(layerId);
+  
+  // Find frames with the same number across all ad sizes
+  updatedGifFrames.forEach((frame: GifFrame, index: number) => {
+    // Skip the source frame
+    if (frame.id === sourceFrameId) {
+      return;
+    }
+    
+    // Check if this frame has the same frame number
+    const frameParts = frame.id.split('-');
+    const currentFrameNumber = frameParts[frameParts.length - 1];
+    
+    if (currentFrameNumber === frameNumber) {
+      console.log(`Found matching frame: ${frame.id}`);
+      
+      // Check if this layer has an override in this frame
+      const hasOverride = frame.overrides?.layerVisibility?.[layerId]?.overridden || false;
+      
+      // Only sync if there's no override
+      if (!hasOverride) {
+        // Get current hidden state
+        const isCurrentlyHidden = frame.hiddenLayers.includes(layerId);
+        
+        if (isHiddenInSource && !isCurrentlyHidden) {
+          // Add to hidden layers
+          frame.hiddenLayers.push(layerId);
+          console.log(`Added layer ${layerId} to hidden layers in frame ${frame.id}`);
+        } else if (!isHiddenInSource && isCurrentlyHidden) {
+          // Remove from hidden layers
+          frame.hiddenLayers = frame.hiddenLayers.filter(id => id !== layerId);
+          console.log(`Removed layer ${layerId} from hidden layers in frame ${frame.id}`);
+        }
+        
+        // Update the visibleLayerCount if present
+        if (typeof frame.visibleLayerCount === 'number') {
+          // Count based on actual hidden layers
+          frame.visibleLayerCount = (frame.frameIndex === 0 ? 5 : 5) - frame.hiddenLayers.length;
+        }
+        
+        // Update the frame in the array
+        updatedGifFrames[index] = frame;
+      } else {
+        console.log(`Layer ${layerId} has an override in frame ${frame.id} - not syncing`);
+      }
+    }
+  });
+  
+  return updatedGifFrames;
 }

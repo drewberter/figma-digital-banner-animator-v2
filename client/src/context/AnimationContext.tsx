@@ -7,7 +7,8 @@ import {
   syncLinkedLayerAnimations, 
   setAnimationOverride,
   unlinkLayer as unlinkLayerUtil,
-  setSyncMode as setSyncModeUtil 
+  setSyncMode as setSyncModeUtil,
+  syncGifFramesByNumber
 } from '../utils/linkingUtils';
 import { mockLayers, mockGifFrames, mockFrames } from '../mock/animationData';
 
@@ -275,6 +276,15 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
         mockGifFrames[gifFrameIndex] = updatedGifFrame;
         
         console.log("Updated GIF frame:", updatedGifFrame);
+        
+        // Sync layer visibility across all frames with the same number
+        // This ensures all frame #1 in different ad sizes show/hide the same layers
+        const updatedGifFrames = syncGifFramesByNumber(mockGifFrames, frameId, layerId);
+        
+        // Update all frames in the mock data array
+        updatedGifFrames.forEach((frame, index) => {
+          mockGifFrames[index] = frame;
+        });
         
         // DO NOT update the parent ad size's layer visibility
         // Just update the current visible layers for UI purposes
