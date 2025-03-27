@@ -125,3 +125,22 @@ export const exportHtmlOptionsSchema = z.object({
   generateFallback: z.boolean().optional(),
   adPlatform: z.enum(['google', 'meta', 'generic']).optional()
 });
+
+export const exportMp4OptionsSchema = z.object({
+  frames: z.array(z.any()),
+  width: z.number().positive(),
+  height: z.number().positive(),
+  fps: z.number().min(15).max(60),
+  videoBitrate: z.number().min(1000).max(10000),
+  codec: z.enum(['h264']).default('h264')
+});
+
+export const exportWebmOptionsSchema = z.object({
+  frames: z.array(z.any()),
+  width: z.number().positive(),
+  height: z.number().positive(),
+  fps: z.number().min(15).max(60),
+  videoBitrate: z.number().min(1000).max(10000),
+  codec: z.enum(['vp9']).default('vp9'),
+  transparent: z.boolean().optional()
+});

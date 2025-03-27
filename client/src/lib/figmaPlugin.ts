@@ -11,6 +11,8 @@ export enum MessageType {
   UPDATE_ANIMATION = 'UPDATE_ANIMATION',
   EXPORT_GIF = 'EXPORT_GIF',
   EXPORT_HTML = 'EXPORT_HTML',
+  EXPORT_MP4 = 'EXPORT_MP4',
+  EXPORT_WEBM = 'EXPORT_WEBM',
   LOAD_STATE = 'LOAD_STATE',
   SAVE_STATE = 'SAVE_STATE',
 }
@@ -94,4 +96,14 @@ export function exportGif(options: any): void {
 // Export current animation as HTML5
 export function exportHtml(options: any): void {
   sendToPlugin(MessageType.EXPORT_HTML, { options });
+}
+
+// Export current animation as MP4
+export function exportMp4(options: any): void {
+  sendToPlugin(MessageType.EXPORT_MP4, { options });
+}
+
+// Export current animation as WebM
+export function exportWebm(options: any): void {
+  sendToPlugin(MessageType.EXPORT_WEBM, { options });
 }

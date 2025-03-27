@@ -1,4 +1,9 @@
-import { exportGif as pluginExportGif, exportHtml as pluginExportHtml } from '../lib/figmaPlugin';
+import { 
+  exportGif as pluginExportGif, 
+  exportHtml as pluginExportHtml,
+  exportMp4 as pluginExportMp4,
+  exportWebm as pluginExportWebm
+} from '../lib/figmaPlugin';
 import { AnimationFrame } from '../types/animation';
 
 // GIF Export options
@@ -23,6 +28,27 @@ interface HtmlExportOptions {
   optimizeForAdNetworks?: boolean;
   generateFallback?: boolean;
   adPlatform?: 'google' | 'meta' | 'generic';
+}
+
+// MP4 Export options
+interface Mp4ExportOptions {
+  frames: AnimationFrame[];
+  width: number;
+  height: number;
+  fps: number;
+  videoBitrate: number;
+  codec: 'h264';
+}
+
+// WebM Export options
+interface WebmExportOptions {
+  frames: AnimationFrame[];
+  width: number;
+  height: number;
+  fps: number;
+  videoBitrate: number;
+  codec: 'vp9';
+  transparent?: boolean;
 }
 
 // Export animation as GIF
@@ -104,7 +130,7 @@ export function generateHtml5Template(
 }
 
 // Helper function to get Google Ads compliant HTML5
-export function getGoogleAdsCompliantHtml(html: string): string {
+export function getGoogleAdsCompliantHtml(html: string, width: number, height: number): string {
   // Add Google Ads specific meta tags and requirements
   return html.replace('</head>', `
   <meta name="ad.size" content="width=${width},height=${height}">
@@ -112,4 +138,26 @@ export function getGoogleAdsCompliantHtml(html: string): string {
     var clickTag = "";
   </script>
 </head>`);
+}
+
+// Export animation as MP4 video
+export async function exportMp4(options: Mp4ExportOptions): Promise<void> {
+  try {
+    // Forward the export request to the plugin
+    pluginExportMp4(options);
+  } catch (error) {
+    console.error('Error exporting MP4:', error);
+    throw error;
+  }
+}
+
+// Export animation as WebM video
+export async function exportWebm(options: WebmExportOptions): Promise<void> {
+  try {
+    // Forward the export request to the plugin
+    pluginExportWebm(options);
+  } catch (error) {
+    console.error('Error exporting WebM:', error);
+    throw error;
+  }
 }

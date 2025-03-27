@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { X, Download } from 'lucide-react';
+import { exportGif, exportHtml, exportMp4, exportWebm } from '../utils/exportUtils';
+import { useAnimationContext } from '../context/AnimationContext';
 
 interface ExportModalProps {
   onClose: () => void;
@@ -14,6 +16,7 @@ interface ExportSize {
 }
 
 const ExportModal = ({ onClose }: ExportModalProps) => {
+  const { frames } = useAnimationContext();
   const [exportType, setExportType] = useState<ExportType>('gif');
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const [fps, setFps] = useState(30);
@@ -38,14 +41,62 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
   const handleExport = () => {
     let size: ExportSize = sizes[selectedSizeIndex];
     
-    console.log(`Exporting as ${exportType}:`, {
+    // Prepare export options based on export type
+    const commonOptions = {
       width: size.width,
       height: size.height,
-      quality,
-      fps,
-      includeFallback,
-      optimizeForAdNetworks
-    });
+      fps
+    };
+    
+    if (exportType === 'gif') {
+      const gifOptions = {
+        frames,
+        ...commonOptions,
+        quality: quality === 'high' ? 1 : quality === 'medium' ? 0.6 : 0.3,
+        dithering: quality === 'high' ? 'diffusion' : quality === 'medium' ? 'pattern' : 'none',
+        colorDepth: quality === 'high' ? 24 : quality === 'medium' ? 16 : 8,
+        loop: true
+      };
+      
+      console.log('Exporting as GIF:', gifOptions);
+      exportGif(gifOptions);
+    } 
+    else if (exportType === 'html') {
+      const htmlOptions = {
+        frames,
+        ...commonOptions,
+        includeClickTag: includeFallback,
+        optimizeForAdNetworks,
+        generateFallback: includeFallback,
+        adPlatform: optimizeForAdNetworks ? 'google' : 'generic'
+      };
+      
+      console.log('Exporting as HTML5:', htmlOptions);
+      exportHtml(htmlOptions);
+    }
+    else if (exportType === 'mp4') {
+      const mp4Options = {
+        frames,
+        ...commonOptions,
+        videoBitrate,
+        codec: 'h264'
+      };
+      
+      console.log('Exporting as MP4:', mp4Options);
+      exportMp4(mp4Options);
+    }
+    else if (exportType === 'webm') {
+      const webmOptions = {
+        frames,
+        ...commonOptions,
+        videoBitrate,
+        codec: 'vp9',
+        transparent
+      };
+      
+      console.log('Exporting as WebM:', webmOptions);
+      exportWebm(webmOptions);
+    }
     
     // Close the modal after export
     onClose();
