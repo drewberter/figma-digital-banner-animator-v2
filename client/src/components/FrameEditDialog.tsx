@@ -89,19 +89,22 @@ const FrameEditDialog = ({
         </div>
         
         <form onSubmit={handleSubmit} className="p-5 space-y-5 flex-1 overflow-y-auto">
-          <div>
-            <label htmlFor="name" className="block text-sm text-neutral-300 mb-2">
-              Frame Name
-            </label>
-            <input
-              id="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter frame name"
-              className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700 focus:border-[#4A7CFF] focus:outline-none"
-            />
-          </div>
+          {/* Only show frame name input in Animation mode */}
+          {timelineMode === TimelineMode.Animation && (
+            <div>
+              <label htmlFor="name" className="block text-sm text-neutral-300 mb-2">
+                Frame Name
+              </label>
+              <input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter frame name"
+                className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700 focus:border-[#4A7CFF] focus:outline-none"
+              />
+            </div>
+          )}
           
           {timelineMode === TimelineMode.Animation && (
             <>

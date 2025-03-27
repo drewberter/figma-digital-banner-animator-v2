@@ -434,10 +434,14 @@ const Timeline = ({
   
   // Handle adding a new frame
   const handleAddFrame = (frameData: { name: string, headlineText: string, description?: string, hiddenLayers?: string[] }) => {
-    // Create new frame with unique ID
+    // Get existing frame count to generate sequential frame number
+    const existingFrameCount = Object.keys(mockLayers).length;
+    const frameNumber = existingFrameCount + 1;
+    
+    // Create new frame with unique ID and sequential name
     const newFrame = {
       id: `frame-${Date.now()}`,
-      name: frameData.name,
+      name: `Frame ${frameNumber}`,
       selected: true,
       width: 300, // Default width
       height: 250, // Default height
