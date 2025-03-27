@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useReducer } from 'react';
-import { Play, Pause, SkipBack, Clock } from 'lucide-react';
+import { Play, Pause, SkipBack, Clock, LogIn, LogOut } from 'lucide-react';
 import { mockLayers } from '../mock/animationData';
-import { Animation, AnimationType, EasingType } from '../types/animation';
+import { Animation, AnimationType, EasingType, AnimationMode } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 
 interface TimelineProps {
@@ -222,14 +222,20 @@ const Timeline = ({
   };
 
   // Handle adding a new animation to a layer
-  const handleAddAnimationToLayer = (layerId: string, type: AnimationType) => {
+  const handleAddAnimationToLayer = (layerId: string, type: AnimationType, mode: AnimationMode = AnimationMode.Entrance) => {
     const layer = frameLayers.find(l => l.id === layerId);
     if (!layer) return;
+    
+    // Calculate a default start time based on the mode
+    const defaultStartTime = mode === AnimationMode.Entrance 
+      ? 0 // Entrance animations start at beginning
+      : 3; // Exit animations start later (adjust as needed)
     
     // Create a new animation
     const newAnimation: Animation = {
       type,
-      startTime: 0, // Start at beginning by default
+      mode,
+      startTime: defaultStartTime,
       duration: 1, // 1 second duration by default
       easing: EasingType.EaseOut, // Default easing
     };
@@ -264,15 +270,50 @@ const Timeline = ({
     // Force a re-render
     forceUpdate();
   };
+  
+  // Handle toggling an animation between entrance and exit
+  const handleToggleAnimationMode = (layerId: string, animIndex: number) => {
+    const layer = frameLayers.find(l => l.id === layerId);
+    if (!layer) return;
+    
+    const animation = layer.animations[animIndex];
+    if (!animation) return;
+    
+    // Toggle between entrance and exit
+    const currentMode = animation.mode || AnimationMode.Entrance;
+    const newMode = currentMode === AnimationMode.Entrance 
+      ? AnimationMode.Exit 
+      : AnimationMode.Entrance;
+    
+    // Update the animation mode
+    animation.mode = newMode;
+    
+    // If switching to exit, move it to a later time if it's at the beginning
+    if (newMode === AnimationMode.Exit && (animation.startTime === 0 || animation.startTime === undefined)) {
+      animation.startTime = Math.max(0, Math.min(duration - animation.duration, 3));
+    }
+    
+    // Force a re-render
+    forceUpdate();
+  };
 
   // Render animation block with drag handles
   const renderAnimationBlock = (layer: any, animation: any, animIndex: number) => {
+    // Determine if this is an entrance or exit animation
+    const isExit = animation.mode === AnimationMode.Exit;
+    const blockColor = isExit 
+      ? 'bg-[#FF5A5A] hover:bg-[#FF6A6A]' // Red for exit animations
+      : 'bg-[#2A5BFF] hover:bg-[#3A6BFF]'; // Blue for entrance animations
+    const borderColor = isExit ? 'border-[#FF7A7A]' : 'border-[#4A7CFF]';
+    
     return (
       <div 
         key={animIndex}
         className={`absolute h-6 top-2 rounded
-          ${selectedLayerId === layer.id ? 'bg-[#2A5BFF] hover:bg-[#3A6BFF] bg-opacity-70 border border-[#4A7CFF]' : 
-            'bg-[#2A5BFF] hover:bg-[#3A6BFF] bg-opacity-30 border border-[#4A7CFF]'} 
+          ${selectedLayerId === layer.id 
+            ? `${blockColor} bg-opacity-70 border ${borderColor}` 
+            : `${blockColor} bg-opacity-30 border ${borderColor}`
+          } 
           cursor-move`}
         style={{
           left: `${timeToPosition(animation.startTime || 0)}px`,
@@ -282,13 +323,16 @@ const Timeline = ({
       >
         {/* Left resize handle */}
         <div 
-          className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize hover:bg-[#5A8CFF]" 
+          className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize hover:bg-opacity-70" 
           onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'resize-left')}
         ></div>
         
         {/* Animation content */}
         <div className="px-2 text-xs text-white truncate flex items-center justify-between w-full h-full pointer-events-none">
-          <span>{animation.type}</span>
+          <span className="flex items-center">
+            {isExit ? <LogOut size={12} className="mr-1" /> : <LogIn size={12} className="mr-1" />}
+            {animation.type}
+          </span>
           {animation.duration >= 0.5 && (
             <span className="text-xs opacity-75 ml-1">
               {animation.duration.toFixed(1)}s
@@ -298,7 +342,7 @@ const Timeline = ({
         
         {/* Right resize handle */}
         <div 
-          className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize hover:bg-[#5A8CFF]" 
+          className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize hover:bg-opacity-70" 
           onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'resize-right')}
         ></div>
       </div>
@@ -427,6 +471,17 @@ const Timeline = ({
                             
                             <ContextMenu.Separator className="h-px bg-neutral-700 my-1" />
                             
+                            <ContextMenu.Item 
+                              className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                              onClick={() => handleToggleAnimationMode(layer.id, animIndex)}
+                            >
+                              {animation.mode === AnimationMode.Exit 
+                                ? 'Convert to Entrance' 
+                                : 'Convert to Exit'}
+                            </ContextMenu.Item>
+                            
+                            <ContextMenu.Separator className="h-px bg-neutral-700 my-1" />
+                            
                             <ContextMenu.Sub>
                               <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
                                 <span>Change Type</span>
@@ -469,7 +524,10 @@ const Timeline = ({
                   >
                     <ContextMenu.Sub>
                       <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
-                        <span>Add Animation</span>
+                        <span className="flex items-center">
+                          <LogIn size={14} className="mr-1.5" />
+                          Add Entrance Animation
+                        </span>
                         <span>▶</span>
                       </ContextMenu.SubTrigger>
                       <ContextMenu.Portal>
@@ -478,7 +536,30 @@ const Timeline = ({
                             <ContextMenu.Item 
                               key={type}
                               className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                              onClick={() => handleAddAnimationToLayer(layer.id, type)}
+                              onClick={() => handleAddAnimationToLayer(layer.id, type, AnimationMode.Entrance)}
+                            >
+                              {type}
+                            </ContextMenu.Item>
+                          ))}
+                        </ContextMenu.SubContent>
+                      </ContextMenu.Portal>
+                    </ContextMenu.Sub>
+                    
+                    <ContextMenu.Sub>
+                      <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
+                        <span className="flex items-center">
+                          <LogOut size={14} className="mr-1.5" />
+                          Add Exit Animation
+                        </span>
+                        <span>▶</span>
+                      </ContextMenu.SubTrigger>
+                      <ContextMenu.Portal>
+                        <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
+                          {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
+                            <ContextMenu.Item 
+                              key={type}
+                              className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                              onClick={() => handleAddAnimationToLayer(layer.id, type, AnimationMode.Exit)}
                             >
                               {type}
                             </ContextMenu.Item>

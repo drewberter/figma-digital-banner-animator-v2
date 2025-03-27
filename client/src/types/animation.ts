@@ -23,8 +23,14 @@ export interface Keyframe {
   properties: Record<string, any>;
 }
 
+export enum AnimationMode {
+  Entrance = 'Entrance',
+  Exit = 'Exit'
+}
+
 export interface Animation {
   type: AnimationType;
+  mode?: AnimationMode; // Entrance or Exit animation
   startTime?: number;
   duration: number;
   delay?: number;

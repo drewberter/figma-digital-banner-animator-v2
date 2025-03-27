@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeftSquare, ChevronRightSquare, Clock, Zap, Palette } from 'lucide-react';
-import { AnimationType, EasingType } from '../types/animation';
+import { ChevronLeftSquare, ChevronRightSquare, Clock, Zap, Palette, LogIn, LogOut } from 'lucide-react';
+import { AnimationType, EasingType, AnimationMode } from '../types/animation';
 import { mockLayers } from '../mock/animationData';
 
 const PropertiesPanel = () => {
@@ -18,6 +18,7 @@ const PropertiesPanel = () => {
   
   const [animation, setAnimation] = useState<{
     type: AnimationType,
+    mode?: AnimationMode,
     startTime: number,
     duration: number,
     easing: EasingType,
@@ -26,6 +27,7 @@ const PropertiesPanel = () => {
     rotation?: number
   }>({
     type: AnimationType.Fade,
+    mode: AnimationMode.Entrance,
     startTime: 0,
     duration: 1,
     easing: EasingType.EaseInOut,
@@ -38,6 +40,9 @@ const PropertiesPanel = () => {
     if (selectedLayer && selectedLayer.animations.length > 0) {
       setAnimation({
         ...selectedLayer.animations[0],
+        // Set default values for optional properties
+        startTime: selectedLayer.animations[0].startTime || 0,
+        mode: selectedLayer.animations[0].mode || AnimationMode.Entrance,
         scale: selectedLayer.animations[0].scale || 1,
         rotation: selectedLayer.animations[0].rotation || 0
       });
@@ -102,6 +107,29 @@ const PropertiesPanel = () => {
       </div>
       
       <div className="flex-1 overflow-y-auto p-3">
+        {/* Animation Mode Toggle */}
+        <div className="mb-4">
+          <label className="block text-xs text-neutral-400 mb-1">Animation Mode</label>
+          <div className="flex bg-[#191919] rounded border border-neutral-700 overflow-hidden">
+            <button
+              className={`flex-1 py-1.5 text-sm flex items-center justify-center
+                ${animation.mode !== AnimationMode.Exit ? 'bg-blue-600 text-white' : 'text-neutral-300'}`}
+              onClick={() => handleChange('mode', AnimationMode.Entrance)}
+            >
+              <LogIn size={14} className="mr-1" />
+              Entrance
+            </button>
+            <button
+              className={`flex-1 py-1.5 text-sm flex items-center justify-center
+                ${animation.mode === AnimationMode.Exit ? 'bg-red-600 text-white' : 'text-neutral-300'}`}
+              onClick={() => handleChange('mode', AnimationMode.Exit)}
+            >
+              <LogOut size={14} className="mr-1" />
+              Exit
+            </button>
+          </div>
+        </div>
+        
         <div className="mb-4">
           <label className="block text-xs text-neutral-400 mb-1">Animation Type</label>
           <select
