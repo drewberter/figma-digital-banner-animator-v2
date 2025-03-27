@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { Animation, AnimationLayer, AnimationFrame, Keyframe, LinkSyncMode } from '../types/animation';
+import { Animation, AnimationLayer, AnimationFrame, Keyframe, LinkSyncMode, AdSize } from '../types/animation';
 import { useAutoSave, loadSavedData } from '../hooks/useAutoSave';
 import { v4 as uuidv4 } from 'uuid';
 import { 
@@ -14,11 +14,19 @@ import {
 interface AnimationContextType {
   layers: AnimationLayer[];
   frames: AnimationFrame[];
+  adSizes: AdSize[];
+  selectedAdSizeId: string | null;
   selectedLayerId: string | null;
   currentFrame: AnimationFrame | null;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
+  
+  // Ad Sizes
+  addAdSize: (adSize: { name: string, width: number, height: number }) => AdSize;
+  removeAdSize: (adSizeId: string) => void;
+  selectAdSize: (adSizeId: string) => void;
+  getSelectedAdSize: () => AdSize | null;
   
   // Layers
   selectLayer: (layerId: string) => void;
@@ -97,6 +105,49 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
   // State - initialize with saved or mock data
   const [layers, setLayers] = useState<AnimationLayer[]>(savedData.layers);
   const [frames, setFrames] = useState<AnimationFrame[]>(savedData.frames);
+  
+  // Initialize AdSizes state by grouping existing frames by dimensions
+  const [adSizes, setAdSizes] = useState<AdSize[]>(() => {
+    // Create initial ad sizes from existing frames
+    const sizeMap = new Map<string, AdSize>();
+    
+    savedData.frames.forEach(frame => {
+      const sizeKey = `${frame.width}x${frame.height}`;
+      
+      if (!sizeMap.has(sizeKey)) {
+        // Create a new ad size entry
+        sizeMap.set(sizeKey, {
+          id: `adsize-${sizeKey}`,
+          name: `${frame.width} × ${frame.height}`,
+          width: frame.width,
+          height: frame.height,
+          frames: [],
+          selected: false
+        });
+      }
+      
+      // Add this frame to the appropriate ad size
+      const adSize = sizeMap.get(sizeKey)!;
+      adSize.frames.push({
+        ...frame,
+        adSizeId: adSize.id
+      });
+    });
+    
+    // Convert map to array and set the first ad size as selected
+    const adSizeArray = Array.from(sizeMap.values());
+    if (adSizeArray.length > 0) {
+      adSizeArray[0].selected = true;
+    }
+    
+    return adSizeArray;
+  });
+  
+  // Track the currently selected ad size
+  const [selectedAdSizeId, setSelectedAdSizeId] = useState<string | null>(
+    adSizes.length > 0 ? adSizes.find(size => size.selected)?.id || adSizes[0].id : null
+  );
+  
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(
     savedData.selectedLayerId || (savedData.layers.length > 0 ? savedData.layers[0].id : null)
   );
@@ -124,6 +175,8 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
   const animationState = {
     layers,
     frames,
+    adSizes,
+    selectedAdSizeId,
     selectedLayerId,
     duration,
     framesLayers
@@ -194,17 +247,42 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
 
   // Add a new frame
   const addFrame = useCallback((frame: AnimationFrame) => {
+    // If there's a selected ad size, associate this frame with it
+    const frameWithAdSize: AnimationFrame = {
+      ...frame,
+      adSizeId: frame.adSizeId || (selectedAdSizeId || undefined),
+      selected: true
+    };
+    
     // Deselect all other frames
     setFrames(prev => {
       const updatedFrames = prev.map(f => ({ ...f, selected: false }));
-      return [...updatedFrames, { ...frame, selected: true }];
+      return [...updatedFrames, frameWithAdSize];
     });
-  }, []);
+    
+    // Also add this frame to the adSize's frames array
+    if (frameWithAdSize.adSizeId) {
+      setAdSizes(prev => 
+        prev.map(size => {
+          if (size.id === frameWithAdSize.adSizeId) {
+            return {
+              ...size,
+              frames: [...size.frames, frameWithAdSize]
+            };
+          }
+          return size;
+        })
+      );
+    }
+  }, [selectedAdSizeId]);
 
   // Remove a frame
   const removeFrame = useCallback((frameId: string) => {
+    // First get the frame to be removed
+    const frameToRemove = frames.find(f => f.id === frameId);
+    
+    // Remove from frames array
     setFrames(prev => {
-      const frameToRemove = prev.find(f => f.id === frameId);
       const filteredFrames = prev.filter(f => f.id !== frameId);
       
       // If the frame was selected, select another frame
@@ -214,7 +292,22 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       
       return filteredFrames;
     });
-  }, []);
+    
+    // If this frame belongs to an ad size, remove it from the ad size's frames array
+    if (frameToRemove?.adSizeId) {
+      setAdSizes(prev => 
+        prev.map(size => {
+          if (size.id === frameToRemove.adSizeId) {
+            return {
+              ...size,
+              frames: size.frames.filter(f => f.id !== frameId)
+            };
+          }
+          return size;
+        })
+      );
+    }
+  }, [frames]);
 
   // Select a frame
   const selectFrame = useCallback((frameId: string) => {
@@ -361,12 +454,78 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
     setLayers(newLayers);
   }, []); // Empty dependency array ensures this runs only once on mount
 
+  // Ad Size methods
+  const addAdSize = useCallback((adSizeData: { name: string, width: number, height: number }) => {
+    const newAdSize: AdSize = {
+      id: `adsize-${adSizeData.width}x${adSizeData.height}-${Date.now()}`,
+      name: adSizeData.name || `${adSizeData.width} × ${adSizeData.height}`,
+      width: adSizeData.width,
+      height: adSizeData.height,
+      frames: [],
+      selected: false,
+    };
+
+    setAdSizes(prev => {
+      // Deselect all other ad sizes
+      const updatedAdSizes = prev.map(size => ({ ...size, selected: false }));
+      return [...updatedAdSizes, { ...newAdSize, selected: true }];
+    });
+    
+    // Set this as the selected ad size
+    setSelectedAdSizeId(newAdSize.id);
+    
+    return newAdSize;
+  }, []);
+  
+  // Remove an ad size and all its associated frames
+  const removeAdSize = useCallback((adSizeId: string) => {
+    setAdSizes(prev => {
+      const filteredSizes = prev.filter(size => size.id !== adSizeId);
+      
+      // If we're removing the selected size, select the first one
+      if (selectedAdSizeId === adSizeId && filteredSizes.length > 0) {
+        filteredSizes[0].selected = true;
+        setSelectedAdSizeId(filteredSizes[0].id);
+      }
+      
+      return filteredSizes;
+    });
+    
+    // Also remove all frames in this ad size
+    setFrames(prev => prev.filter(frame => frame.adSizeId !== adSizeId));
+  }, [selectedAdSizeId]);
+  
+  // Select an ad size
+  const selectAdSize = useCallback((adSizeId: string) => {
+    setAdSizes(prev =>
+      prev.map(size => ({
+        ...size,
+        selected: size.id === adSizeId
+      }))
+    );
+    
+    setSelectedAdSizeId(adSizeId);
+    
+    // Also need to update the current frame
+    const targetAdSize = adSizes.find(size => size.id === adSizeId);
+    if (targetAdSize && targetAdSize.frames.length > 0) {
+      selectFrame(targetAdSize.frames[0].id);
+    }
+  }, [adSizes, selectFrame]);
+  
+  // Get currently selected ad size
+  const getSelectedAdSize = useCallback(() => {
+    return adSizes.find(size => size.id === selectedAdSizeId) || null;
+  }, [adSizes, selectedAdSizeId]);
+
   // Manual save method (for explicit save button)
   const saveAnimationState = useCallback(() => {
     try {
       const state = {
         layers,
         frames,
+        adSizes,
+        selectedAdSizeId,
         selectedLayerId,
         duration
       };
@@ -375,16 +534,18 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Error saving animation state:', error);
     }
-  }, [layers, frames, selectedLayerId, duration]);
+  }, [layers, frames, adSizes, selectedAdSizeId, selectedLayerId, duration]);
 
   // Manual load method (for explicit load button)
   const loadAnimationState = useCallback(() => {
     try {
       const savedState = localStorage.getItem(STORAGE_KEY);
       if (savedState) {
-        const { layers, frames, selectedLayerId, duration } = JSON.parse(savedState);
+        const { layers, frames, adSizes, selectedAdSizeId, selectedLayerId, duration } = JSON.parse(savedState);
         setLayers(layers);
         setFrames(frames);
+        if (adSizes) setAdSizes(adSizes);
+        if (selectedAdSizeId) setSelectedAdSizeId(selectedAdSizeId);
         setSelectedLayerId(selectedLayerId);
         setDuration(duration);
         console.log('Animation state loaded from storage');
@@ -543,11 +704,19 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
   const contextValue: AnimationContextType = {
     layers,
     frames,
+    adSizes,
+    selectedAdSizeId,
     selectedLayerId,
     currentFrame,
     isPlaying,
     currentTime,
     duration,
+    
+    // Ad Size methods
+    addAdSize,
+    removeAdSize,
+    selectAdSize,
+    getSelectedAdSize,
     
     // Layer methods
     selectLayer,

@@ -78,6 +78,15 @@ export interface AnimationLayer {
   linkedLayer?: LinkedLayerInfo; // Information about layer linking
 }
 
+export interface AdSize {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  frames: AnimationFrame[];
+  selected: boolean;
+}
+
 export interface AnimationFrame {
   id: string;
   name: string;
@@ -92,6 +101,7 @@ export interface AnimationFrame {
   delay?: number; // Delay in seconds before animations start for this frame
   buttonText?: string; // Text for the CTA button
   logoText?: string; // Text for the logo element
+  adSizeId?: string; // Reference to the parent ad size
 }
 
 export interface Preset {
