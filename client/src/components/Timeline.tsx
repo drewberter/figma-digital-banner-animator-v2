@@ -1283,21 +1283,24 @@ const Timeline = ({
                   // This is the parent ad size for which we want to show GIF frames
                   let selectedAdSizeId = localSelectedFrameId;
                   
-                  // If it's a GIF frame ID (format: "gif-frame-1-1" or "gif-frame-frameX-Y")
+                  // If it's a GIF frame ID, extract the ad size ID using the same robust logic as in handleAddBlankFrame
                   if (localSelectedFrameId.startsWith('gif-frame-')) {
-                    // Check if it's the old format (gif-frame-1-1) or new format (gif-frame-frameX-Y)
                     const parts = localSelectedFrameId.split('-');
-                    if (parts.length > 2) {
-                      // Check if the third part is numeric or starts with "frame"
-                      if (parts[2] === '1' || parts[2] === '2' || parts[2] === '3' || parts[2] === '4') {
-                        // Old format: gif-frame-1-1 (where 1 is the frame number)
-                        selectedAdSizeId = `frame-${parts[2]}`;
+                    
+                    if (parts.length >= 4) { 
+                      if (parts[2] === 'frame') {
+                        // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
+                        selectedAdSizeId = `${parts[2]}-${parts[3]}`;
                       } else {
-                        // New format: gif-frame-frameX-Y
-                        selectedAdSizeId = parts[2];
+                        // Format is gif-frame-X-Y, so determine if X is a frame number or part of the ad size ID
+                        selectedAdSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
                       }
+                    } else if (parts.length === 4) { 
+                      // Old format: gif-frame-1-1
+                      selectedAdSizeId = `frame-${parts[2]}`;
                     } else {
-                      selectedAdSizeId = 'frame-1'; // Fallback
+                      // Fallback
+                      selectedAdSizeId = 'frame-1';
                     }
                     console.log("FrameCardGrid - Extracted adSizeId from GIF frame:", selectedAdSizeId);
                   }

@@ -116,18 +116,47 @@ function App() {
     
     // If switching to GIF Frames mode, initialize the frames
     if (mode === TimelineMode.GifFrames) {
+      // Store the current selectedAdSizeId to use for GIF frames
+      const currentAdSizeId = selectedAdSizeId;
+      
       // Generate GIF frames for the current ad size
-      const gifFrames = generateGifFramesForAdSize(selectedAdSizeId);
+      const gifFrames = generateGifFramesForAdSize(currentAdSizeId);
       
       // If frames were generated successfully, select the first one
       if (gifFrames.length > 0) {
-        console.log("App: Generated GIF frames for ad size", selectedAdSizeId, "first frame:", gifFrames[0].id);
+        console.log("TimelineModeChange: Generated GIF frames for ad size", currentAdSizeId, "first frame:", gifFrames[0].id);
         setSelectedGifFrameId(gifFrames[0].id);
+        
+        // Important: when in GIF frames mode, selected frame id is the GIF frame id
+        // We don't need to set selectedAdSizeId here as it's preserved
+        console.log("App: Selected GIF frame:", gifFrames[0].id);
       } else {
-        console.warn("App: No GIF frames were generated for ad size", selectedAdSizeId);
+        console.warn("App: No GIF frames were generated for ad size", currentAdSizeId);
+      }
+    } else if (mode === TimelineMode.Animation) {
+      // When switching back to Animation mode, select the ad size that was previously used for GIF frames
+      // Extract the ad size ID from the current GIF frame ID
+      if (selectedGifFrameId && selectedGifFrameId.startsWith('gif-frame-')) {
+        const parts = selectedGifFrameId.split('-');
+        let adSizeId = 'frame-1'; // Default fallback
+        
+        if (parts.length >= 4) {
+          if (parts[2] === 'frame') {
+            // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
+            adSizeId = `${parts[2]}-${parts[3]}`;
+          } else {
+            // Format is gif-frame-X-Y, determine if X is a frame number or part of the ad size ID
+            adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+          }
+        } else if (parts.length === 4) {
+          // Old format: gif-frame-1-1
+          adSizeId = `frame-${parts[2]}`;
+        }
+        
+        console.log("App: Switching back to Animation mode, selected ad size:", adSizeId);
+        setSelectedAdSizeId(adSizeId);
       }
     }
-    // When switching back to Animation mode, keep the currently selected ad size
   };
   
   // Track animation frame ID in a ref so we can cancel it
@@ -153,19 +182,23 @@ function App() {
     // Extract the parent ad size from the GIF frame ID or use the currently selected ad size
     let adSizeId = selectedAdSizeId;
     
-    // If we have a selected GIF frame, extract the ad size from it
+    // If we have a selected GIF frame, extract the ad size from it using consistent extraction logic
     if (selectedGifFrameId && selectedGifFrameId.startsWith('gif-frame-')) {
       const parts = selectedGifFrameId.split('-');
-      if (parts.length > 2) {
-        // Check if it's the old format (gif-frame-1-1) or new format (gif-frame-frameX-Y)
-        if (parts[2] === '1' || parts[2] === '2' || parts[2] === '3' || parts[2] === '4') {
-          // Old format: gif-frame-1-1 (where 1 is the frame number)
-          adSizeId = `frame-${parts[2]}`;
+      
+      if (parts.length >= 4) {
+        if (parts[2] === 'frame') {
+          // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
+          adSizeId = `${parts[2]}-${parts[3]}`;
         } else {
-          // New format: gif-frame-frameX-Y
-          adSizeId = parts[2];
+          // Format is gif-frame-X-Y, determine if X is a frame number or part of the ad size ID
+          adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
         }
+      } else if (parts.length === 4) {
+        // Old format: gif-frame-1-1
+        adSizeId = `frame-${parts[2]}`;
       }
+      
       console.log("App useEffect: Extracted adSizeId from GIF frame:", selectedGifFrameId, "->", adSizeId);
     }
       
