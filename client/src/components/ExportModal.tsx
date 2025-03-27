@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Download, ChevronUp, ChevronDown } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, Download, ChevronUp, ChevronDown, Play, Pause } from 'lucide-react';
 import { exportGif, exportHtml, exportMp4, exportWebm } from '../utils/exportUtils';
 import { useAnimationContext } from '../context/AnimationContext';
 
@@ -9,18 +9,11 @@ interface ExportModalProps {
 
 type ExportType = 'gif' | 'html' | 'mp4' | 'webm';
 
-interface ExportSize {
-  width: number;
-  height: number;
-  name: string;
-}
-
 const ExportModal = ({ onClose }: ExportModalProps) => {
-  const { frames } = useAnimationContext();
+  const { frames, currentFrame } = useAnimationContext();
   const [exportType, setExportType] = useState<ExportType>('gif');
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const [fps, setFps] = useState(30);
-  const [selectedSizeIndex, setSelectedSizeIndex] = useState(0);
   const [includeFallback, setIncludeFallback] = useState(true);
   const [optimizeForAdNetworks, setOptimizeForAdNetworks] = useState(true);
   const [videoBitrate, setVideoBitrate] = useState(5000); // kbps
@@ -36,24 +29,60 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
   const [dithering, setDithering] = useState<'none' | 'pattern' | 'diffusion'>('diffusion');
   const [compression, setCompression] = useState(7); // 1-10 scale
   
-  // Common banner sizes
-  const sizes: ExportSize[] = [
-    { width: 300, height: 250, name: 'Medium Rectangle (300×250)' },
-    { width: 728, height: 90, name: 'Leaderboard (728×90)' },
-    { width: 320, height: 50, name: 'Mobile Leaderboard (320×50)' },
-    { width: 160, height: 600, name: 'Wide Skyscraper (160×600)' },
-    { width: 300, height: 600, name: 'Half Page (300×600)' },
-    { width: 320, height: 100, name: 'Large Mobile Banner (320×100)' }
-  ];
+  // GIF Preview
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [previewFrame, setPreviewFrame] = useState(0);
+  const previewInterval = useRef<number | null>(null);
+  
+  // When frameCount is active, disable the fps control
+  const isFpsDisabled = specialGifFormat || (showAdvancedGifOptions && frameCount > 0);
+  
+  // Use selected frame dimensions
+  const getFrameDimensions = () => {
+    if (!currentFrame) {
+      // Default dimensions if no frame is selected
+      return { width: 300, height: 250 };
+    }
+    return {
+      width: currentFrame.width,
+      height: currentFrame.height
+    };
+  };
+  
+  // Cleanup preview interval on unmount
+  useEffect(() => {
+    return () => {
+      if (previewInterval.current) {
+        clearInterval(previewInterval.current);
+      }
+    };
+  }, []);
+  
+  // Toggle GIF preview playback
+  const togglePreview = () => {
+    if (previewPlaying) {
+      if (previewInterval.current) {
+        clearInterval(previewInterval.current);
+        previewInterval.current = null;
+      }
+      setPreviewPlaying(false);
+    } else {
+      setPreviewPlaying(true);
+      const delay = specialGifFormat ? 2500 : showAdvancedGifOptions ? frameDelay : (1000 / fps);
+      previewInterval.current = window.setInterval(() => {
+        setPreviewFrame(prev => (prev + 1) % frames.length);
+      }, delay);
+    }
+  };
   
   // Handle export
   const handleExport = () => {
-    let size: ExportSize = sizes[selectedSizeIndex];
+    const { width, height } = getFrameDimensions();
     
     // Prepare export options based on export type
     const commonOptions = {
-      width: size.width,
-      height: size.height,
+      width,
+      height,
       fps
     };
     
@@ -221,20 +250,57 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
             </div>
           </div>
           
+          {/* Show frame dimensions information */}
           <div>
-            <label className="block text-sm text-neutral-300 mb-2">Size</label>
-            <select
-              className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700"
-              value={selectedSizeIndex}
-              onChange={(e) => setSelectedSizeIndex(parseInt(e.target.value))}
-            >
-              {sizes.map((size, index) => (
-                <option key={index} value={index}>
-                  {size.name} - {size.width}×{size.height}
-                </option>
-              ))}
-            </select>
+            <label className="block text-sm text-neutral-300 mb-2">Frame Size</label>
+            <div className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700">
+              {currentFrame 
+                ? `Original Figma frame: ${currentFrame.width}×${currentFrame.height}`
+                : "Using original Figma frame dimensions"}
+            </div>
           </div>
+          
+          {/* Add GIF Preview for gif export type */}
+          {exportType === 'gif' && (
+            <div className="mt-4">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-sm text-neutral-300">Preview</label>
+                <button 
+                  onClick={togglePreview}
+                  className="flex items-center text-xs text-[#4A7CFF] hover:text-[#5A8CFF]"
+                >
+                  {previewPlaying ? (
+                    <>
+                      <Pause size={14} className="mr-1" />
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play size={14} className="mr-1" />
+                      Play
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="bg-black rounded-md h-[120px] flex items-center justify-center overflow-hidden">
+                {frames.length > 0 ? (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <div className="text-xs text-neutral-500 absolute bottom-2 right-2">
+                      Frame {previewFrame + 1}/{frames.length}
+                    </div>
+                    <div className="w-[80%] h-[80%] bg-[#1a1a1a] flex items-center justify-center">
+                      {/* Here you would show the actual frame preview */}
+                      <div className="text-center text-neutral-400">
+                        Frame preview: {frames[previewFrame]?.name || 'No frames'}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-neutral-500 text-sm">No frames available</div>
+                )}
+              </div>
+            </div>
+          )}
           
           {exportType === 'gif' && (
             <>
@@ -275,11 +341,17 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
                   value={fps}
                   onChange={(e) => setFps(parseInt(e.target.value))}
                   className="w-full"
-                  disabled={specialGifFormat}
+                  disabled={isFpsDisabled}
                 />
                 <div className="flex justify-between text-xs text-neutral-500">
                   <span>15 fps</span>
-                  <span className="text-neutral-300">{specialGifFormat ? "0.4 fps (2.5s delay)" : `${fps} fps`}</span>
+                  <span className="text-neutral-300">
+                    {specialGifFormat 
+                      ? "0.4 fps (2.5s delay)" 
+                      : (showAdvancedGifOptions && frameCount > 0)
+                        ? `Using frame delay (${frameDelay}ms)` 
+                        : `${fps} fps`}
+                  </span>
                   <span>60 fps</span>
                 </div>
               </div>
@@ -316,7 +388,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
                 </button>
                 
                 {showAdvancedGifOptions && !specialGifFormat && (
-                  <div className="mt-4 space-y-4 rounded-md bg-[#1a1a1a] p-4 border border-neutral-700">
+                  <div className="mt-4 space-y-4 rounded-md bg-[#1a1a1a] p-4 border border-neutral-700 max-h-[300px] overflow-y-auto">
                     <div>
                       <label className="block text-sm text-neutral-300 mb-2">Frame Count</label>
                       <div className="flex items-center">
