@@ -30,7 +30,7 @@ const FrameCardGrid = ({
   }));
 
   return (
-    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 overflow-y-auto">
+    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 overflow-y-auto max-h-[calc(100vh-180px)]">
       {/* Frame cards */}
       {frameEntries.map((frame) => (
         <FrameCard 
@@ -90,20 +90,48 @@ const FrameCard = ({
     >
       {/* Frame preview area */}
       <div 
-        className="h-[140px] bg-neutral-800 flex items-center justify-center relative cursor-pointer"
+        className="h-[140px] bg-neutral-800 flex items-center justify-center relative cursor-pointer overflow-hidden"
         onClick={onSelect}
       >
-        {/* Frame thumbnail - this would ideally be a preview of the animation frame */}
-        <div className="text-center">
-          <span className="text-lg font-semibold text-white">{frame.name}</span>
-          <div className="text-xs text-neutral-400 mt-1">
-            {`${frame.width} × ${frame.height}`}
+        {/* Interactive frame preview that shows visible layers */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          {/* Background */}
+          {layers.find(l => l.name === 'Background' && l.visible) && (
+            <div className="absolute inset-0 bg-blue-900"></div>
+          )}
+          
+          {/* Content elements - stacked in the right order */}
+          <div className="relative z-10 p-3 flex flex-col items-center justify-center w-full h-full">
+            {/* Headline */}
+            {layers.find(l => l.name === 'Headline' && l.visible) && (
+              <div className="text-lg font-bold text-white mb-1 text-center">Headline Text</div>
+            )}
+            
+            {/* Subhead */}
+            {layers.find(l => l.name === 'Subhead' && l.visible) && (
+              <div className="text-xs text-white mb-2 text-center">Subhead description text</div>
+            )}
+            
+            {/* CTA Button */}
+            {layers.find(l => l.name === 'CTA Button' && l.visible) && (
+              <div className="bg-yellow-500 text-black text-xs px-2 py-1 rounded mb-2">CTA Button</div>
+            )}
+            
+            {/* Logo */}
+            {layers.find(l => l.name === 'Logo' && l.visible) && (
+              <div className="mt-auto text-xs bg-white text-black px-2 py-1 rounded-full">Logo</div>
+            )}
           </div>
+        </div>
+
+        {/* Frame dimensions overlay */}
+        <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 rounded px-1 py-0.5 text-xs text-white">
+          {`${frame.width} × ${frame.height}`}
         </div>
 
         {/* Frame info badge */}
         <div className="absolute top-2 right-2 bg-black bg-opacity-50 rounded-full px-2 py-0.5 text-xs text-white">
-          {layers.filter(l => l.visible).length}/{layers.length} layers visible
+          {layers.filter(l => l.visible).length}/{layers.length} visible
         </div>
       </div>
 
@@ -148,6 +176,10 @@ const FrameCard = ({
                 if (onDelayChange) {
                   onDelayChange(frame.id, newDelay);
                 }
+                
+                // Also update the frame data directly for immediate feedback
+                // This will be important for the frame sequence playback
+                frame.delay = newDelay;
               }}
               onBlur={() => setShowDelayInput(false)}
               onKeyDown={(e) => {

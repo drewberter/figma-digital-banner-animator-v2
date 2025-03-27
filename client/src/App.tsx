@@ -95,9 +95,57 @@ function App() {
   // Track animation frame ID in a ref so we can cancel it
   const animationFrameIdRef = useRef<number | null>(null);
   
+  // Track frame sequence playback
+  const [frameSequenceData, setFrameSequenceData] = useState({
+    currentFrameIndex: 0,
+    frameIds: [] as string[],
+    frameTotalDurations: new Map<string, number>(),   // Total duration including delay
+    frameStartTimes: new Map<string, number>()        // When this frame starts in the sequence
+  });
+  
+  // We'll get access to animation context data within the AnimationProvider wrapper
+
+  // Initialize or update frame sequence data when frames or mode changes
+  // This will be updated in wrapped Timeline component
+  useEffect(() => {
+    // Only update in Frame Style mode - this will now get data from mock objects instead of context
+    if (timelineMode !== TimelineMode.FrameStyle) return;
+    
+    // Hardcode frame IDs for development (in real app, would use context)
+    const frameIds = ['frame-1', 'frame-2', 'frame-3'];
+    
+    // Calculate frame durations including their delay
+    const frameTotalDurations = new Map<string, number>();
+    const frameStartTimes = new Map<string, number>();
+    
+    let cumulativeTime = 0;
+    frameIds.forEach(frameId => {
+      // Just use default delays for development
+      const frameDelay = 0.5; // Default delay
+      
+      // Start time is the cumulative time before this frame
+      frameStartTimes.set(frameId, cumulativeTime);
+      
+      // Each frame plays for its delay plus the animation duration
+      const frameTotalDuration = frameDelay + timelineDuration;
+      frameTotalDurations.set(frameId, frameTotalDuration);
+      
+      // Add this frame's duration to the cumulative time
+      cumulativeTime += frameTotalDuration;
+    });
+    
+    setFrameSequenceData({
+      currentFrameIndex: frameIds.indexOf(selectedFrameId),
+      frameIds,
+      frameTotalDurations,
+      frameStartTimes
+    });
+    
+  }, [timelineMode, selectedFrameId, timelineDuration]);
+
   // Handle play/pause toggle
   const handlePlayPauseToggle = (playing: boolean) => {
-    // Reset to beginning if we're at the end of the timeline and trying to play
+    // Reset time if we're at the end or changing modes
     if (playing && currentTime >= timelineDuration) {
       setCurrentTime(0);
     }
@@ -120,17 +168,86 @@ function App() {
       
       const animationFrame = (now: number) => {
         const elapsed = (now - startTime) / 1000; // Convert to seconds
-        const newTime = initialTime + elapsed;
         
-        // If we reach the end of the timeline, stop playing
-        if (newTime >= timelineDuration) {
-          setCurrentTime(timelineDuration);
-          setIsPlaying(false);
-          animationFrameIdRef.current = null;
-          return;
+        // Different playback behavior based on timeline mode
+        if (timelineMode === TimelineMode.Animation) {
+          // Standard animation mode - plays a single animation
+          const newTime = initialTime + elapsed;
+          
+          // If we reach the end of the timeline, stop playing
+          if (newTime >= timelineDuration) {
+            setCurrentTime(timelineDuration);
+            setIsPlaying(false);
+            animationFrameIdRef.current = null;
+            return;
+          }
+          
+          setCurrentTime(newTime);
+        } 
+        else if (timelineMode === TimelineMode.FrameStyle) {
+          // Frame sequence mode - plays through all frames
+          const { frameIds, frameTotalDurations, frameStartTimes } = frameSequenceData;
+          
+          if (frameIds.length === 0) {
+            setIsPlaying(false);
+            animationFrameIdRef.current = null;
+            return;
+          }
+          
+          const newTime = initialTime + elapsed;
+          
+          // Calculate total sequence duration
+          const totalSequenceDuration = Array.from(frameTotalDurations.values()).reduce((sum, duration) => sum + duration, 0);
+          
+          // If we've completed the sequence, start over
+          if (newTime >= totalSequenceDuration) {
+            setCurrentTime(0);
+            setSelectedFrameId(frameIds[0]);
+            animationFrameIdRef.current = requestAnimationFrame(animationFrame);
+            return;
+          }
+          
+          // Find which frame should be playing at this time
+          let foundCurrentFrame = false;
+          let framePositionTime = 0;
+          
+          for (let i = 0; i < frameIds.length; i++) {
+            const frameId = frameIds[i];
+            const frameStartTime = frameStartTimes.get(frameId) || 0;
+            const frameDuration = frameTotalDurations.get(frameId) || 0;
+            
+            // If this frame contains the current time
+            if (newTime >= frameStartTime && newTime < frameStartTime + frameDuration) {
+              foundCurrentFrame = true;
+              
+              // If we need to switch frames
+              if (frameId !== selectedFrameId) {
+                setSelectedFrameId(frameId);
+              }
+              
+              // Set time within this frame (accounting for this frame's delay)
+              // We're using a standard delay of 0.5s for all frames in the mock implementation
+              const frameDelay = 0.5;
+              
+              // Calculate time relative to this frame's start
+              framePositionTime = newTime - frameStartTime;
+              
+              // If we're still in the frame's delay period, set time to 0
+              // Otherwise, subtract the delay to get actual animation time
+              const frameAnimationTime = Math.max(0, framePositionTime - frameDelay);
+              setCurrentTime(frameAnimationTime);
+              break;
+            }
+          }
+          
+          // If we somehow didn't find a frame (shouldn't happen), stop
+          if (!foundCurrentFrame) {
+            setIsPlaying(false);
+            animationFrameIdRef.current = null;
+            return;
+          }
         }
         
-        setCurrentTime(newTime);
         animationFrameIdRef.current = requestAnimationFrame(animationFrame);
       };
       
@@ -189,6 +306,7 @@ function App() {
                 onUnlinkLayer={handleUnlinkLayer}
                 timelineMode={timelineMode}
                 onTimelineModeChange={handleTimelineModeChange}
+                onFrameSelect={handleFrameSelect}
               />
             </div>
             

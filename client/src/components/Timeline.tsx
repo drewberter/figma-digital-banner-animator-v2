@@ -27,6 +27,7 @@ interface TimelineProps {
   onUnlinkLayer?: (layerId: string) => void;
   timelineMode?: TimelineMode;
   onTimelineModeChange?: (mode: TimelineMode) => void;
+  onFrameSelect?: (frameId: string) => void; // Callback for frame selection
 }
 
 const Timeline = ({
@@ -39,10 +40,12 @@ const Timeline = ({
   onLinkLayers,
   onUnlinkLayer,
   timelineMode = TimelineMode.Animation, // Default to Animation mode
-  onTimelineModeChange
+  onTimelineModeChange,
+  onFrameSelect
 }: TimelineProps) => {
   // Create a forceUpdate function for timeline component
   const [, forceUpdate] = useReducer(x => x + 1, 0);
+  const [localSelectedFrameId, setSelectedFrameId] = useState<string>(selectedFrameId);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   
   // Handle mode changes
@@ -99,13 +102,13 @@ const Timeline = ({
   
   // Handle toggling layer visibility in the current frame
   const handleToggleLayerVisibility = (layerId: string) => {
-    console.log("Toggling visibility for layer", layerId, "in frame", selectedFrameId);
+    console.log("Toggling visibility for layer", layerId, "in frame", localSelectedFrameId);
     
     // Find the current frame
-    const currentFrameIndex = Object.keys(mockLayers).findIndex(frameId => frameId === selectedFrameId);
+    const currentFrameIndex = Object.keys(mockLayers).findIndex(frameId => frameId === localSelectedFrameId);
     if (currentFrameIndex === -1) return;
     
-    const frame = mockLayers[selectedFrameId];
+    const frame = mockLayers[localSelectedFrameId];
     const layerIndex = frame.findIndex(l => l.id === layerId);
     if (layerIndex === -1) return;
     
@@ -113,7 +116,7 @@ const Timeline = ({
     frame[layerIndex].visible = !frame[layerIndex].visible;
     
     // Update the layers for the current frame
-    mockLayers[selectedFrameId] = [...frame];
+    mockLayers[localSelectedFrameId] = [...frame];
     
     // Force a re-render
     forceUpdate();
@@ -141,7 +144,7 @@ const Timeline = ({
   };
   
   // Get the layers for the current frame
-  const frameLayers = mockLayers[selectedFrameId] || [];
+  const frameLayers = mockLayers[localSelectedFrameId] || [];
   
   // Reference objects for drag state and positioning
   const dragState = useRef({
@@ -160,11 +163,11 @@ const Timeline = ({
     // Give the timeline a small delay to fully render
     const timer = setTimeout(() => {
       forceUpdate();
-      console.log("Timeline rerendering for frame:", selectedFrameId);
+      console.log("Timeline rerendering for frame:", localSelectedFrameId);
     }, 100);
     
     return () => clearTimeout(timer);
-  }, [selectedFrameId]);
+  }, [localSelectedFrameId]);
   
   // Calculate time marker positions
   const timeMarkers = [];
@@ -315,7 +318,7 @@ const Timeline = ({
       }
       
       // Update mockLayers with the change
-      mockLayers[selectedFrameId] = updatedLayers;
+      mockLayers[localSelectedFrameId] = updatedLayers;
       
       // Force a re-render
       forceUpdate();
@@ -479,10 +482,14 @@ const Timeline = ({
   // Handle adding a blank frame
   const handleAddBlankFrame = () => {
     // Create a new blank frame without needing a dialog
+    // Get the number of existing frames to create a sequential frame number
+    const frameCount = Object.keys(mockLayers).length;
+    const newFrameNumber = frameCount + 1;
+    
     handleAddFrame({
-      name: 'New Frame',
-      headlineText: 'New Frame Headline',
-      description: 'Description for the new frame'
+      name: `Frame ${newFrameNumber}`,
+      headlineText: `Frame ${newFrameNumber} Headline`,
+      description: `Description for frame ${newFrameNumber}`
     });
   };
   
@@ -492,8 +499,12 @@ const Timeline = ({
     const sourceLayers = mockLayers[frameId];
     if (!sourceLayers) return;
     
-    // Create new frame with unique ID
-    const newFrameId = `frame-${Date.now()}`;
+    // Get the number of existing frames to create a sequential frame number
+    const frameCount = Object.keys(mockLayers).length;
+    const newFrameNumber = frameCount + 1;
+    
+    // Create new frame with a user-friendly ID (still unique but more readable)
+    const newFrameId = `frame-${newFrameNumber}`;
     
     // Deep clone the layers
     mockLayers[newFrameId] = JSON.parse(JSON.stringify(sourceLayers));
@@ -639,14 +650,24 @@ const Timeline = ({
             </>
           ) : (
             // Frame Style mode controls
-            <button 
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-md flex items-center text-sm font-medium"
-              onClick={() => setIsFrameDialogOpen(true)}
-              title="Add new frame"
-            >
-              <Plus size={16} className="mr-1" />
-              Add Frame
-            </button>
+            <div className="flex space-x-2">
+              <button 
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-md flex items-center text-sm font-medium"
+                onClick={() => setIsFrameDialogOpen(true)}
+                title="Add new frame"
+              >
+                <Plus size={16} className="mr-1" />
+                Add Frame
+              </button>
+              <button 
+                className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-md flex items-center text-sm font-medium"
+                onClick={() => onPlayPauseToggle(!isPlaying)}
+                title={isPlaying ? "Pause sequence" : "Play sequence"}
+              >
+                {isPlaying ? <Pause size={16} className="mr-1" /> : <Play size={16} className="mr-1" />}
+                {isPlaying ? "Pause" : "Play"}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -948,10 +969,15 @@ const Timeline = ({
                   return acc;
                 }, {} as Record<string, AnimationFrame>)}
                 layers={mockLayers}
-                selectedFrameId={selectedFrameId}
+                selectedFrameId={localSelectedFrameId}
                 onFrameSelect={(frameId) => {
-                  // In a real app, this would update context state
-                  console.log("Selected frame:", frameId);
+                  // Update the selected frame ID
+                  setSelectedFrameId(frameId);
+                  
+                  // Also inform the parent component about the selection change
+                  if (onFrameSelect) {
+                    onFrameSelect(frameId);
+                  }
                 }}
                 onToggleLayerVisibility={handleToggleLayerVisibilityInFrame}
                 onAddFrame={handleAddBlankFrame}
