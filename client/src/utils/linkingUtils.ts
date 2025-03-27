@@ -2,6 +2,139 @@ import { v4 as uuidv4 } from 'uuid';
 import { AnimationLayer, Animation, LinkSyncMode, LinkedLayerInfo, AnimationFrame, GifFrame } from '../types/animation';
 
 /**
+ * Extracts information from a GIF frame ID
+ * Handles different formats like "gif-frame-frame-1-2" or "gif-frame-1-2"
+ */
+interface ParsedFrameId {
+  frameNumber: string;
+  adSizeId: string;
+  isValid: boolean;
+}
+
+export function parseGifFrameId(frameId: string): ParsedFrameId {
+  if (!frameId.startsWith('gif-frame-')) {
+    return { frameNumber: '', adSizeId: '', isValid: false };
+  }
+  
+  const parts = frameId.split('-');
+  
+  // Different formats to handle:
+  // 1. gif-frame-frame-X-Y (new format)
+  // 2. gif-frame-X-Y (old format)
+  let frameNumber = '';
+  let adSizeId = '';
+  
+  if (parts.length >= 5 && parts[2] === 'frame') {
+    // Format: gif-frame-frame-X-Y
+    frameNumber = parts[parts.length - 1];
+    adSizeId = `${parts[2]}-${parts[3]}`;
+  } else if (parts.length >= 4) {
+    // Format: gif-frame-X-Y
+    frameNumber = parts[parts.length - 1];
+    adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+  }
+  
+  return { 
+    frameNumber, 
+    adSizeId,
+    isValid: frameNumber !== '' && adSizeId !== ''
+  };
+}
+
+/**
+ * Translates a layer ID from one ad size to another
+ * Handles the specific format of layer IDs in different ad sizes
+ */
+export function translateLayerId(
+  layerId: string, 
+  sourceAdSizeId: string, 
+  targetAdSizeId: string
+): string {
+  // If ad sizes are the same, no translation needed
+  if (sourceAdSizeId === targetAdSizeId) {
+    return layerId;
+  }
+  
+  // Most layer IDs follow pattern: "layer-[adSizeId]-[layerName]"
+  const layerIdParts = layerId.split('-');
+  
+  // Too short to be a valid layer ID
+  if (layerIdParts.length < 3) {
+    console.warn(`translateLayerId: Invalid layer ID format: ${layerId}`);
+    return layerId; // Return original ID as fallback
+  }
+  
+  // Check if this is in the standard format
+  if (layerIdParts[0] !== 'layer') {
+    console.warn(`translateLayerId: Non-standard layer ID prefix: ${layerId}`);
+    return layerId; // Return original ID as fallback
+  }
+  
+  // Extract the source ad size ID parts from the layer ID
+  // For example, if layerId is "layer-frame-1-header" and sourceAdSizeId is "frame-1"
+  const sourceAdSizeParts = sourceAdSizeId.split('-');
+  const targetAdSizeParts = targetAdSizeId.split('-');
+  
+  // We need to identify the format pattern of the layer ID
+  let targetLayerId = '';
+  
+  // Check if the ad size segment in layer ID matches the source ad size
+  if (layerIdParts[1] === sourceAdSizeParts[0] && 
+      layerIdParts[2] === sourceAdSizeParts[1]) {
+    // Standard format where ad size is split into two parts in the layer ID
+    // e.g., "layer-frame-1-header" -> "layer-frame-2-header"
+    
+    // Extract the layer specific part (after the ad size parts)
+    const layerSpecificPart = layerIdParts.slice(3).join('-');
+    
+    // Reconstruct with target ad size
+    targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
+  } else if (layerIdParts[1] === sourceAdSizeId) {
+    // Format where ad size is a single segment in the layer ID
+    // e.g., "layer-frame1-header" -> "layer-frame2-header"
+    
+    // Extract the layer specific part
+    const layerSpecificPart = layerIdParts.slice(2).join('-');
+    
+    // Reconstruct with target ad size
+    targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
+  } else {
+    // If the layer ID doesn't clearly follow the expected pattern
+    // Try to match the index pattern (layer-X-Y where X is the ad size number)
+    
+    // Simple number-based replacement
+    // e.g., "layer-1-2" -> "layer-2-2" when moving from ad size 1 to 2
+    const sourceAdSizeNumber = sourceAdSizeId.split('-')[1];
+    const targetAdSizeNumber = targetAdSizeId.split('-')[1];
+    
+    if (layerIdParts[1] === sourceAdSizeNumber) {
+      layerIdParts[1] = targetAdSizeNumber;
+      targetLayerId = layerIdParts.join('-');
+    } else {
+      // If nothing else works, just use the original layer ID
+      console.warn(`translateLayerId: Unable to translate layer ID ${layerId} from ${sourceAdSizeId} to ${targetAdSizeId}`);
+      targetLayerId = layerId;
+    }
+  }
+  
+  console.log(`translateLayerId: Translated ${layerId} from ${sourceAdSizeId} to ${targetAdSizeId} -> ${targetLayerId}`);
+  return targetLayerId;
+}
+
+/**
+ * Finds all frames with the same frame number (sequence position) across all ad sizes
+ */
+export function findFramesWithSameNumber(
+  gifFrames: GifFrame[], 
+  frameNumber: string
+): GifFrame[] {
+  return gifFrames.filter(frame => {
+    const parsedId = parseGifFrameId(frame.id);
+    return parsedId.isValid && parsedId.frameNumber === frameNumber;
+  });
+}
+
+/**
  * Automatically links layers with the same name across different frames
  * 
  * @param frames Object mapping frame IDs to arrays of layers
@@ -431,144 +564,92 @@ export function syncGifFramesByNumber(
     // Make a deep copy of the frames to avoid mutating the original
     const updatedGifFrames = JSON.parse(JSON.stringify(gifFrames));
     
-    // Find the source frame and its frame number
+    // Find the source frame
     const sourceFrame = updatedGifFrames.find((frame: GifFrame) => frame.id === sourceFrameId);
     if (!sourceFrame) {
       console.error("Source GIF frame not found:", sourceFrameId);
       return gifFrames;
     }
     
-    // Extract the frame number from the source frame ID
-    // GIF frame IDs follow format: gif-frame-[adSizeId]-[frameNumber]
-    const parts = sourceFrameId.split('-');
-    let frameNumber: string | null = null;
-    
-    // Extract frame number based on ID format - use the last segment after splitting by dashes
-    frameNumber = parts[parts.length - 1];
-    
-    if (!frameNumber) {
-      console.error("Could not extract frame number from source frame ID:", sourceFrameId);
+    // Parse the frame ID to extract adSizeId and frameNumber
+    const parsedSourceId = parseGifFrameId(sourceFrameId);
+    if (!parsedSourceId.isValid) {
+      console.error("Could not parse source frame ID:", sourceFrameId);
       return gifFrames;
     }
     
-    // Validate the source frame has an adSizeId
-    if (!sourceFrame.adSizeId) {
-      console.error("Source frame is missing adSizeId:", sourceFrameId);
-      return gifFrames;
-    }
+    // Extract details from the source frame
+    const { frameNumber, adSizeId: sourceAdSizeId } = parsedSourceId;
+    const sourceAdSize = sourceFrame.adSizeId || sourceAdSizeId;
     
-    // Get the layer name from the layerId - this is needed for layer linking by name
-    // Most layer IDs follow the pattern like "layer-1-1" where the layer name is after "layer-"
-    const layerName = layerId.split('-').slice(1).join('-'); 
-    console.log(`syncGifFramesByNumber - Syncing frames with number ${frameNumber}, layer ${layerId}, layerName: ${layerName}`);
+    console.log(`syncGifFramesByNumber - Source frame ${sourceFrameId} has frame number ${frameNumber} and ad size ${sourceAdSize}`);
     
     // Check if the layer is hidden in the source frame
     const isHiddenInSource = sourceFrame.hiddenLayers && sourceFrame.hiddenLayers.includes(layerId);
-    console.log(`syncGifFramesByNumber - Layer ${layerId} is hidden in source frame: ${isHiddenInSource}`);
+    console.log(`syncGifFramesByNumber - Source layer ${layerId} is hidden: ${isHiddenInSource}`);
     
-    // Find frames with the same number across all ad sizes
-    updatedGifFrames.forEach((frame: GifFrame, index: number) => {
-      // Skip the source frame
+    // Find all frames with the same frame number across all ad sizes
+    const matchingFrames = findFramesWithSameNumber(updatedGifFrames, frameNumber);
+    console.log(`syncGifFramesByNumber - Found ${matchingFrames.length} frames with number ${frameNumber}`);
+    
+    // Process each matching frame
+    matchingFrames.forEach(frame => {
+      // Skip the source frame itself
       if (frame.id === sourceFrameId) {
         return;
       }
       
-      // Check if this frame has the same frame number
-      const frameParts = frame.id.split('-');
-      const currentFrameNumber = frameParts[frameParts.length - 1];
+      // Get the target frame's ad size
+      const parsedTargetId = parseGifFrameId(frame.id);
+      if (!parsedTargetId.isValid) {
+        console.warn(`syncGifFramesByNumber - Could not parse target frame ID: ${frame.id}, skipping`);
+        return;
+      }
       
-      if (currentFrameNumber === frameNumber) {
-        console.log(`syncGifFramesByNumber - Found matching frame: ${frame.id}`);
-        
-        // Compute the ad size ID from the frame ID
-        let adSizeId = 'frame-1'; // Default fallback
-        
-        if (frameParts.length >= 4) {
-          if (frameParts[2] === 'frame') {
-            // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
-            adSizeId = `${frameParts[2]}-${frameParts[3]}`;
-          } else {
-            // Format is gif-frame-X-Y, determine if X is a frame number or part of the ad size ID
-            adSizeId = frameParts[2].startsWith('frame') ? frameParts[2] : `frame-${frameParts[2]}`;
-          }
+      const targetAdSize = frame.adSizeId || parsedTargetId.adSizeId;
+      console.log(`syncGifFramesByNumber - Processing target frame ${frame.id} with ad size ${targetAdSize}`);
+      
+      // Translate the source layer ID to the target ad size
+      const targetLayerId = translateLayerId(layerId, sourceAdSize, targetAdSize);
+      
+      // Check if this layer has an override in this frame
+      // Override format: frame.overrides.layerVisibility[layerId].overridden
+      const hasOverride = frame.overrides?.layerVisibility?.[targetLayerId]?.overridden || false;
+      
+      // Only sync if there's no override
+      if (!hasOverride) {
+        // Ensure hiddenLayers array is initialized
+        if (!frame.hiddenLayers) {
+          frame.hiddenLayers = [];
         }
         
-        // Try to find a layer with the same name in this frame's ad size
-        // We need to find the correct layer ID for this frame's ad size, since layer IDs can differ across ad sizes
-        // The layer ID follows pattern: "layer-[adSizeId]-[layerName]"
+        // Get current visibility state
+        const isCurrentlyHidden = frame.hiddenLayers.includes(targetLayerId);
+        console.log(`syncGifFramesByNumber - Target layer ${targetLayerId} in frame ${frame.id} is currently hidden: ${isCurrentlyHidden}`);
         
-        // Get the source ad size from the source frame
-        const sourceAdSizeId = sourceFrame.adSizeId;
-        const targetAdSizeId = frame.adSizeId;
-        
-        // We need to convert from layer-[sourceAdSizeId]-[layerName] to layer-[targetAdSizeId]-[layerName]
-        // Extract the layer ID components - we assume format like "layer-frame-1-layerName"
-        const layerIdParts = layerId.split('-');
-        
-        // Correct layer ID based on target ad size
-        let targetLayerId = layerId; // Default to same ID
-        
-        if (layerIdParts.length >= 3 && targetAdSizeId !== sourceAdSizeId) {
-          // Try to generate the correct layer ID for this frame's ad size 
-          // Assemble pattern: "layer-[adSizeId]-[rest of name]"
-          // First get the target ad size parts
-          const targetAdSizeParts = targetAdSizeId.split('-');
-          
-          if (targetAdSizeParts.length === 2) { // Most common case: "frame-X"
-            // Extract the layer name part (everything after the ad size parts in the source)
-            // For example, if layerId is "layer-frame-1-header" and targetAdSizeId is "frame-2",
-            // we want to construct "layer-frame-2-header"
-            
-            // Rebuild: "layer" + targetAdSizeId + rest
-            const layerNamePart = layerIdParts.slice(3).join('-');
-            targetLayerId = `layer-${targetAdSizeId}-${layerNamePart}`;
-            
-            console.log(`syncGifFramesByNumber - Adjusted layer ID for frame ${frame.id}: ${layerId} -> ${targetLayerId}`);
-          }
-        }
-        
-        // Check if this layer has an override in this frame
-        const hasOverride = frame.overrides?.layerVisibility?.[targetLayerId]?.overridden || false;
-        
-        console.log(`syncGifFramesByNumber - Frame ${frame.id} - Layer ${targetLayerId} has override: ${hasOverride}`);
-        
-        // Only sync if there's no override
-        if (!hasOverride) {
-          // Ensure hiddenLayers is initialized
-          if (!frame.hiddenLayers) {
-            frame.hiddenLayers = [];
-          }
-          
-          // Get current hidden state
-          const isCurrentlyHidden = frame.hiddenLayers.includes(targetLayerId);
-          
-          if (isHiddenInSource && !isCurrentlyHidden) {
-            // Add to hidden layers
-            frame.hiddenLayers.push(targetLayerId);
-            console.log(`syncGifFramesByNumber - Added layer ${targetLayerId} to hidden layers in frame ${frame.id}`);
-          } else if (!isHiddenInSource && isCurrentlyHidden) {
-            // Remove from hidden layers
-            frame.hiddenLayers = frame.hiddenLayers.filter(id => id !== targetLayerId);
-            console.log(`syncGifFramesByNumber - Removed layer ${targetLayerId} from hidden layers in frame ${frame.id}`);
-          }
-          
-          // Update the visibleLayerCount if present
-          if (typeof frame.visibleLayerCount === 'number') {
-            // Count based on actual hidden layers
-            frame.visibleLayerCount = (frame.frameIndex === 0 ? 5 : 5) - frame.hiddenLayers.length;
-          }
-          
-          // Update the frame in the array
-          updatedGifFrames[index] = frame;
+        if (isHiddenInSource && !isCurrentlyHidden) {
+          // Source is hidden but target is visible - hide the target layer
+          frame.hiddenLayers.push(targetLayerId);
+          console.log(`syncGifFramesByNumber - Added layer ${targetLayerId} to hidden layers in frame ${frame.id}`);
+        } else if (!isHiddenInSource && isCurrentlyHidden) {
+          // Source is visible but target is hidden - show the target layer
+          frame.hiddenLayers = frame.hiddenLayers.filter(id => id !== targetLayerId);
+          console.log(`syncGifFramesByNumber - Removed layer ${targetLayerId} from hidden layers in frame ${frame.id}`);
         } else {
-          console.log(`syncGifFramesByNumber - Layer ${targetLayerId} has an override in frame ${frame.id} - not syncing`);
+          console.log(`syncGifFramesByNumber - Layer ${targetLayerId} visibility already matches source in frame ${frame.id}`);
+        }
+        
+        // Update the visibleLayerCount if present
+        if (typeof frame.visibleLayerCount === 'number') {
+          const totalLayers = 5; // Default number of layers
+          frame.visibleLayerCount = totalLayers - frame.hiddenLayers.length;
         }
       } else {
-        console.log(`syncGifFramesByNumber - Frame ${frame.id} has number ${currentFrameNumber}, doesn't match ${frameNumber}`);
+        console.log(`syncGifFramesByNumber - Layer ${targetLayerId} has an override in frame ${frame.id} - not syncing`);
       }
     });
     
-    console.log(`syncGifFramesByNumber - END - Updated ${updatedGifFrames.length} GIF frames`);
+    console.log(`syncGifFramesByNumber - END - Successfully synced layer visibility across frames`);
     return updatedGifFrames;
   } catch (error) {
     console.error("Error in syncGifFramesByNumber:", error);

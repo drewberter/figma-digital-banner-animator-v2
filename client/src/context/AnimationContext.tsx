@@ -8,7 +8,10 @@ import {
   setAnimationOverride,
   unlinkLayer as unlinkLayerUtil,
   setSyncMode as setSyncModeUtil,
-  syncGifFramesByNumber
+  syncGifFramesByNumber,
+  parseGifFrameId,
+  translateLayerId,
+  findFramesWithSameNumber
 } from '../utils/linkingUtils';
 import { mockLayers, mockGifFrames, mockFrames } from '../mock/animationData';
 
@@ -233,79 +236,93 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
   const toggleLayerVisibility = useCallback((frameId: string, layerId: string) => {
     // Check if this is a GIF frame
     if (frameId.startsWith('gif-frame-')) {
-      // Extract the parent ad size ID from the GIF frame ID
-      const parts = frameId.split('-');
-      let adSizeId = 'frame-1'; // Default fallback
-      
-      if (parts.length >= 4) {
-        if (parts[2] === 'frame') {
-          // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
-          adSizeId = `${parts[2]}-${parts[3]}`;
-        } else {
-          // Format is gif-frame-X-Y, determine if X is a frame number or part of the ad size ID
-          adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
-        }
-      } else if (parts.length === 4) {
-        // Old format: gif-frame-1-1
-        adSizeId = `frame-${parts[2]}`;
+      // Use our parser to extract frame information
+      const parsedFrameId = parseGifFrameId(frameId);
+      if (!parsedFrameId.isValid) {
+        console.error("AnimationContext - Invalid GIF frame ID format:", frameId);
+        return;
       }
       
-      console.log("AnimationContext - For GIF frame:", frameId, "using parent ad size:", adSizeId);
+      const { adSizeId, frameNumber } = parsedFrameId;
+      console.log(`AnimationContext - For GIF frame: ${frameId}, using parent ad size: ${adSizeId}, frame number: ${frameNumber}`);
       
       // Find the GIF frame index
       const gifFrameIndex = mockGifFrames.findIndex((f: GifFrame) => f.id === frameId);
-      if (gifFrameIndex !== -1) {
-        // Create a copy of the frame
-        const updatedGifFrame = { ...mockGifFrames[gifFrameIndex] };
-        
-        // Update the hiddenLayers array
-        const hiddenIndex = updatedGifFrame.hiddenLayers.indexOf(layerId);
-        if (hiddenIndex >= 0) {
-          // Layer is hidden, make it visible by removing from hiddenLayers
-          updatedGifFrame.hiddenLayers = updatedGifFrame.hiddenLayers.filter(id => id !== layerId);
-        } else {
-          // Layer is visible, hide it by adding to hiddenLayers
-          updatedGifFrame.hiddenLayers = [...updatedGifFrame.hiddenLayers, layerId];
-        }
-        
-        // Update the visibleLayerCount
-        const totalLayers = mockLayers[adSizeId]?.length || 0;
-        updatedGifFrame.visibleLayerCount = totalLayers - updatedGifFrame.hiddenLayers.length;
-        
-        // Replace the frame in the array (this modifies the mock data directly)
-        mockGifFrames[gifFrameIndex] = updatedGifFrame;
-        
-        console.log("Updated GIF frame:", updatedGifFrame);
-        
-        // Sync layer visibility across all frames with the same number
-        // This ensures all frame #1 in different ad sizes show/hide the same layers
-        console.log("AnimationContext - Before sync: GIF frames with synced visibility for layer:", layerId);
-        
-        const updatedGifFrames = syncGifFramesByNumber(mockGifFrames, frameId, layerId);
-        console.log("AnimationContext - After sync: GIF frames with synced visibility, count:", updatedGifFrames.length);
-        
-        // Update all frames in the mock data array
-        updatedGifFrames.forEach((frame, index) => {
-          mockGifFrames[index] = frame;
-          console.log("AnimationContext - Updated GIF frame:", frame.id, 
-                      "hiddenLayers:", frame.hiddenLayers,
-                      "includes layer:", frame.hiddenLayers.includes(layerId));
-        });
-        
-        // Trigger a complete re-render of the UI by forcing an update
-        // This ensures that all components using the GIF frames data get refreshed
-        setLayers(prevLayers => {
-          console.log("AnimationContext - Forcing UI refresh with updated layer data");
-          // Find the layer that was toggled and return a new array with a timestamp to force update
-          return prevLayers.map(layer => 
-            layer.id === layerId 
-              ? { ...layer, lastToggled: new Date().getTime() } 
-              : layer
-          );
-        });
-      } else {
+      if (gifFrameIndex === -1) {
         console.error("GIF frame not found:", frameId);
+        return;
       }
+      
+      // Create a copy of the frame
+      const updatedGifFrame = { ...mockGifFrames[gifFrameIndex] };
+      
+      // Ensure hiddenLayers is initialized
+      if (!updatedGifFrame.hiddenLayers) {
+        updatedGifFrame.hiddenLayers = [];
+      }
+      
+      // Update the hiddenLayers array
+      const isCurrentlyHidden = updatedGifFrame.hiddenLayers.includes(layerId);
+      if (isCurrentlyHidden) {
+        // Layer is hidden, make it visible by removing from hiddenLayers
+        updatedGifFrame.hiddenLayers = updatedGifFrame.hiddenLayers.filter(id => id !== layerId);
+        console.log(`AnimationContext - Making layer ${layerId} visible in frame ${frameId}`);
+      } else {
+        // Layer is visible, hide it by adding to hiddenLayers
+        updatedGifFrame.hiddenLayers = [...updatedGifFrame.hiddenLayers, layerId];
+        console.log(`AnimationContext - Making layer ${layerId} hidden in frame ${frameId}`);
+      }
+      
+      // Update the visibleLayerCount
+      const totalLayers = mockLayers[adSizeId]?.length || 0;
+      updatedGifFrame.visibleLayerCount = totalLayers - updatedGifFrame.hiddenLayers.length;
+      
+      // Replace the frame in the array (this modifies the mock data directly)
+      mockGifFrames[gifFrameIndex] = updatedGifFrame;
+      
+      console.log("AnimationContext - Updated GIF frame:", updatedGifFrame);
+      
+      // Sync layer visibility across all frames with the same number
+      // This ensures all frame #1 in different ad sizes show/hide the same layers
+      console.log("AnimationContext - Syncing layer visibility across frames with number:", frameNumber);
+      
+      // Use our improved syncing function
+      const updatedGifFrames = syncGifFramesByNumber(mockGifFrames, frameId, layerId);
+      
+      // Debug output
+      console.log(`AnimationContext - After sync: ${updatedGifFrames.length} GIF frames updated`);
+      
+      // Log each frame's synced state
+      updatedGifFrames.forEach(frame => {
+        const parsedId = parseGifFrameId(frame.id);
+        if (parsedId.isValid && parsedId.frameNumber === frameNumber && frame.id !== frameId) {
+          // Find equivalent layer ID in this frame
+          const targetAdSize = frame.adSizeId || parsedId.adSizeId;
+          const targetLayerId = translateLayerId(layerId, adSizeId, targetAdSize);
+          console.log(
+            `AnimationContext - Frame ${frame.id} - Layer ${targetLayerId} - ` +
+            `Hidden: ${frame.hiddenLayers.includes(targetLayerId)} - ` +
+            `Override: ${frame.overrides?.layerVisibility?.[targetLayerId]?.overridden || false}`
+          );
+        }
+      });
+      
+      // Update all frames in the mock data array
+      updatedGifFrames.forEach((frame, index) => {
+        mockGifFrames[index] = frame;
+      });
+      
+      // Trigger a complete re-render of the UI by forcing an update
+      // This ensures that all components using the GIF frames data get refreshed
+      setLayers(prevLayers => {
+        console.log("AnimationContext - Forcing UI refresh with updated layer data");
+        // Find the layer that was toggled and return a new array with a timestamp to force update
+        return prevLayers.map(layer => 
+          layer.id === layerId 
+            ? { ...layer, lastToggled: new Date().getTime() } 
+            : layer
+        );
+      });
     } else {
       // Regular frame - update the layers directly
       // This works with linked layers
@@ -338,88 +355,114 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Extract the parent ad size ID from the GIF frame ID
-    const parts = frameId.split('-');
-    let adSizeId = 'frame-1'; // Default fallback
-    
-    if (parts.length >= 4) {
-      if (parts[2] === 'frame') {
-        // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
-        adSizeId = `${parts[2]}-${parts[3]}`;
-      } else {
-        // Format is gif-frame-X-Y, determine if X is a frame number or part of the ad size ID
-        adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
-      }
+    // Use our parser to extract frame information
+    const parsedFrameId = parseGifFrameId(frameId);
+    if (!parsedFrameId.isValid) {
+      console.error("AnimationContext - Invalid GIF frame ID format:", frameId);
+      return;
     }
     
-    console.log("AnimationContext - toggleLayerOverride for GIF frame:", frameId, "layer:", layerId);
+    const { adSizeId, frameNumber } = parsedFrameId;
+    console.log(`AnimationContext - toggleLayerOverride for GIF frame: ${frameId}, ad size: ${adSizeId}, frame number: ${frameNumber}`);
     
     // Find the GIF frame index
     const gifFrameIndex = mockGifFrames.findIndex((f: GifFrame) => f.id === frameId);
-    if (gifFrameIndex !== -1) {
-      // Create a copy of the frame
-      const updatedGifFrame = { ...mockGifFrames[gifFrameIndex] };
+    if (gifFrameIndex === -1) {
+      console.error("GIF frame not found:", frameId);
+      return;
+    }
+    
+    // Create a copy of the frame
+    const updatedGifFrame = { ...mockGifFrames[gifFrameIndex] };
+    
+    // Ensure hiddenLayers array is initialized
+    if (!updatedGifFrame.hiddenLayers) {
+      updatedGifFrame.hiddenLayers = [];
+    }
+    
+    // Initialize overrides.layerVisibility object if not present
+    if (!updatedGifFrame.overrides) {
+      updatedGifFrame.overrides = { layerVisibility: {} };
+    }
+    if (!updatedGifFrame.overrides.layerVisibility) {
+      updatedGifFrame.overrides.layerVisibility = {};
+    }
+    
+    // Get current visibility state
+    const isHidden = updatedGifFrame.hiddenLayers.includes(layerId);
+    
+    // Toggle override status for this layer
+    if (updatedGifFrame.overrides.layerVisibility[layerId]) {
+      // Layer already has an override - toggle it off
+      const currentOverride = updatedGifFrame.overrides.layerVisibility[layerId];
+      currentOverride.overridden = !currentOverride.overridden;
       
-      // Initialize overrides.layerVisibility object if not present
-      if (!updatedGifFrame.overrides) {
-        updatedGifFrame.overrides = { layerVisibility: {} };
-      }
-      if (!updatedGifFrame.overrides.layerVisibility) {
-        updatedGifFrame.overrides.layerVisibility = {};
-      }
-      
-      // Get current visibility state
-      const isHidden = updatedGifFrame.hiddenLayers.includes(layerId);
-      
-      // Toggle override status for this layer
-      if (updatedGifFrame.overrides.layerVisibility[layerId]) {
-        // Layer already has an override - toggle it off
-        const currentOverride = updatedGifFrame.overrides.layerVisibility[layerId];
-        currentOverride.overridden = !currentOverride.overridden;
+      // If we're turning off override, update the hidden state from the parent layer
+      if (!currentOverride.overridden) {
+        // Get parent layer visibility
+        const parentLayers = mockLayers[adSizeId] || [];
+        const parentLayer = parentLayers.find(layer => layer.id === layerId);
         
-        // If we're turning off override, update the hidden state from the parent layer
-        if (!currentOverride.overridden) {
-          // Get parent layer visibility
-          const parentLayers = mockLayers[adSizeId] || [];
-          const parentLayer = parentLayers.find(layer => layer.id === layerId);
-          
-          if (parentLayer) {
-            // If parent layer is visible, remove from hiddenLayers
-            // If parent layer is hidden, add to hiddenLayers
-            if (parentLayer.visible && isHidden) {
-              // Make visible
-              updatedGifFrame.hiddenLayers = updatedGifFrame.hiddenLayers.filter(id => id !== layerId);
-            } else if (!parentLayer.visible && !isHidden) {
-              // Make hidden
-              updatedGifFrame.hiddenLayers = [...updatedGifFrame.hiddenLayers, layerId];
-            }
+        if (parentLayer) {
+          // If parent layer is visible, remove from hiddenLayers
+          // If parent layer is hidden, add to hiddenLayers
+          if (parentLayer.visible && isHidden) {
+            // Make visible
+            updatedGifFrame.hiddenLayers = updatedGifFrame.hiddenLayers.filter(id => id !== layerId);
+          } else if (!parentLayer.visible && !isHidden) {
+            // Make hidden
+            updatedGifFrame.hiddenLayers = [...updatedGifFrame.hiddenLayers, layerId];
           }
         }
-      } else {
-        // Layer doesn't have an override yet - create one
-        updatedGifFrame.overrides.layerVisibility[layerId] = {
-          overridden: true,
-          hidden: isHidden
-        };
+        
+        // When turning off override, we should sync with other frames with the same number
+        console.log(`AnimationContext - Layer ${layerId} override turned off, syncing with other frames`);
       }
-      
-      // Mark all affected layers as having override changes
-      setLayers(prev => 
-        prev.map(layer => {
-          if (layer.id === layerId) {
-            // For temporary UI feedback
-            return { ...layer, isOverridden: updatedGifFrame.overrides.layerVisibility[layerId]?.overridden || false };
-          }
-          return layer;
-        })
-      );
-      
-      // Update the GIF frame (this modifies the mock data directly)
-      mockGifFrames[gifFrameIndex] = updatedGifFrame;
-      console.log("Updated GIF frame with layer override:", updatedGifFrame);
     } else {
-      console.error("GIF frame not found:", frameId);
+      // Layer doesn't have an override yet - create one
+      updatedGifFrame.overrides.layerVisibility[layerId] = {
+        overridden: true,
+        hidden: isHidden
+      };
+      console.log(`AnimationContext - Created new override for layer ${layerId} with hidden=${isHidden}`);
     }
+    
+    // Check the override status after the update
+    const hasOverride = updatedGifFrame.overrides.layerVisibility[layerId]?.overridden || false;
+    console.log(`AnimationContext - Layer ${layerId} override status is now: ${hasOverride}`);
+    
+    // Mark all affected layers as having override changes
+    setLayers(prev => 
+      prev.map(layer => {
+        if (layer.id === layerId) {
+          // For temporary UI feedback
+          return { ...layer, isOverridden: hasOverride };
+        }
+        return layer;
+      })
+    );
+    
+    // Update the GIF frame
+    mockGifFrames[gifFrameIndex] = updatedGifFrame;
+    
+    // If we're turning off the override, we should sync this layer with other frames
+    if (!hasOverride) {
+      const updatedGifFrames = syncGifFramesByNumber(mockGifFrames, frameId, layerId);
+      
+      // Update all frames in the mock data array
+      updatedGifFrames.forEach((frame, index) => {
+        mockGifFrames[index] = frame;
+      });
+    }
+    
+    // Force a UI refresh
+    setLayers(prevLayers => {
+      return prevLayers.map(layer => 
+        layer.id === layerId 
+          ? { ...layer, lastToggled: new Date().getTime() } 
+          : layer
+      );
+    });
   }, []);
 
   // Toggle layer lock
