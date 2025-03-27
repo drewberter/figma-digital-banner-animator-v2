@@ -665,7 +665,7 @@ const Timeline = ({
       <div className="flex justify-between items-center p-2 border-b border-neutral-800">
         {/* Mode Toggle */}
         <div className="flex space-x-2">
-          <Tabs.Root defaultValue="animation" onValueChange={(value) => handleTimelineModeChange(value === 'animation' ? TimelineMode.Animation : TimelineMode.FrameStyle)}>
+          <Tabs.Root defaultValue="animation" onValueChange={(value) => handleTimelineModeChange(value === 'animation' ? TimelineMode.Animation : TimelineMode.GifFrames)}>
             <Tabs.List className="flex p-1 bg-neutral-800 rounded-md" aria-label="Timeline Mode">
               <Tabs.Trigger
                 value="animation"
@@ -678,7 +678,7 @@ const Timeline = ({
               <Tabs.Trigger
                 value="frameStyle"
                 className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-                          ${timelineMode === TimelineMode.FrameStyle ? 'bg-blue-600 text-white' : 'text-neutral-300 hover:text-white'}`}
+                          ${timelineMode === TimelineMode.GifFrames ? 'bg-blue-600 text-white' : 'text-neutral-300 hover:text-white'}`}
               >
                 <Layers className="w-4 h-4 mr-1.5" />
                 Frame Style
@@ -821,7 +821,7 @@ const Timeline = ({
                       )}
                     </span>
                   ) : (
-                    // Visibility toggle for FrameStyle mode
+                    // Visibility toggle for GifFrames mode
                     <span 
                       className={`mr-2 flex items-center ${layer.visible 
                         ? 'text-green-400 hover:text-green-300' 
@@ -852,7 +852,7 @@ const Timeline = ({
                     </div>
                   )
                 ) : (
-                  // Frame Style mode - show visibility toggle
+                  // GIF Frames mode - show visibility toggle
                   <button
                     className={`p-1 rounded ${layer.visible ? 'text-green-400 hover:bg-neutral-700' : 'text-neutral-500 hover:bg-neutral-700'}`}
                     onClick={(e) => {
@@ -1044,7 +1044,7 @@ const Timeline = ({
                 </ContextMenu.Root>
               ))
             ) : (
-              // Frame Style Mode - Show card grid for frame management
+              // GIF Frames Mode - Show card grid for frame management
               <FrameCardGrid
                 frames={Object.keys(mockLayers).reduce((acc, frameId) => {
                   // Create frame objects from mockLayers keys

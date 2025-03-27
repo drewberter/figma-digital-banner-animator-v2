@@ -108,8 +108,8 @@ function App() {
   // Initialize or update frame sequence data when frames or mode changes
   // This will be updated in wrapped Timeline component
   useEffect(() => {
-    // Only update in Frame Style mode - this will now get data from mock objects instead of context
-    if (timelineMode !== TimelineMode.FrameStyle) return;
+    // Only update in GIF Frames mode - this will now get data from mock objects instead of context
+    if (timelineMode !== TimelineMode.GifFrames) return;
     
     // Hardcode frame IDs for development (in real app, would use context)
     const frameIds = ['frame-1', 'frame-2', 'frame-3', 'frame-4'];
@@ -184,8 +184,8 @@ function App() {
           
           setCurrentTime(newTime);
         } 
-        else if (timelineMode === TimelineMode.FrameStyle) {
-          // Frame sequence mode - plays through all frames
+        else if (timelineMode === TimelineMode.GifFrames) {
+          // GIF frames sequence mode - plays through all frames
           const { frameIds, frameTotalDurations, frameStartTimes } = frameSequenceData;
           
           if (frameIds.length === 0) {

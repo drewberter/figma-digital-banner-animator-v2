@@ -57,7 +57,7 @@ export enum LinkSyncMode {
 
 export enum TimelineMode {
   Animation = 'Animation', // Standard timeline mode for editing animations
-  FrameStyle = 'FrameStyle' // Mode for managing layer visibility across frames
+  GifFrames = 'GifFrames' // Mode for managing layer visibility across gif frames for export
 }
 
 export interface LinkedLayerInfo {
