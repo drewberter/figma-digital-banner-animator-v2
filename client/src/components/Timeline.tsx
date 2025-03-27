@@ -3,7 +3,7 @@ import { Play, Pause, SkipBack, Clock, LogIn, LogOut } from 'lucide-react';
 import { mockLayers } from '../mock/animationData';
 import { Animation, AnimationType, EasingType, AnimationMode } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { autoLinkLayers } from '../utils/linkingUtils';
+import { autoLinkLayers, syncLinkedLayerAnimations } from '../utils/linkingUtils';
 
 interface TimelineProps {
   onTimeUpdate: (time: number) => void;
@@ -245,6 +245,20 @@ const Timeline = ({
     const handleAnimationDragEnd = () => {
       document.removeEventListener('mousemove', handleAnimationDragMove);
       document.removeEventListener('mouseup', handleAnimationDragEnd);
+      
+      // After dragging completes, sync changes to linked layers
+      if (dragState.current.layerId) {
+        // Sync changes to any linked layers
+        const updatedLayers = syncLinkedLayerAnimations(mockLayers, dragState.current.layerId);
+        
+        // Update all frames with synced changes
+        Object.keys(updatedLayers).forEach(frameId => {
+          mockLayers[frameId] = updatedLayers[frameId];
+        });
+        
+        // Force re-render
+        forceUpdate();
+      }
     };
     
     document.addEventListener('mousemove', handleAnimationDragMove);
@@ -261,8 +275,9 @@ const Timeline = ({
       ? 0 // Entrance animations start at beginning
       : 3; // Exit animations start later (adjust as needed)
     
-    // Create a new animation
+    // Create a new animation with unique ID
     const newAnimation: Animation = {
+      id: `anim-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, // Generate unique ID
       type,
       mode,
       startTime: defaultStartTime,
@@ -272,6 +287,14 @@ const Timeline = ({
     
     // Add the animation to the layer
     layer.animations.push(newAnimation);
+    
+    // Sync to linked layers if this layer is linked
+    if (layer.linkedLayer) {
+      const updatedLayers = syncLinkedLayerAnimations(mockLayers, layerId);
+      Object.keys(updatedLayers).forEach(frameId => {
+        mockLayers[frameId] = updatedLayers[frameId];
+      });
+    }
     
     // Force a re-render
     forceUpdate();
@@ -285,6 +308,14 @@ const Timeline = ({
     // Remove the animation
     layer.animations.splice(animIndex, 1);
     
+    // Sync to linked layers if this layer is linked
+    if (layer.linkedLayer) {
+      const updatedLayers = syncLinkedLayerAnimations(mockLayers, layerId);
+      Object.keys(updatedLayers).forEach(frameId => {
+        mockLayers[frameId] = updatedLayers[frameId];
+      });
+    }
+    
     // Force a re-render
     forceUpdate();
   };
@@ -296,6 +327,14 @@ const Timeline = ({
     
     // Update the animation type
     layer.animations[animIndex].type = type;
+    
+    // Sync to linked layers if this layer is linked
+    if (layer.linkedLayer) {
+      const updatedLayers = syncLinkedLayerAnimations(mockLayers, layerId);
+      Object.keys(updatedLayers).forEach(frameId => {
+        mockLayers[frameId] = updatedLayers[frameId];
+      });
+    }
     
     // Force a re-render
     forceUpdate();
@@ -321,6 +360,14 @@ const Timeline = ({
     // If switching to exit, move it to a later time if it's at the beginning
     if (newMode === AnimationMode.Exit && (animation.startTime === 0 || animation.startTime === undefined)) {
       animation.startTime = Math.max(0, Math.min(duration - animation.duration, 3));
+    }
+    
+    // Sync to linked layers if this layer is linked
+    if (layer.linkedLayer) {
+      const updatedLayers = syncLinkedLayerAnimations(mockLayers, layerId);
+      Object.keys(updatedLayers).forEach(frameId => {
+        mockLayers[frameId] = updatedLayers[frameId];
+      });
     }
     
     // Force a re-render
@@ -482,16 +529,22 @@ const Timeline = ({
               <div className="flex items-center">
                 {/* Layer name with linked indicator */}
                 <span className="flex items-center">
-                  {/* Link indicator - always show but style differently if linked */}
+                  {/* Link indicator - clickable to toggle link state */}
                   <span 
                     className={`mr-2 flex items-center ${layer.linkedLayer 
                       ? (layer.linkedLayer.isMain ? 'text-blue-400 bg-blue-900' : 'text-blue-300 bg-blue-800') 
                       : 'text-neutral-600'
-                    } ${layer.linkedLayer ? 'bg-opacity-60 px-1 py-0.5 rounded-sm' : ''}`}
+                    } ${layer.linkedLayer ? 'bg-opacity-60 px-1 py-0.5 rounded-sm cursor-pointer hover:bg-opacity-80' : 'cursor-pointer hover:text-neutral-400'}`}
                     title={layer.linkedLayer 
-                      ? `Linked layer (${layer.linkedLayer.isMain ? 'Main' : 'Secondary'}) - ${layer.linkedLayer.syncMode} sync` 
+                      ? `Click to unlink (${layer.linkedLayer.isMain ? 'Main' : 'Secondary'}) - ${layer.linkedLayer.syncMode} sync` 
                       : 'Not linked'
                     }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (layer.linkedLayer && onUnlinkLayer) {
+                        onUnlinkLayer(layer.id);
+                      }
+                    }}
                   >
                     <svg 
                       xmlns="http://www.w3.org/2000/svg" 
@@ -519,28 +572,12 @@ const Timeline = ({
                 </span>
               </div>
               
-              {/* Layer link status indicators & actions */}
+              {/* Layer sync mode indicators (no separate unlink button) */}
               {layer.linkedLayer && (
                 <div className="flex space-x-1">
-                  <button
-                    className="flex items-center text-xs px-1 py-0.5 rounded-sm bg-opacity-20 bg-red-500 text-red-300 hover:bg-opacity-40 hover:text-white"
-                    title="Unlink layer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (onUnlinkLayer) {
-                        onUnlinkLayer(layer.id);
-                      } else {
-                        // Fallback if no handler is provided
-                        alert(`Unlinking layer: ${layer.name}`);
-                      }
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 6 6 18"></path>
-                      <path d="m6 6 12 12"></path>
-                    </svg>
-                    <span className="ml-1 text-xs">Unlink</span>
-                  </button>
+                  <span className="text-xs text-blue-300 px-1 py-0.5 rounded-sm bg-blue-900 bg-opacity-30">
+                    {layer.linkedLayer.syncMode}
+                  </span>
                 </div>
               )}
             </div>

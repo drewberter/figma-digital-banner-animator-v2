@@ -85,7 +85,7 @@ export function syncLinkedLayerAnimations(
   
   Object.keys(updatedFrames).forEach(frameId => {
     const layerIndex = updatedFrames[frameId].findIndex(
-      (layer: AnimationLayer) => layer.id === sourceLayerId
+      (layer) => layer.id === sourceLayerId
     );
     if (layerIndex !== -1) {
       sourceLayer = updatedFrames[frameId][layerIndex];
@@ -107,7 +107,7 @@ export function syncLinkedLayerAnimations(
   
   // Find all layers in the same group
   Object.keys(updatedFrames).forEach(frameId => {
-    updatedFrames[frameId].forEach((layer: AnimationLayer, layerIndex: number) => {
+    updatedFrames[frameId].forEach((layer, layerIndex: number) => {
       // Skip the source layer
       if (layer.id === sourceLayerId) {
         return;
