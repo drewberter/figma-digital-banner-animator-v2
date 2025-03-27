@@ -113,6 +113,17 @@ function App() {
   const handleTimelineModeChange = (mode: TimelineMode) => {
     console.log(`App: Switching to ${mode} mode`);
     setTimelineMode(mode);
+    
+    // If switching to GIF frames mode, we need to generate frames for the current ad size
+    if (mode === TimelineMode.GifFrames) {
+      // Generate frames based on the currently selected ad size
+      const gifFrames = generateGifFramesForAdSize(selectedAdSizeId);
+      if (gifFrames.length > 0) {
+        // Select the first frame
+        setSelectedGifFrameId(gifFrames[0].id);
+      }
+    }
+    // When switching back to Animation mode, keep the currently selected ad size
   };
   
   // Track animation frame ID in a ref so we can cancel it
@@ -134,8 +145,17 @@ function App() {
     // Only update in GIF Frames mode - this will now get data from mock objects instead of context
     if (timelineMode !== TimelineMode.GifFrames) return;
     
-    // Use mockGifFrames for GIF frame data
-    const frameIds = mockGifFrames.map(frame => frame.id);
+    // Generate frames for the current ad size
+    // Extract the parent ad size from the GIF frame ID or use the currently selected ad size
+    const adSizeId = selectedGifFrameId && selectedGifFrameId.includes('-') 
+      ? selectedGifFrameId.split('-')[1] // Extract "frame-X" from "gif-frame-X-..." or similar format
+      : selectedAdSizeId;
+      
+    // Generate current GIF frames specifically for this ad size
+    const currentGifFrames = generateGifFramesForAdSize(adSizeId);
+    
+    // Use the current GIF frames for this specific ad size
+    const frameIds = currentGifFrames.map(frame => frame.id);
     
     // Calculate frame durations including their delay
     const frameTotalDurations = new Map<string, number>();
@@ -143,8 +163,8 @@ function App() {
     
     let cumulativeTime = 0;
     frameIds.forEach(frameId => {
-      // Get the delay from the mockGifFrames data
-      const gifFrame = mockGifFrames.find(frame => frame.id === frameId);
+      // Get the delay from the current GIF frames data
+      const gifFrame = currentGifFrames.find(frame => frame.id === frameId);
       const frameDelay = gifFrame ? gifFrame.delay : 2.5; // Use frame delay or fallback to 2.5s
       
       // Start time is the cumulative time before this frame
@@ -165,7 +185,7 @@ function App() {
       frameStartTimes
     });
     
-  }, [timelineMode, selectedGifFrameId, timelineDuration]);
+  }, [timelineMode, selectedGifFrameId, selectedAdSizeId, timelineDuration]);
 
   // Handle play/pause toggle
   const handlePlayPauseToggle = (playing: boolean) => {
@@ -250,8 +270,14 @@ function App() {
               }
               
               // Set time within this frame (accounting for this frame's delay)
-              // Get the delay from the mockGifFrames data
-              const gifFrame = mockGifFrames.find(frame => frame.id === frameId);
+              // Get the parent ad size ID from the GIF frame ID
+              const adSizeId = frameId.split('-')[1]; // Extract "frame-X" from "gif-frame-X-frame-Y"
+              
+              // Get frames for this ad size
+              const relevantFrames = generateGifFramesForAdSize(adSizeId);
+              
+              // Find the specific frame
+              const gifFrame = relevantFrames.find(frame => frame.id === frameId);
               const frameDelay = gifFrame ? gifFrame.delay : 2.5; // Use frame delay or fallback to 2.5s
               
               // Calculate time relative to this frame's start
