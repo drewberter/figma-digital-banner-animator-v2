@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useReducer } from 'react';
 import { Play, Pause, SkipBack, Clock, LogIn, LogOut, Eye, EyeOff, Layers, Zap, Plus } from 'lucide-react';
-import { mockLayers } from '../mock/animationData';
+import { mockLayers, mockFrames } from '../mock/animationData';
 import FrameEditDialog from './FrameEditDialog';
 import FrameCardGrid from './FrameCardGrid';
 import { 
@@ -465,7 +465,14 @@ const Timeline = ({
   };
   
   // Handle adding a new frame
-  const handleAddFrame = (frameData: { name: string, headlineText: string, description?: string, hiddenLayers?: string[] }) => {
+  const handleAddFrame = (frameData: { 
+    name: string, 
+    headlineText: string, 
+    description?: string, 
+    hiddenLayers?: string[],
+    width?: number,
+    height?: number
+  }) => {
     // Get existing frame count to generate sequential frame number
     const existingFrameCount = Object.keys(mockLayers).length;
     const frameNumber = existingFrameCount + 1;
@@ -476,6 +483,49 @@ const Timeline = ({
     // Clone the layers from the first frame
     const baseFrame = Object.values(mockLayers)[0] || [];
     mockLayers[newFrameId] = JSON.parse(JSON.stringify(baseFrame)); // Deep clone
+    
+    // Find a mock frame to use as a source for dimensions (default to first one)
+    const sourceFrame = mockFrames.find((f: AnimationFrame) => f.id === Object.keys(mockLayers)[0]) || mockFrames[0];
+    
+    // Create the frame object with frameData properties
+    const frameObjects = Object.keys(mockLayers).reduce((acc, frameId) => {
+      // Use the data from mockFrames for existing frames
+      const mockFrame = mockFrames.find((f: AnimationFrame) => f.id === frameId);
+      
+      // For existing frames, use their properties
+      if (mockFrame) {
+        acc[frameId] = {
+          id: frameId,
+          name: mockFrame.name,
+          selected: frameId === localSelectedFrameId,
+          width: mockFrame.width,
+          height: mockFrame.height,
+          delay: mockFrame.delay || 2.5,
+          headlineText: mockFrame.headlineText,
+          description: mockFrame.description,
+          buttonText: mockFrame.buttonText,
+          logoText: mockFrame.logoText
+        };
+      }
+      // For the new frame, use the provided data
+      else if (frameId === newFrameId) {
+        acc[frameId] = {
+          id: frameId,
+          name: frameData.name,
+          selected: true, // Make the new frame selected
+          width: frameData.width || sourceFrame.width || 300,
+          height: frameData.height || sourceFrame.height || 250,
+          delay: 2.5,
+          headlineText: frameData.headlineText,
+          description: frameData.description,
+          buttonText: 'Shop Now',
+          logoText: 'LOGO',
+          hiddenLayers: frameData.hiddenLayers || []
+        };
+      }
+      
+      return acc;
+    }, {} as Record<string, AnimationFrame>);
     
     // Force a re-render
     forceUpdate();
@@ -523,13 +573,20 @@ const Timeline = ({
       // Use the delay from the existing frame, or default to 2.5s
       const frameDelay = existingFrame ? existingFrame.delay : 2.5;
       
+      // Find the actual frame in mockFrames to get the correct dimensions
+      const mockFrame = mockFrames.find((f: AnimationFrame) => f.id === frameId);
+      
       acc[frameId] = {
         id: frameId,
-        name: `Frame ${frameId.split('-')[1] || ''}`, // Extract frame number from ID
+        name: mockFrame?.name || `Frame ${frameId.split('-')[1] || ''}`, // Use actual name if available
         selected: frameId === localSelectedFrameId,
-        width: 300, // Default width
-        height: 250, // Default height
-        delay: frameDelay // Copy the delay from source frame
+        width: mockFrame?.width || 300, // Use actual width if available
+        height: mockFrame?.height || 250, // Use actual height if available
+        delay: frameDelay, // Copy the delay from source frame
+        headlineText: mockFrame?.headlineText,
+        description: mockFrame?.description,
+        buttonText: mockFrame?.buttonText,
+        logoText: mockFrame?.logoText
       };
       return acc;
     }, {} as Record<string, AnimationFrame>);

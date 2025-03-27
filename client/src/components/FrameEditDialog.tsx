@@ -9,7 +9,9 @@ interface FrameEditDialogProps {
     name: string, 
     headlineText: string, 
     description?: string,
-    hiddenLayers?: string[] 
+    hiddenLayers?: string[],
+    width?: number,
+    height?: number
   }) => void;
   frame?: AnimationFrame;
   isEditing: boolean;
@@ -30,6 +32,8 @@ const FrameEditDialog = ({
   const [headlineText, setHeadlineText] = useState('');
   const [description, setDescription] = useState('');
   const [hiddenLayers, setHiddenLayers] = useState<string[]>([]);
+  const [width, setWidth] = useState<number>(300);
+  const [height, setHeight] = useState<number>(250);
 
   useEffect(() => {
     if (frame) {
@@ -37,12 +41,17 @@ const FrameEditDialog = ({
       setHeadlineText(frame.headlineText || '');
       setDescription(frame.description || '');
       setHiddenLayers(frame.hiddenLayers || []);
+      setWidth(frame.width || 300);
+      setHeight(frame.height || 250);
     } else {
       // Reset form for a new frame
       setName('');
       setHeadlineText('');
       setDescription('');
       setHiddenLayers([]);
+      // Default size for a standard digital ad
+      setWidth(300);
+      setHeight(250);
     }
   }, [frame, isOpen]);
 
@@ -61,7 +70,9 @@ const FrameEditDialog = ({
       name: name.trim() || 'Untitled Frame',
       headlineText: headlineText.trim(),
       description: description.trim() || undefined,
-      hiddenLayers: hiddenLayers.length > 0 ? hiddenLayers : undefined
+      hiddenLayers: hiddenLayers.length > 0 ? hiddenLayers : undefined,
+      width,
+      height
     });
   };
 
@@ -134,6 +145,44 @@ const FrameEditDialog = ({
                   rows={3}
                   className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700 focus:border-[#4A7CFF] focus:outline-none resize-none"
                 />
+              </div>
+              
+              {/* Frame dimensions */}
+              <div className="flex space-x-4">
+                <div className="w-1/2">
+                  <label htmlFor="frameWidth" className="block text-sm text-neutral-300 mb-2">
+                    Width (px)
+                  </label>
+                  <input
+                    id="frameWidth"
+                    type="number"
+                    value={width}
+                    onChange={(e) => setWidth(Math.max(100, Math.min(1200, parseInt(e.target.value) || 300)))}
+                    placeholder="300"
+                    min="100"
+                    max="1200"
+                    className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700 focus:border-[#4A7CFF] focus:outline-none"
+                  />
+                </div>
+                <div className="w-1/2">
+                  <label htmlFor="frameHeight" className="block text-sm text-neutral-300 mb-2">
+                    Height (px)
+                  </label>
+                  <input
+                    id="frameHeight"
+                    type="number"
+                    value={height}
+                    onChange={(e) => setHeight(Math.max(100, Math.min(1200, parseInt(e.target.value) || 250)))}
+                    placeholder="250"
+                    min="100"
+                    max="1200"
+                    className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700 focus:border-[#4A7CFF] focus:outline-none"
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-1 text-xs text-neutral-500">
+                Common ad sizes: 300×250, 336×280, 250×250, 120×600, 160×600, 300×600, 728×90, 970×90
               </div>
             </>
           )}
