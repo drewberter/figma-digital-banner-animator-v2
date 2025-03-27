@@ -114,13 +114,17 @@ function App() {
     console.log(`App: Switching to ${mode} mode`);
     setTimelineMode(mode);
     
-    // If switching to GIF frames mode, we need to generate frames for the current ad size
+    // If switching to GIF Frames mode, initialize the frames
     if (mode === TimelineMode.GifFrames) {
-      // Generate frames based on the currently selected ad size
+      // Generate GIF frames for the current ad size
       const gifFrames = generateGifFramesForAdSize(selectedAdSizeId);
+      
+      // If frames were generated successfully, select the first one
       if (gifFrames.length > 0) {
-        // Select the first frame
+        console.log("App: Generated GIF frames for ad size", selectedAdSizeId, "first frame:", gifFrames[0].id);
         setSelectedGifFrameId(gifFrames[0].id);
+      } else {
+        console.warn("App: No GIF frames were generated for ad size", selectedAdSizeId);
       }
     }
     // When switching back to Animation mode, keep the currently selected ad size
@@ -147,9 +151,23 @@ function App() {
     
     // Generate frames for the current ad size
     // Extract the parent ad size from the GIF frame ID or use the currently selected ad size
-    const adSizeId = selectedGifFrameId && selectedGifFrameId.includes('-') 
-      ? selectedGifFrameId.split('-')[1] // Extract "frame-X" from "gif-frame-X-..." or similar format
-      : selectedAdSizeId;
+    let adSizeId = selectedAdSizeId;
+    
+    // If we have a selected GIF frame, extract the ad size from it
+    if (selectedGifFrameId && selectedGifFrameId.startsWith('gif-frame-')) {
+      const parts = selectedGifFrameId.split('-');
+      if (parts.length > 2) {
+        // Check if it's the old format (gif-frame-1-1) or new format (gif-frame-frameX-Y)
+        if (parts[2] === '1' || parts[2] === '2' || parts[2] === '3' || parts[2] === '4') {
+          // Old format: gif-frame-1-1 (where 1 is the frame number)
+          adSizeId = `frame-${parts[2]}`;
+        } else {
+          // New format: gif-frame-frameX-Y
+          adSizeId = parts[2];
+        }
+      }
+      console.log("App useEffect: Extracted adSizeId from GIF frame:", selectedGifFrameId, "->", adSizeId);
+    }
       
     // Generate current GIF frames specifically for this ad size
     const currentGifFrames = generateGifFramesForAdSize(adSizeId);

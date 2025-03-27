@@ -10,7 +10,8 @@ import {
   AnimationMode,
   TimelineMode,
   AnimationFrame,
-  AnimationLayer
+  AnimationLayer,
+  GifFrame
 } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -569,80 +570,240 @@ const Timeline = ({
   
   // Handle adding a blank frame
   const handleAddBlankFrame = () => {
-    // Create a new blank frame without needing a dialog
-    // Get the number of existing frames to create a sequential frame number
-    const frameCount = Object.keys(mockLayers).length;
-    const newFrameNumber = frameCount + 1;
-    
-    handleAddFrame({
-      name: `Frame ${newFrameNumber}`,
-      headlineText: `Frame ${newFrameNumber} Headline`,
-      description: `Description for frame ${newFrameNumber}`
-    });
+    // Different behavior based on the timeline mode
+    if (timelineMode === TimelineMode.Animation) {
+      // In Animation mode, add a new ad size
+      const frameCount = Object.keys(mockLayers).length;
+      const newFrameNumber = frameCount + 1;
+      
+      handleAddFrame({
+        name: `Frame ${newFrameNumber}`,
+        headlineText: `Frame ${newFrameNumber} Headline`,
+        description: `Description for frame ${newFrameNumber}`
+      });
+    } else if (timelineMode === TimelineMode.GifFrames) {
+      // In GIF Frames mode, add a new GIF frame to the current ad size
+      
+      // Get the selected ad size ID (using the "frame-X" format)
+      // This is the parent ad size for which we want to add a GIF frame
+      let selectedAdSizeId = localSelectedFrameId;
+      
+      // If it's already a GIF frame ID, extract the parent ad size
+      if (localSelectedFrameId.startsWith('gif-frame-')) {
+        // Extract ad size ID using our improved extraction logic
+        const parts = localSelectedFrameId.split('-');
+        if (parts.length > 2) {
+          // Check if it's the old format (gif-frame-1-1) or new format (gif-frame-frameX-Y)
+          if (parts[2] === '1' || parts[2] === '2' || parts[2] === '3' || parts[2] === '4') {
+            // Old format: gif-frame-1-1 (where 1 is the frame number)
+            selectedAdSizeId = `frame-${parts[2]}`;
+          } else {
+            // New format: gif-frame-frameX-Y
+            selectedAdSizeId = parts[2];
+          }
+        } else {
+          selectedAdSizeId = 'frame-1'; // Fallback
+        }
+      }
+      
+      console.log("Adding new GIF frame for ad size:", selectedAdSizeId);
+      
+      // Get current GIF frames for this ad size
+      const currentGifFrames = generateGifFramesForAdSize(selectedAdSizeId);
+      
+      // Create a new GIF frame
+      const newGifFrameNumber = currentGifFrames.length + 1;
+      const newGifFrameId = `gif-frame-${selectedAdSizeId}-${newGifFrameNumber}`;
+      
+      // Find the base ad size to get its layers
+      const adSize = mockFrames.find(f => f.id === selectedAdSizeId);
+      if (!adSize) {
+        console.error("Could not find ad size:", selectedAdSizeId);
+        return;
+      }
+      
+      // Get layers for this ad size
+      const layers = mockLayers[selectedAdSizeId] || [];
+      
+      // Create the new GIF frame
+      const newGifFrame: GifFrame = {
+        id: newGifFrameId,
+        name: `GIF Frame ${newGifFrameNumber}`,
+        selected: false,
+        delay: 2.5, // Default delay
+        adSizeId: selectedAdSizeId,
+        hiddenLayers: [], // All layers visible by default
+        visibleLayerCount: layers.length,
+        frameIndex: currentGifFrames.length
+      };
+      
+      // Add the new GIF frame to the mock data
+      mockGifFrames.push(newGifFrame);
+      
+      // If frames were generated, select the new one
+      if (onFrameSelect) {
+        onFrameSelect(newGifFrameId);
+      }
+      
+      // Force a re-render
+      forceUpdate();
+    }
   };
   
   // Handle duplicating a frame and its layers
   const handleDuplicateFrame = (frameId: string) => {
-    // Clone the selected frame's layers
-    const sourceLayers = mockLayers[frameId];
-    if (!sourceLayers) return;
-    
-    // Get the number of existing frames to create a sequential frame number
-    const frameCount = Object.keys(mockLayers).length;
-    const newFrameNumber = frameCount + 1;
-    
-    // Create new frame with a user-friendly ID (still unique but more readable)
-    const newFrameId = `frame-${newFrameNumber}`;
-    
-    // Deep clone the layers
-    mockLayers[newFrameId] = JSON.parse(JSON.stringify(sourceLayers));
-    
-    // Copy over frame properties when generating frames in FrameCardGrid
-    // This will make sure delay is properly copied
-    const frameObjects = Object.keys(mockLayers).reduce((acc, frameId) => {
-      // Get the original frame if it exists
-      const existingFrame = Object.values(acc).find(f => f.id === frameId);
+    // Different behavior based on timeline mode and frame type
+    if (frameId.startsWith('gif-frame-')) {
+      // Duplicating a GIF frame
+      console.log("Duplicating GIF frame:", frameId);
       
-      // Use the delay from the existing frame, or default to 2.5s
-      const frameDelay = existingFrame ? existingFrame.delay : 2.5;
+      // Find the source frame in mockGifFrames
+      const sourceGifFrame = mockGifFrames.find(frame => frame.id === frameId);
+      if (!sourceGifFrame) {
+        console.error("Source GIF frame not found:", frameId);
+        return;
+      }
       
-      // Find the actual frame in mockFrames to get the correct dimensions
-      const mockFrame = mockFrames.find((f: AnimationFrame) => f.id === frameId);
+      // Extract the parent ad size and frame count
+      const adSizeId = sourceGifFrame.adSizeId;
       
-      acc[frameId] = {
-        id: frameId,
-        name: mockFrame?.name || `Frame ${frameId.split('-')[1] || ''}`, // Use actual name if available
-        selected: frameId === localSelectedFrameId,
-        width: mockFrame?.width || 300, // Use actual width if available
-        height: mockFrame?.height || 250, // Use actual height if available
-        delay: frameDelay, // Copy the delay from source frame
-        headlineText: mockFrame?.headlineText,
-        description: mockFrame?.description,
-        buttonText: mockFrame?.buttonText,
-        logoText: mockFrame?.logoText
+      // Get all existing GIF frames for this ad size
+      const existingGifFrames = mockGifFrames.filter(frame => frame.adSizeId === adSizeId);
+      
+      // Create a new GIF frame with the next frame number
+      const newGifFrameNumber = existingGifFrames.length + 1;
+      const newGifFrameId = `gif-frame-${adSizeId}-${newGifFrameNumber}`;
+      
+      // Clone the source GIF frame
+      const newGifFrame: GifFrame = {
+        ...JSON.parse(JSON.stringify(sourceGifFrame)), // Deep clone
+        id: newGifFrameId,
+        name: `GIF Frame ${newGifFrameNumber}`,
+        selected: false,
+        frameIndex: existingGifFrames.length
       };
-      return acc;
-    }, {} as Record<string, AnimationFrame>);
-    
-    // Set the same delay for the new frame as the source frame
-    if (frameObjects[frameId]) {
-      frameObjects[newFrameId] = {
-        ...frameObjects[newFrameId],
-        delay: frameObjects[frameId].delay,
-      };
+      
+      // Add the new GIF frame to mockGifFrames
+      mockGifFrames.push(newGifFrame);
+      
+      // Select the new frame
+      if (onFrameSelect) {
+        onFrameSelect(newGifFrameId);
+      }
+      
+      // Force a re-render
+      forceUpdate();
+    } else {
+      // Duplicating an ad size (animation frame)
+      // Clone the selected frame's layers
+      const sourceLayers = mockLayers[frameId];
+      if (!sourceLayers) return;
+      
+      // Get the number of existing frames to create a sequential frame number
+      const frameCount = Object.keys(mockLayers).length;
+      const newFrameNumber = frameCount + 1;
+      
+      // Create new frame with a user-friendly ID (still unique but more readable)
+      const newFrameId = `frame-${newFrameNumber}`;
+      
+      // Deep clone the layers
+      mockLayers[newFrameId] = JSON.parse(JSON.stringify(sourceLayers));
+      
+      // Copy over frame properties when generating frames in FrameCardGrid
+      // This will make sure delay is properly copied
+      const frameObjects = Object.keys(mockLayers).reduce((acc, frameId) => {
+        // Get the original frame if it exists
+        const existingFrame = Object.values(acc).find(f => f.id === frameId);
+        
+        // Use the delay from the existing frame, or default to 2.5s
+        const frameDelay = existingFrame ? existingFrame.delay : 2.5;
+        
+        // Find the actual frame in mockFrames to get the correct dimensions
+        const mockFrame = mockFrames.find((f: AnimationFrame) => f.id === frameId);
+        
+        acc[frameId] = {
+          id: frameId,
+          name: mockFrame?.name || `Frame ${frameId.split('-')[1] || ''}`, // Use actual name if available
+          selected: frameId === localSelectedFrameId,
+          width: mockFrame?.width || 300, // Use actual width if available
+          height: mockFrame?.height || 250, // Use actual height if available
+          delay: frameDelay, // Copy the delay from source frame
+          headlineText: mockFrame?.headlineText,
+          description: mockFrame?.description,
+          buttonText: mockFrame?.buttonText,
+          logoText: mockFrame?.logoText
+        };
+        return acc;
+      }, {} as Record<string, AnimationFrame>);
+      
+      // Set the same delay for the new frame as the source frame
+      if (frameObjects[frameId]) {
+        frameObjects[newFrameId] = {
+          ...frameObjects[newFrameId],
+          delay: frameObjects[frameId].delay,
+        };
+      }
+      
+      // Force a re-render
+      forceUpdate();
     }
-    
-    // Force a re-render
-    forceUpdate();
   };
   
   // Handle deleting a frame
   const handleDeleteFrame = (frameId: string) => {
-    // Remove the frame from mockLayers
-    delete mockLayers[frameId];
-    
-    // Force a re-render
-    forceUpdate();
+    // Different behavior based on frame type
+    if (frameId.startsWith('gif-frame-')) {
+      // Deleting a GIF frame
+      console.log("Deleting GIF frame:", frameId);
+      
+      // Find the frame index in mockGifFrames
+      const frameIndex = mockGifFrames.findIndex(frame => frame.id === frameId);
+      if (frameIndex === -1) {
+        console.error("Could not find GIF frame to delete:", frameId);
+        return;
+      }
+      
+      // Get the frame to find its parent ad size
+      const frame = mockGifFrames[frameIndex];
+      
+      // Remove the frame from mockGifFrames
+      mockGifFrames.splice(frameIndex, 1);
+      
+      // If this was the last gif frame in this ad size, we need to select another ad size
+      const remainingGifFrames = mockGifFrames.filter(f => f.adSizeId === frame.adSizeId);
+      
+      // Choose a new frame to select
+      if (remainingGifFrames.length > 0) {
+        // Select the first remaining frame in this ad size
+        if (onFrameSelect) {
+          onFrameSelect(remainingGifFrames[0].id);
+        }
+      } else {
+        // No more GIF frames for this ad size, select the ad size itself
+        if (onFrameSelect) {
+          onFrameSelect(frame.adSizeId);
+        }
+      }
+      
+      // Force a re-render
+      forceUpdate();
+    } else {
+      // Deleting an animation frame (ad size)
+      // Remove the frame from mockLayers
+      delete mockLayers[frameId];
+      
+      // Remove any associated GIF frames that use this ad size
+      const gifFramesToRemove = mockGifFrames.filter(frame => frame.adSizeId === frameId);
+      gifFramesToRemove.forEach(frame => {
+        const index = mockGifFrames.indexOf(frame);
+        if (index !== -1) {
+          mockGifFrames.splice(index, 1);
+        }
+      });
+      
+      // Force a re-render
+      forceUpdate();
+    }
   };
   
   // Render the animation block with drag handles
