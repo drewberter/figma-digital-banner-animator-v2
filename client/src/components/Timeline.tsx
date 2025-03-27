@@ -491,7 +491,7 @@ const Timeline = ({
           <div className="mr-5 flex items-center">
             <Tabs.Root 
               value={timelineMode} 
-              onValueChange={(value) => setTimelineMode(value as TimelineMode)}
+              onValueChange={(value) => handleTimelineModeChange(value as TimelineMode)}
               className="flex bg-neutral-800 rounded-md p-0.5"
             >
               <Tabs.List className="flex">

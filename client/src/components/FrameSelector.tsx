@@ -80,6 +80,7 @@ const FrameSelector = ({
         frame={frameBeingEdited}
         isEditing={editingFrameId !== null}
         availableLayers={layers}
+        timelineMode={timelineMode}
       />
       
       {frames.length > 0 ? (
