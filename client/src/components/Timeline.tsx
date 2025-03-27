@@ -58,12 +58,22 @@ const Timeline = ({
         // Extract the ad size ID if we're looking at a GIF frame already
         let adSizeId = localSelectedFrameId;
         
-        // If it's a GIF frame ID (format: "gif-frame-frameX-Y")
+        // If it's a GIF frame ID (format: "gif-frame-1-1" or "gif-frame-frameX-Y")
         if (localSelectedFrameId.startsWith('gif-frame-')) {
-          // Parse to extract the adSizeId part
+          // Check if it's the old format (gif-frame-1-1) or new format (gif-frame-frameX-Y)
           const parts = localSelectedFrameId.split('-');
-          // The adSizeId should be after "gif-frame-"
-          adSizeId = parts.length > 2 ? parts[2] : 'frame-1';
+          if (parts.length > 2) {
+            // Check if the third part is numeric or starts with "frame"
+            if (parts[2] === '1' || parts[2] === '2' || parts[2] === '3' || parts[2] === '4') {
+              // Old format: gif-frame-1-1 (where 1 is the frame number)
+              adSizeId = `frame-${parts[2]}`;
+            } else {
+              // New format: gif-frame-frameX-Y
+              adSizeId = parts[2];
+            }
+          } else {
+            adSizeId = 'frame-1'; // Fallback
+          }
           console.log("Extracted adSizeId from GIF frame:", adSizeId);
         }
           
@@ -1074,12 +1084,22 @@ const Timeline = ({
                   // This is the parent ad size for which we want to show GIF frames
                   let selectedAdSizeId = localSelectedFrameId;
                   
-                  // If it's a GIF frame ID (format: "gif-frame-frameX-Y")
+                  // If it's a GIF frame ID (format: "gif-frame-1-1" or "gif-frame-frameX-Y")
                   if (localSelectedFrameId.startsWith('gif-frame-')) {
-                    // Parse to extract the adSizeId part
+                    // Check if it's the old format (gif-frame-1-1) or new format (gif-frame-frameX-Y)
                     const parts = localSelectedFrameId.split('-');
-                    // The adSizeId should be after "gif-frame-"
-                    selectedAdSizeId = parts.length > 2 ? parts[2] : 'frame-1';
+                    if (parts.length > 2) {
+                      // Check if the third part is numeric or starts with "frame"
+                      if (parts[2] === '1' || parts[2] === '2' || parts[2] === '3' || parts[2] === '4') {
+                        // Old format: gif-frame-1-1 (where 1 is the frame number)
+                        selectedAdSizeId = `frame-${parts[2]}`;
+                      } else {
+                        // New format: gif-frame-frameX-Y
+                        selectedAdSizeId = parts[2];
+                      }
+                    } else {
+                      selectedAdSizeId = 'frame-1'; // Fallback
+                    }
                     console.log("FrameCardGrid - Extracted adSizeId from GIF frame:", selectedAdSizeId);
                   }
                   

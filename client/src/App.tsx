@@ -270,11 +270,23 @@ function App() {
               }
               
               // Set time within this frame (accounting for this frame's delay)
-              // Get the parent ad size ID from the GIF frame ID
-              // Format is "gif-frame-frameX-Y"
+              // Get the parent ad size ID from the GIF frame ID 
+              // Could be either format: "gif-frame-1-1" (old) or "gif-frame-frameX-Y" (new)
+              let adSizeId = 'frame-1'; // Default fallback
               const parts = frameId.split('-');
-              // The adSizeId should be after "gif-frame-"
-              const adSizeId = parts.length > 2 ? parts[2] : 'frame-1';
+              
+              if (parts.length > 2) {
+                // Check if the third part is numeric or starts with "frame"
+                if (parts[2] === '1' || parts[2] === '2' || parts[2] === '3' || parts[2] === '4') {
+                  // Old format: gif-frame-1-1 (where 1 is the frame number)
+                  adSizeId = `frame-${parts[2]}`;
+                } else {
+                  // New format: gif-frame-frameX-Y
+                  adSizeId = parts[2];
+                }
+              }
+              
+              console.log("App: Extracting adSizeId from GIF frame:", frameId, "->", adSizeId);
               
               // Get frames for this ad size
               const relevantFrames = generateGifFramesForAdSize(adSizeId);
