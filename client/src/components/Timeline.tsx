@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useReducer } from 'react';
-import { Play, Pause, SkipBack, Clock, LogIn, LogOut, Eye, EyeOff, Layers, Zap } from 'lucide-react';
+import { Play, Pause, SkipBack, Clock, LogIn, LogOut, Eye, EyeOff, Layers, Zap, Plus } from 'lucide-react';
 import { mockLayers } from '../mock/animationData';
+import FrameEditDialog from './FrameEditDialog';
 import { 
   Animation, 
   AnimationType, 
@@ -60,6 +61,7 @@ const Timeline = ({
   const [showDurationInput, setShowDurationInput] = useState(false);
   
   const [isDragging, setIsDragging] = useState(false);
+  const [isFrameDialogOpen, setIsFrameDialogOpen] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   
@@ -429,6 +431,42 @@ const Timeline = ({
     // Force a re-render
     forceUpdate();
   };
+  
+  // Handle adding a new frame
+  const handleAddFrame = (frameData: { name: string, headlineText: string, description?: string, hiddenLayers?: string[] }) => {
+    // Create new frame with unique ID
+    const newFrame = {
+      id: `frame-${Date.now()}`,
+      name: frameData.name,
+      selected: true,
+      width: 300, // Default width
+      height: 250, // Default height
+      headlineText: frameData.headlineText,
+      description: frameData.description || '',
+      hiddenLayers: frameData.hiddenLayers || []
+    };
+    
+    // Add the frame to the data structure
+    // Here, since we are in the mock data structure, we need to:
+    // 1. Clone the layers from the current frame
+    const currentFrame = mockLayers[selectedFrameId];
+    if (currentFrame) {
+      // Create a copy of the current frame's layers for the new frame
+      mockLayers[newFrame.id] = currentFrame.map(layer => ({
+        ...layer,
+        // if hiddenLayers includes this layer's id, mark it as invisible
+        visible: frameData.hiddenLayers?.includes(layer.id) ? false : layer.visible
+      }));
+    }
+    
+    // Close the dialog
+    setIsFrameDialogOpen(false);
+    
+    // Force a re-render
+    forceUpdate();
+    
+    console.log("Added new frame:", newFrame.id);
+  };
 
   // Render animation block with drag handles
   const renderAnimationBlock = (layer: any, animation: any, animIndex: number) => {
@@ -586,9 +624,18 @@ const Timeline = ({
               Add Keyframe
             </button>
           ) : (
-            <span className="text-xs text-neutral-400">
-              Toggle layer visibility per frame
-            </span>
+            <div className="flex items-center space-x-3">
+              <span className="text-xs text-neutral-400">
+                Toggle layer visibility per frame
+              </span>
+              <button 
+                className="px-3 py-1 bg-[#4A7CFF] text-white text-xs rounded-md flex items-center hover:bg-[#3A6CEE]"
+                onClick={() => setIsFrameDialogOpen(true)}
+              >
+                <Plus size={12} className="mr-1" />
+                Add Frame
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -887,6 +934,16 @@ const Timeline = ({
           </div>
         </div>
       </div>
+      
+      {/* Frame Edit Dialog */}
+      <FrameEditDialog
+        isOpen={isFrameDialogOpen}
+        onClose={() => setIsFrameDialogOpen(false)}
+        onSave={handleAddFrame}
+        isEditing={false}
+        timelineMode={TimelineMode.FrameStyle}
+        availableLayers={frameLayers}
+      />
     </div>
   );
 };
