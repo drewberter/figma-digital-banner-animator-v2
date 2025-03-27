@@ -58,77 +58,56 @@ export function translateLayerId(
     return layerId;
   }
   
-  // Most layer IDs follow pattern: "layer-[adSizeId]-[layerName]"
-  const layerIdParts = layerId.split('-');
-  
-  // Too short to be a valid layer ID
-  if (layerIdParts.length < 3) {
-    console.warn(`translateLayerId: Invalid layer ID format: ${layerId}`);
-    return layerId; // Return original ID as fallback
-  }
-  
-  // Check if this is in the standard format
-  if (layerIdParts[0] !== 'layer') {
-    console.warn(`translateLayerId: Non-standard layer ID prefix: ${layerId}`);
-    return layerId; // Return original ID as fallback
-  }
-
-  let targetLayerId = '';
-  const sourceAdSizeNumber = sourceAdSizeId.split('-')[1];
-  const targetAdSizeNumber = targetAdSizeId.split('-')[1];
+  console.log(`translateLayerId - START: Translating layer ${layerId} from ${sourceAdSizeId} to ${targetAdSizeId}`);
   
   // STRATEGY 1: If we have the layer name and all layers, find the equivalent layer by name
+  // This is the most reliable method for matching layers across different ad sizes
   if (sourceLayerName && allLayers && allLayers[targetAdSizeId]) {
     // Find a layer in the target ad size with the same name
     const targetLayer = allLayers[targetAdSizeId].find(layer => layer.name === sourceLayerName);
     if (targetLayer) {
-      console.log(`translateLayerId: Found layer with matching name "${sourceLayerName}" in target ad size`);
+      console.log(`translateLayerId: Found layer with matching name "${sourceLayerName}" in target ad size -> ${targetLayer.id}`);
       return targetLayer.id;
     }
   }
   
-  // STRATEGY 2: Check for semantic naming patterns in the layer ID itself
-  const lastPart = layerIdParts[layerIdParts.length - 1].toLowerCase();
-  if (['headline', 'background', 'button', 'logo', 'subhead', 'cta', 'image', 'icon'].includes(lastPart)) {
-    // This is a semantically named layer - keep the name and just change the ad size
-    targetLayerId = `layer-${targetAdSizeNumber}-${lastPart}`;
-    console.log(`translateLayerId: Semantic match found for "${lastPart}"`);
-    return targetLayerId;
+  // Parse layer ID - for our specific format "layer-X-Y"
+  const layerIdParts = layerId.split('-');
+  
+  // Check if this is in our standard format
+  if (layerIdParts[0] !== 'layer' || layerIdParts.length < 3) {
+    console.warn(`translateLayerId: Non-standard layer ID format: ${layerId}, returning original`);
+    return layerId; // Return original ID as fallback
+  }
+
+  // Extract the source frame number and position
+  const sourceFrameNumber = parseInt(layerIdParts[1], 10);
+  const layerPosition = layerIdParts[2];
+  
+  // Extract the target frame number
+  const targetFrameNumber = parseInt(targetAdSizeId.split('-')[1], 10);
+  
+  if (isNaN(sourceFrameNumber) || isNaN(targetFrameNumber)) {
+    console.warn(`translateLayerId: Could not parse frame numbers - source: ${sourceFrameNumber}, target: ${targetFrameNumber}`);
+    return layerId; // Return original as fallback
   }
   
-  // STRATEGY 3: If layer ID has the pattern "layer-X-Y" where X is ad size and Y is position
-  if (layerIdParts.length === 3) {
-    // Check if the second segment matches the source ad size number
-    if (layerIdParts[1] === sourceAdSizeNumber) {
-      // This is most likely a match! Keep the last part (layer index/position)
-      const layerPosition = layerIdParts[2];
-      targetLayerId = `layer-${targetAdSizeNumber}-${layerPosition}`;
-      console.log(`translateLayerId: Position-based match. Keeping layer position ${layerPosition}`);
-      return targetLayerId;
+  // STRATEGY 2: Match by position in the layers array
+  // For our specific format "layer-X-Y", we can substitute X with the target frame number
+  const targetLayerId = `layer-${targetFrameNumber}-${layerPosition}`;
+  
+  console.log(`translateLayerId: Created position-based mapping from ${layerId} to ${targetLayerId}`);
+  
+  // If we have access to all layers and the target frame layers, we can verify this mapping
+  if (allLayers && allLayers[targetAdSizeId]) {
+    // Check if the target layer exists
+    const targetLayerExists = allLayers[targetAdSizeId].some(layer => layer.id === targetLayerId);
+    if (!targetLayerExists) {
+      console.warn(`translateLayerId: Generated target layer ID ${targetLayerId} does not exist in target frame`);
+      // We'll still return it as it follows the pattern
     }
   }
   
-  // STRATEGY 4: Try other ID patterns
-  const sourceAdSizeParts = sourceAdSizeId.split('-');
-  const targetAdSizeParts = targetAdSizeId.split('-');
-  
-  // Check for complex ID patterns
-  if (layerIdParts[1] === sourceAdSizeParts[0] && 
-      layerIdParts[2] === sourceAdSizeParts[1]) {
-    // Format: "layer-frame-1-header" -> "layer-frame-2-header"
-    const layerSpecificPart = layerIdParts.slice(3).join('-');
-    targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
-  } else if (layerIdParts[1] === sourceAdSizeId) {
-    // Format: "layer-frame1-header" -> "layer-frame2-header"
-    const layerSpecificPart = layerIdParts.slice(2).join('-');
-    targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
-  } else {
-    // If nothing worked, use the original ID as fallback
-    console.warn(`translateLayerId: Unable to translate layer ID ${layerId} from ${sourceAdSizeId} to ${targetAdSizeId}`);
-    targetLayerId = layerId;
-  }
-  
-  console.log(`translateLayerId: Translated ${layerId} from ${sourceAdSizeId} to ${targetAdSizeId} -> ${targetLayerId}`);
   return targetLayerId;
 }
 
