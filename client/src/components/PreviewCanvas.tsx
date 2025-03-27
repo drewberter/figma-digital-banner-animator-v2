@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { mockFrames, mockLayers } from '../mock/animationData';
-import { AnimationType, EasingType } from '../types/animation';
+import { AnimationType, EasingType, AnimationMode } from '../types/animation';
 
 interface PreviewCanvasProps {
   selectedFrameId?: string;
@@ -112,18 +112,32 @@ const PreviewCanvas = ({
       const progress = (currentTime - startTime) / activeAnimation.duration;
       const easedProgress = applyEasing(progress, activeAnimation.easing);
       
+      // Check if this is an exit animation
+      const isExit = activeAnimation.mode === AnimationMode.Exit;
+      
+      // For exit animations, we invert the progress (1 - easedProgress)
+      // This way elements fade/scale/slide out instead of in
+      const animationProgress = isExit ? (1 - easedProgress) : easedProgress;
+      
       // Apply different animation types
       if (activeAnimation.type === AnimationType.Fade) {
-        element.style.opacity = `${easedProgress}`;
+        element.style.opacity = `${animationProgress}`;
         animationApplied = true;
       } else if (activeAnimation.type === AnimationType.Scale) {
-        const scale = 0.8 + (easedProgress * 0.4); // Scale from 0.8 to 1.2
+        // For entrance: 0.8 to 1.2, for exit: 1.2 to 0.8
+        const scale = isExit 
+          ? (1.2 - (easedProgress * 0.4)) 
+          : (0.8 + (easedProgress * 0.4));
         element.style.transform = `scale(${scale})`;
-        element.style.opacity = '1';
+        element.style.opacity = isExit ? `${animationProgress}` : '1';
         animationApplied = true;
       } else if (activeAnimation.type === AnimationType.Slide) {
-        let offset = 20 - (easedProgress * 20); // Start 20px offset, end at 0
-        let direction = activeAnimation.direction || 'right';
+        const direction = activeAnimation.direction || 'right';
+        
+        // For entrance: 20px to 0px, for exit: 0px to 20px
+        let offset = isExit 
+          ? (easedProgress * 20) 
+          : (20 - (easedProgress * 20));
         
         if (direction === 'right') {
           element.style.transform = `translateX(${-offset}px)`;
@@ -135,43 +149,60 @@ const PreviewCanvas = ({
           element.style.transform = `translateY(${-offset}px)`;
         }
         
-        element.style.opacity = '1';
+        element.style.opacity = isExit ? `${animationProgress}` : '1';
         animationApplied = true;
       } else if (activeAnimation.type === AnimationType.Rotate) {
-        const rotation = easedProgress * (activeAnimation.rotation || 360);
+        // For entrance: 0 to rotation, for exit: rotation to 0
+        const rotationAmount = activeAnimation.rotation || 360;
+        const rotation = isExit 
+          ? ((1 - easedProgress) * rotationAmount) 
+          : (easedProgress * rotationAmount);
         element.style.transform = `rotate(${rotation}deg)`;
-        element.style.opacity = '1';
+        element.style.opacity = isExit ? `${animationProgress}` : '1';
         animationApplied = true;
       } else if (activeAnimation.type === AnimationType.Bounce) {
-        // Simple bounce effect
-        const bounceScale = 1 + (Math.sin(easedProgress * Math.PI * 2) * 0.1);
+        // Simple bounce effect 
+        const bounceScale = isExit
+          ? (1 - (easedProgress * 0.2) + (Math.sin(easedProgress * Math.PI * 2) * 0.1))
+          : (1 + (Math.sin(easedProgress * Math.PI * 2) * 0.1));
         element.style.transform = `scale(${bounceScale})`;
-        element.style.opacity = '1';
+        element.style.opacity = isExit ? `${animationProgress}` : '1';
         animationApplied = true;
       } else if (activeAnimation.type === AnimationType.Pulse) {
         // Simple pulse effect - opacity pulsing
-        const pulseOpacity = 0.7 + (Math.sin(easedProgress * Math.PI * 2) * 0.3);
+        const basePulse = isExit ? animationProgress : 0.7;
+        const pulseAmount = isExit ? 0.2 : 0.3;
+        const pulseOpacity = basePulse + (Math.sin(easedProgress * Math.PI * 2) * pulseAmount);
         element.style.opacity = `${pulseOpacity}`;
         animationApplied = true;
       }
     } 
     // If no active animation but we've passed one, show the final state
     else if (finalAnimation) {
-      if (finalAnimation.type === AnimationType.Fade) {
-        element.style.opacity = '1';
-      } else if (finalAnimation.type === AnimationType.Scale) {
-        element.style.transform = 'scale(1.2)';
-        element.style.opacity = '1';
-      } else if (finalAnimation.type === AnimationType.Slide) {
-        element.style.transform = 'translateY(0)';
-        element.style.opacity = '1';
-      } else if (finalAnimation.type === AnimationType.Rotate) {
-        element.style.transform = `rotate(${finalAnimation.rotation || 360}deg)`;
-        element.style.opacity = '1';
-      } else if (finalAnimation.type === AnimationType.Bounce || 
-                finalAnimation.type === AnimationType.Pulse) {
-        element.style.transform = 'scale(1)';
-        element.style.opacity = '1';
+      // Check if the final animation is an exit animation
+      const isExit = finalAnimation.mode === AnimationMode.Exit;
+      
+      // If it's an exit animation that has completed, hide the element
+      if (isExit) {
+        element.style.opacity = '0';
+      } else {
+        // For entrance animations that have completed, show the element
+        if (finalAnimation.type === AnimationType.Fade) {
+          element.style.opacity = '1';
+        } else if (finalAnimation.type === AnimationType.Scale) {
+          element.style.transform = 'scale(1.2)';
+          element.style.opacity = '1';
+        } else if (finalAnimation.type === AnimationType.Slide) {
+          element.style.transform = 'translateY(0)';
+          element.style.opacity = '1';
+        } else if (finalAnimation.type === AnimationType.Rotate) {
+          element.style.transform = `rotate(${finalAnimation.rotation || 360}deg)`;
+          element.style.opacity = '1';
+        } else if (finalAnimation.type === AnimationType.Bounce || 
+                  finalAnimation.type === AnimationType.Pulse) {
+          element.style.transform = 'scale(1)';
+          element.style.opacity = '1';
+        }
       }
       animationApplied = true;
     }

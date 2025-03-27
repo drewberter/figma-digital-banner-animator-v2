@@ -16,22 +16,27 @@ const PropertiesPanel = () => {
   };
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  const [animation, setAnimation] = useState<{
-    type: AnimationType,
-    mode?: AnimationMode,
-    startTime: number,
-    duration: number,
-    easing: EasingType,
-    opacity: number,
-    scale?: number,
-    rotation?: number
-  }>({
+  // Define a local interface for the animation state to avoid optional properties
+  interface AnimationState {
+    type: AnimationType;
+    mode: AnimationMode;
+    startTime: number;
+    duration: number;
+    easing: EasingType;
+    opacity: number;
+    scale: number;
+    rotation: number;
+  }
+  
+  const [animation, setAnimation] = useState<AnimationState>({
     type: AnimationType.Fade,
     mode: AnimationMode.Entrance,
     startTime: 0,
     duration: 1,
     easing: EasingType.EaseInOut,
-    opacity: 1
+    opacity: 1,
+    scale: 1,
+    rotation: 0
   });
   
   // Get selected layer's animation data
@@ -43,6 +48,7 @@ const PropertiesPanel = () => {
         // Set default values for optional properties
         startTime: selectedLayer.animations[0].startTime || 0,
         mode: selectedLayer.animations[0].mode || AnimationMode.Entrance,
+        opacity: selectedLayer.animations[0].opacity || 1,
         scale: selectedLayer.animations[0].scale || 1,
         rotation: selectedLayer.animations[0].rotation || 0
       });
