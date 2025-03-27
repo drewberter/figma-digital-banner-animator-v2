@@ -7,10 +7,12 @@ import PropertiesPanel from "./components/PropertiesPanel";
 import ExportModal from "./components/ExportModal";
 import PresetsPanel from "./components/PresetsPanel";
 import AutoSaveIndicator from "./components/AutoSaveIndicator";
+import SyncDebugPanel from "./components/SyncDebugPanel";
 import { AnimationProvider, useAnimationContext } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
 import { TimelineMode } from "./types/animation";
 import { mockGifFrames, generateGifFramesForAdSize } from "./mock/animationData";
+import { DEBUG_SYNC } from "./utils/syncLogger";
 
 function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -459,6 +461,9 @@ function App() {
           
           {/* Auto-save indicator */}
           <AutoSaveIndicator saving={saving} lastSaved={lastSaved} />
+          
+          {/* Sync debugging panel - only show when DEBUG_SYNC is true */}
+          {DEBUG_SYNC && <SyncDebugPanel />}
         </div>
       </AnimationProvider>
     </PluginProvider>
