@@ -1,12 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, SkipBack, Clock } from 'lucide-react';
-// import { useAnimationContext } from '../context/AnimationContext';
 import { mockLayers } from '../mock/animationData';
 
-const Timeline = () => {
-  // Local state instead of context
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+interface TimelineProps {
+  onTimeUpdate: (time: number) => void;
+  onPlayPauseToggle: (playing: boolean) => void;
+  isPlaying: boolean;
+  currentTime: number;
+}
+
+const Timeline = ({
+  onTimeUpdate,
+  onPlayPauseToggle,
+  isPlaying,
+  currentTime
+}: TimelineProps) => {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const duration = 5; // Fixed duration for now
   
@@ -50,7 +58,7 @@ const Timeline = () => {
     const clickPosition = e.clientX - rect.left;
     const newTime = positionToTime(clickPosition);
     
-    setCurrentTime(newTime);
+    onTimeUpdate(newTime);
   };
   
   // Handle playhead drag start
@@ -68,7 +76,7 @@ const Timeline = () => {
       const mousePosition = e.clientX - rect.left;
       const newTime = positionToTime(mousePosition);
       
-      setCurrentTime(newTime);
+      onTimeUpdate(newTime);
     };
     
     const handleMouseUp = () => {
@@ -84,7 +92,7 @@ const Timeline = () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, setCurrentTime]);
+  }, [isDragging, onTimeUpdate]);
   
   // Get the currently selected layer from mock data
   const getSelectedLayer = () => {
@@ -102,7 +110,7 @@ const Timeline = () => {
   // Toggle playback with animation loop
   const togglePlayback = () => {
     const newIsPlaying = !isPlaying;
-    setIsPlaying(newIsPlaying);
+    onPlayPauseToggle(newIsPlaying);
     
     if (newIsPlaying) {
       // Start animation frame loop
@@ -125,14 +133,13 @@ const Timeline = () => {
       lastTimeRef.current = now;
       
       // Update current time
-      setCurrentTime(prevTime => {
-        const newTime = prevTime + deltaTime;
-        // Loop back to start if we've reached the end
-        if (newTime >= duration) {
-          return 0;
-        }
-        return newTime;
-      });
+      const newTime = currentTime + deltaTime;
+      // Loop back to start if we've reached the end
+      if (newTime >= duration) {
+        onTimeUpdate(0);
+      } else {
+        onTimeUpdate(newTime);
+      }
       
       // Continue the loop
       animationFrameRef.current = requestAnimationFrame(animate);
@@ -165,7 +172,7 @@ const Timeline = () => {
           
           <button 
             className="w-8 h-8 flex items-center justify-center rounded hover:bg-neutral-800"
-            onClick={() => setCurrentTime(0)}
+            onClick={() => onTimeUpdate(0)}
             title="Restart"
           >
             <SkipBack size={16} className="text-neutral-300" />
@@ -253,26 +260,179 @@ const Timeline = () => {
                 key={layer.id}
                 className={`h-10 relative ${selectedLayerId === layer.id ? 'bg-[#1A1A1A]' : ''}`}
               >
-                {/* Animation blocks */}
-                {layer.animations.map((animation: any, index: number) => (
-                  <div 
-                    key={index}
-                    className={`absolute h-6 top-2 rounded ${selectedLayerId === layer.id ? 'bg-[#2A5BFF] bg-opacity-70 border border-[#4A7CFF]' : 'bg-[#2A5BFF] bg-opacity-30 border border-[#4A7CFF]'}`}
-                    style={{
-                      left: `${timeToPosition(animation.startTime || 0)}px`,
-                      width: `${timeToPosition(animation.duration)}px`
-                    }}
-                  >
-                    <div className="px-2 text-xs text-white truncate flex items-center justify-between w-full">
-                      <span>{animation.type}</span>
-                      {animation.duration >= 0.5 && (
-                        <span className="text-xs opacity-75 ml-1">
-                          {animation.duration.toFixed(1)}s
-                        </span>
-                      )}
+                {/* Animation blocks with drag handles */}
+                {layer.animations.map((animation: any, index: number) => {
+                  // Track dragging state for each animation
+                  const [isDraggingLeft, setIsDraggingLeft] = useState(false);
+                  const [isDraggingRight, setIsDraggingRight] = useState(false);
+                  const [isDraggingBlock, setIsDraggingBlock] = useState(false);
+                  
+                  // References to track mouse positions during drag
+                  const startPositionRef = useRef(0);
+                  const originalStartTimeRef = useRef(0);
+                  const originalDurationRef = useRef(0);
+                  
+                  // Handle start drag for left resize handle
+                  const handleLeftDragStart = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    setIsDraggingLeft(true);
+                    startPositionRef.current = e.clientX;
+                    originalStartTimeRef.current = animation.startTime || 0;
+                    originalDurationRef.current = animation.duration;
+                    
+                    // Add event listeners for drag and release
+                    document.addEventListener('mousemove', handleLeftDragMove);
+                    document.addEventListener('mouseup', handleLeftDragEnd);
+                  };
+                  
+                  // Handle drag move for left resize handle
+                  const handleLeftDragMove = (e: MouseEvent) => {
+                    if (!isDraggingLeft || !timelineRef.current) return;
+                    
+                    const rect = timelineRef.current.getBoundingClientRect();
+                    const dx = e.clientX - startPositionRef.current;
+                    const dxTime = positionToTime(dx);
+                    
+                    // Calculate new start time and duration
+                    let newStartTime = Math.max(0, originalStartTimeRef.current + dxTime);
+                    let newDuration = Math.max(0.1, originalDurationRef.current - (newStartTime - originalStartTimeRef.current));
+                    
+                    // Update the animation on the layer
+                    if (layer && layer.id) {
+                      console.log(`Resizing animation start: ${layer.id}, new start: ${newStartTime}, new duration: ${newDuration}`);
+                      // This would update the animation in the context in a real implementation
+                      animation.startTime = newStartTime;
+                      animation.duration = newDuration;
+                      // Force a re-render
+                      forceUpdate();
+                    }
+                  };
+                  
+                  // Handle drag end for left resize handle
+                  const handleLeftDragEnd = () => {
+                    setIsDraggingLeft(false);
+                    document.removeEventListener('mousemove', handleLeftDragMove);
+                    document.removeEventListener('mouseup', handleLeftDragEnd);
+                  };
+                  
+                  // Handle start drag for right resize handle
+                  const handleRightDragStart = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    setIsDraggingRight(true);
+                    startPositionRef.current = e.clientX;
+                    originalDurationRef.current = animation.duration;
+                    
+                    // Add event listeners for drag and release
+                    document.addEventListener('mousemove', handleRightDragMove);
+                    document.addEventListener('mouseup', handleRightDragEnd);
+                  };
+                  
+                  // Handle drag move for right resize handle
+                  const handleRightDragMove = (e: MouseEvent) => {
+                    if (!isDraggingRight || !timelineRef.current) return;
+                    
+                    const rect = timelineRef.current.getBoundingClientRect();
+                    const dx = e.clientX - startPositionRef.current;
+                    const dxTime = positionToTime(dx);
+                    
+                    // Calculate new duration
+                    let newDuration = Math.max(0.1, originalDurationRef.current + dxTime);
+                    
+                    // Update the animation on the layer
+                    if (layer && layer.id) {
+                      console.log(`Resizing animation duration: ${layer.id}, new duration: ${newDuration}`);
+                      // This would update the animation in the context in a real implementation
+                      animation.duration = newDuration;
+                      // Force a re-render
+                      forceUpdate();
+                    }
+                  };
+                  
+                  // Handle drag end for right resize handle
+                  const handleRightDragEnd = () => {
+                    setIsDraggingRight(false);
+                    document.removeEventListener('mousemove', handleRightDragMove);
+                    document.removeEventListener('mouseup', handleRightDragEnd);
+                  };
+                  
+                  // Handle block drag for moving the entire animation
+                  const handleBlockDragStart = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    setIsDraggingBlock(true);
+                    startPositionRef.current = e.clientX;
+                    originalStartTimeRef.current = animation.startTime || 0;
+                    
+                    // Add event listeners for drag and release
+                    document.addEventListener('mousemove', handleBlockDragMove);
+                    document.addEventListener('mouseup', handleBlockDragEnd);
+                  };
+                  
+                  // Handle drag move for moving the entire animation
+                  const handleBlockDragMove = (e: MouseEvent) => {
+                    if (!isDraggingBlock || !timelineRef.current) return;
+                    
+                    const rect = timelineRef.current.getBoundingClientRect();
+                    const dx = e.clientX - startPositionRef.current;
+                    const dxTime = positionToTime(dx);
+                    
+                    // Calculate new start time, ensuring it doesn't go below 0
+                    let newStartTime = Math.max(0, originalStartTimeRef.current + dxTime);
+                    
+                    // Update the animation on the layer
+                    if (layer && layer.id) {
+                      console.log(`Moving animation: ${layer.id}, new start: ${newStartTime}`);
+                      // This would update the animation in the context in a real implementation
+                      animation.startTime = newStartTime;
+                      // Force a re-render
+                      forceUpdate();
+                    }
+                  };
+                  
+                  // Handle drag end for moving the entire animation
+                  const handleBlockDragEnd = () => {
+                    setIsDraggingBlock(false);
+                    document.removeEventListener('mousemove', handleBlockDragMove);
+                    document.removeEventListener('mouseup', handleBlockDragEnd);
+                  };
+                  
+                  // Force update utility
+                  const [, updateState] = useState({});
+                  const forceUpdate = () => updateState({});
+                  
+                  return (
+                    <div 
+                      key={index}
+                      className={`absolute h-6 top-2 rounded ${selectedLayerId === layer.id ? 'bg-[#2A5BFF] bg-opacity-70 border border-[#4A7CFF]' : 'bg-[#2A5BFF] bg-opacity-30 border border-[#4A7CFF]'} cursor-move`}
+                      style={{
+                        left: `${timeToPosition(animation.startTime || 0)}px`,
+                        width: `${timeToPosition(animation.duration)}px`
+                      }}
+                      onMouseDown={handleBlockDragStart}
+                    >
+                      {/* Left resize handle */}
+                      <div 
+                        className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize" 
+                        onMouseDown={handleLeftDragStart}
+                      ></div>
+                      
+                      {/* Animation content */}
+                      <div className="px-2 text-xs text-white truncate flex items-center justify-between w-full h-full pointer-events-none">
+                        <span>{animation.type}</span>
+                        {animation.duration >= 0.5 && (
+                          <span className="text-xs opacity-75 ml-1">
+                            {animation.duration.toFixed(1)}s
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Right resize handle */}
+                      <div 
+                        className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize" 
+                        onMouseDown={handleRightDragStart}
+                      ></div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 
                 {/* Only show keyframes for selected layer */}
                 {selectedLayerId === layer.id && keyframes.map((keyframe: any, index: number) => (

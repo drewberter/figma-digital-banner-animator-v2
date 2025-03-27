@@ -13,6 +13,8 @@ function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPresetsPanelOpen, setIsPresetsPanelOpen] = useState(false);
   const [selectedFrameId, setSelectedFrameId] = useState('frame-1');
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const handleExport = () => {
     setIsExportModalOpen(true);
@@ -32,6 +34,16 @@ function App() {
     console.log('App: Selected frame:', frameId);
     setSelectedFrameId(frameId);
   };
+  
+  // Handle timeline updates
+  const handleTimeUpdate = (time: number) => {
+    setCurrentTime(time);
+  };
+  
+  // Handle play/pause toggle
+  const handlePlayPauseToggle = (playing: boolean) => {
+    setIsPlaying(playing);
+  };
 
   return (
     <PluginProvider>
@@ -46,8 +58,16 @@ function App() {
             />
             
             <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden">
-              <PreviewCanvas selectedFrameId={selectedFrameId} />
-              <Timeline />
+              <PreviewCanvas 
+                selectedFrameId={selectedFrameId} 
+                currentTime={currentTime} 
+              />
+              <Timeline 
+                onTimeUpdate={handleTimeUpdate}
+                onPlayPauseToggle={handlePlayPauseToggle}
+                isPlaying={isPlaying}
+                currentTime={currentTime}
+              />
             </div>
             
             <PropertiesPanel />
