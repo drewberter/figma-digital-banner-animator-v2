@@ -356,7 +356,7 @@ const FrameCard = ({
                           }
                           
                           // Call the visibility toggle handler which will handle GIF frame syncing
-                          // IMPORTANT: We only need to pass layer.id as the parent component provides the frame.id
+                          // The parent component handles adding the frame.id
                           console.log(`FrameCard - Toggling visibility for layer ${layer.id} in frame ${frame.id}`);
                           onToggleLayerVisibility(layer.id);
                         } else {
