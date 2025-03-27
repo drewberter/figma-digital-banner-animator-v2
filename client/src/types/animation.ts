@@ -112,6 +112,7 @@ export interface GifFrame {
   adSizeId: string; // Reference to the parent ad size this GIF frame is based on
   hiddenLayers: string[]; // IDs of layers that should be hidden in this frame
   visibleLayerCount?: number; // Count of visible layers (for UI display)
+  frameIndex?: number; // Optional index to track frame sequence
 }
 
 export interface Preset {

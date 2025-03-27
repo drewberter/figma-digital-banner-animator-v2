@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useReducer } from 'react';
 import { Play, Pause, SkipBack, Clock, LogIn, LogOut, Eye, EyeOff, Layers, Zap, Plus } from 'lucide-react';
-import { mockLayers, mockFrames, mockGifFrames } from '../mock/animationData';
+import { mockLayers, mockFrames, mockGifFrames, generateGifFramesForAdSize } from '../mock/animationData';
 import FrameEditDialog from './FrameEditDialog';
 import FrameCardGrid from './FrameCardGrid';
 import { 
@@ -52,6 +52,22 @@ const Timeline = ({
   const handleTimelineModeChange = (mode: TimelineMode) => {
     if (onTimelineModeChange) {
       onTimelineModeChange(mode);
+      
+      // If switching to GIF frames mode, ensure we have proper GIF frames for the current ad size
+      if (mode === TimelineMode.GifFrames) {
+        // Extract the ad size ID if we're looking at a GIF frame already
+        const adSizeId = localSelectedFrameId.startsWith('gif-') 
+          ? localSelectedFrameId.split('-')[1] // Extract ad size ID from "gif-frame-X-frame-Y"
+          : localSelectedFrameId;
+          
+        // Generate GIF frames for the current ad size
+        const gifFrames = generateGifFramesForAdSize(adSizeId);
+        
+        // If frames were generated, select the first one
+        if (gifFrames.length > 0 && onFrameSelect) {
+          onFrameSelect(gifFrames[0].id);
+        }
+      }
     }
   };
   
@@ -1046,20 +1062,33 @@ const Timeline = ({
             ) : (
               // GIF Frames Mode - Show card grid for frame management
               <FrameCardGrid
-                frames={mockGifFrames.reduce((acc, gifFrame) => {
-                  // Convert GifFrame to AnimationFrame for compatibility with FrameCardGrid
-                  const adSize = mockFrames.find(f => f.id === gifFrame.adSizeId);
-                  acc[gifFrame.id] = {
-                    id: gifFrame.id,
-                    name: gifFrame.name,
-                    selected: gifFrame.id === localSelectedFrameId,
-                    width: adSize ? adSize.width : 300, // Use parent ad size dimensions
-                    height: adSize ? adSize.height : 250,
-                    delay: gifFrame.delay,
-                    hiddenLayers: gifFrame.hiddenLayers
-                  };
-                  return acc;
-                }, {} as Record<string, AnimationFrame>)}
+                frames={(() => {
+                  // Get the selected ad size ID (using the "frame-X" format)
+                  // This is the parent ad size for which we want to show GIF frames
+                  const selectedAdSizeId = localSelectedFrameId.startsWith('gif-') 
+                    ? localSelectedFrameId.split('-')[1] // Extract "frame-X" from "gif-frame-X-frame-Y"
+                    : localSelectedFrameId;
+                  
+                  // If we're in GIF frames mode but don't have a valid ad size selected yet,
+                  // generate frames for this ad size
+                  const relevantGifFrames = generateGifFramesForAdSize(selectedAdSizeId);
+                  
+                  // Convert GifFrames to AnimationFrames for compatibility with FrameCardGrid
+                  return relevantGifFrames.reduce((acc, gifFrame) => {
+                    // Convert GifFrame to AnimationFrame for compatibility with FrameCardGrid
+                    const adSize = mockFrames.find(f => f.id === gifFrame.adSizeId);
+                    acc[gifFrame.id] = {
+                      id: gifFrame.id,
+                      name: gifFrame.name,
+                      selected: gifFrame.id === localSelectedFrameId,
+                      width: adSize ? adSize.width : 300, // Use parent ad size dimensions
+                      height: adSize ? adSize.height : 250,
+                      delay: gifFrame.delay,
+                      hiddenLayers: gifFrame.hiddenLayers
+                    };
+                    return acc;
+                  }, {} as Record<string, AnimationFrame>);
+                })()}
                 layers={mockLayers}
                 selectedFrameId={localSelectedFrameId}
                 onFrameSelect={(frameId) => {

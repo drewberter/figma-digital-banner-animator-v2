@@ -117,36 +117,103 @@ export const mockFrames: AnimationFrame[] = [
 ];
 
 // Mock animation layers data
-// Mock GIF frames data - based on the first ad size (frame-1)
+// Initial mock GIF frames
 export const mockGifFrames: GifFrame[] = [
   {
-    id: 'gif-frame-1',
+    id: 'gif-frame-1-1',
     name: 'Frame 1',
     selected: true,
     delay: 2.5,
-    adSizeId: 'frame-1', // Reference to the 300x250 Banner
-    hiddenLayers: [], // No hidden layers - all visible
-    visibleLayerCount: 5
+    adSizeId: 'frame-1',
+    hiddenLayers: [],
+    visibleLayerCount: 5,
+    frameIndex: 0
   },
   {
-    id: 'gif-frame-2',
+    id: 'gif-frame-1-2',
     name: 'Frame 2',
     selected: false,
     delay: 2.5,
-    adSizeId: 'frame-1', // Reference to the 300x250 Banner
-    hiddenLayers: ['layer-1-3'], // Hide Subhead
-    visibleLayerCount: 4
+    adSizeId: 'frame-1', 
+    hiddenLayers: ['layer-1-3'],
+    visibleLayerCount: 4,
+    frameIndex: 1
   },
   {
-    id: 'gif-frame-3',
+    id: 'gif-frame-1-3',
     name: 'Frame 3',
     selected: false,
     delay: 2.5,
-    adSizeId: 'frame-1', // Reference to the 300x250 Banner
-    hiddenLayers: ['layer-1-3', 'layer-1-5'], // Hide Subhead and Logo
-    visibleLayerCount: 3
+    adSizeId: 'frame-1',
+    hiddenLayers: ['layer-1-3', 'layer-1-5'],
+    visibleLayerCount: 3,
+    frameIndex: 2
   }
 ];
+
+// Generate GIF frames for a specific ad size
+export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
+  // If no ad size provided, return empty array
+  if (!adSizeId) return [];
+  
+  // Find the specific ad size
+  const adSize = mockFrames.find(f => f.id === adSizeId);
+  if (!adSize) return [];
+  
+  // Get layers for this ad size
+  const layers = mockLayers[adSizeId] || [];
+  
+  // Create GIF frames based on the specific ad size
+  // For this demo, we'll create 3 frames with different layer visibility
+  const frames: GifFrame[] = [];
+  
+  // Create frame 1 - All layers visible
+  frames.push({
+    id: `gif-${adSizeId}-frame-1`,
+    name: 'Frame 1',
+    selected: true,
+    delay: 2.5,
+    adSizeId: adSizeId,
+    hiddenLayers: [],
+    visibleLayerCount: layers.length,
+    frameIndex: 0
+  });
+  
+  // Find the third layer (usually the subhead) to hide in frame 2
+  const thirdLayerId = layers.length > 2 ? layers[2].id : null;
+  
+  // Create frame 2 - Hide one layer (e.g., subheadline)
+  frames.push({
+    id: `gif-${adSizeId}-frame-2`,
+    name: 'Frame 2',
+    selected: false,
+    delay: 2.5,
+    adSizeId: adSizeId,
+    hiddenLayers: thirdLayerId ? [thirdLayerId] : [],
+    visibleLayerCount: thirdLayerId ? layers.length - 1 : layers.length,
+    frameIndex: 1
+  });
+  
+  // Find the last layer (usually the logo) to hide in frame 3
+  const lastLayerId = layers.length > 0 ? layers[layers.length - 1].id : null;
+  
+  // Create frame 3 - Hide two layers (e.g., subheadline and logo)
+  frames.push({
+    id: `gif-${adSizeId}-frame-3`,
+    name: 'Frame 3',
+    selected: false,
+    delay: 2.5,
+    adSizeId: adSizeId,
+    hiddenLayers: [
+      ...(thirdLayerId ? [thirdLayerId] : []),
+      ...(lastLayerId ? [lastLayerId] : [])
+    ],
+    visibleLayerCount: layers.length - (thirdLayerId ? 1 : 0) - (lastLayerId ? 1 : 0),
+    frameIndex: 2
+  });
+  
+  return frames;
+}
 
 export const mockLayers: Record<string, AnimationLayer[]> = {
   // 300x250 Banner

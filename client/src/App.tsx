@@ -10,7 +10,7 @@ import AutoSaveIndicator from "./components/AutoSaveIndicator";
 import { AnimationProvider, useAnimationContext } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
 import { TimelineMode } from "./types/animation";
-import { mockGifFrames } from "./mock/animationData";
+import { mockGifFrames, generateGifFramesForAdSize } from "./mock/animationData";
 
 function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -74,6 +74,16 @@ function App() {
   const handleFrameSelect = (frameId: string) => {
     console.log('App: Selected ad size:', frameId);
     setSelectedAdSizeId(frameId);
+    
+    // If we're in GIF Frames mode, generate new GIF frames for this ad size
+    if (timelineMode === TimelineMode.GifFrames) {
+      // Get the first GIF frame for this ad size
+      const newGifFrames = generateGifFramesForAdSize(frameId);
+      if (newGifFrames.length > 0) {
+        // Select the first GIF frame from the new set
+        setSelectedGifFrameId(newGifFrames[0].id);
+      }
+    }
   };
   
   // Handle GIF frame selection in GIF frames mode
