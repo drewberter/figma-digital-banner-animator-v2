@@ -321,6 +321,45 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
     
     return () => clearInterval(interval);
   }, [isPlaying, duration]);
+  
+  // Auto-link layers with the same name on initial load
+  useEffect(() => {
+    // This effect will run once when the component mounts
+    console.log("Auto-linking layers with the same name on load");
+    
+    // First, organize layers by frame
+    const frameLayersMap: Record<string, AnimationLayer[]> = {};
+    
+    frames.forEach(frame => {
+      // For now, we'll use the mock data structure
+      if (mockLayers[frame.id]) {
+        frameLayersMap[frame.id] = mockLayers[frame.id];
+      } else {
+        // If this frame has no layers in mock data, use what's in the current layers
+        const frameLayers = layers.filter(layer => {
+          // This is a simplification - in real implementation, we'd have better frame-layer mapping
+          return frame.selected;
+        });
+        frameLayersMap[frame.id] = frameLayers;
+      }
+    });
+    
+    // Auto-link layers with the same name across frames
+    const linkedFramesLayers = autoLinkLayers(frameLayersMap);
+    
+    // Apply the links to our layers
+    const newLayers = [...layers];
+    Object.entries(linkedFramesLayers).forEach(([frameId, frameLayers]) => {
+      frameLayers.forEach(layer => {
+        const layerIndex = newLayers.findIndex(l => l.id === layer.id);
+        if (layerIndex !== -1) {
+          newLayers[layerIndex] = {...layer};
+        }
+      });
+    });
+    
+    setLayers(newLayers);
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   // Manual save method (for explicit save button)
   const saveAnimationState = useCallback(() => {

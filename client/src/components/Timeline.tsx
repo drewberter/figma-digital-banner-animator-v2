@@ -466,22 +466,33 @@ const Timeline = ({
                 ${layer.linkedLayer ? 'border-l-2 border-blue-500' : ''}`}
             >
               <div className="flex items-center">
-                {/* Show linked indicator if layer is linked */}
-                {layer.linkedLayer && (
+                {/* Layer name with linked indicator */}
+                <span className="flex items-center">
+                  {/* Link indicator - always show but style differently if linked */}
                   <span 
-                    className={`mr-2 flex items-center ${layer.linkedLayer.isMain ? 'text-blue-400' : 'text-blue-500'}`}
-                    title={`Linked layer (${layer.linkedLayer.isMain ? 'Main' : 'Secondary'}) - ${layer.linkedLayer.syncMode} sync`}
+                    className={`mr-2 flex items-center ${layer.linkedLayer 
+                      ? (layer.linkedLayer.isMain ? 'text-blue-400 bg-blue-900' : 'text-blue-300 bg-blue-800') 
+                      : 'text-neutral-600'
+                    } ${layer.linkedLayer ? 'bg-opacity-40 px-0.5 rounded' : ''}`}
+                    title={layer.linkedLayer 
+                      ? `Linked layer (${layer.linkedLayer.isMain ? 'Main' : 'Secondary'}) - ${layer.linkedLayer.syncMode} sync` 
+                      : 'Not linked'
+                    }
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                     </svg>
-                    <span className="ml-1 text-xs px-1 rounded-sm bg-opacity-50 bg-blue-800">
-                      {layer.linkedLayer.isMain ? 'Main' : 'Link'}
-                    </span>
+                    
+                    {/* Only show label if actually linked */}
+                    {layer.linkedLayer && (
+                      <span className="ml-1 text-xs font-bold">
+                        {layer.linkedLayer.isMain ? 'M' : 'L'}
+                      </span>
+                    )}
                   </span>
-                )}
-                {layer.name}
+                  {layer.name}
+                </span>
               </div>
               
               {/* Layer link status indicators & actions */}

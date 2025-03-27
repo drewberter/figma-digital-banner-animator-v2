@@ -72,6 +72,17 @@ function App() {
     setCurrentTime(time);
   };
   
+  // Handle layer linking through Timeline component
+  const handleLinkLayers = () => {
+    console.log("App: Linking layers by name");
+    // This will be handled by the Timeline component directly
+  };
+  
+  const handleUnlinkLayer = (layerId: string) => {
+    console.log("App: Unlinking layer", layerId);
+    // This will be handled by the Timeline component directly
+  };
+  
   // Handle play/pause toggle
   const handlePlayPauseToggle = (playing: boolean) => {
     // Reset to beginning if we're at the end of the timeline and trying to play
@@ -139,6 +150,8 @@ function App() {
                 currentTime={currentTime}
                 selectedFrameId={selectedFrameId}
                 onDurationChange={setTimelineDuration}
+                onLinkLayers={handleLinkLayers}
+                onUnlinkLayer={handleUnlinkLayer}
               />
             </div>
             
