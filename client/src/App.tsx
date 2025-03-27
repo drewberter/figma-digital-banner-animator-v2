@@ -99,27 +99,30 @@ function App() {
     setCurrentTime(time);
   };
   
+  // We'll obtain the animation context methods inside components that are wrapped by AnimationProvider
+  
   // Handle layer linking through Timeline component
   const handleLinkLayers = () => {
     console.log("App: Linking layers by name");
-    // This will be handled by the Timeline component directly
+    
+    // The actual linking is done in TimelineWrapper with AnimationContext
+    
+    // Indicate saving is in progress
+    setSaving(true);
+    setTimeout(() => {
+      setSaving(false);
+      setLastSaved(new Date());
+      console.log("App: Layer link operation completed");
+    }, 500);
   };
   
-  // We'll obtain the animation context methods inside the AnimationProvider wrapper
-  
+  // Handler for unlinking layers
   const handleUnlinkLayer = (layerId: string) => {
     console.log("App: Unlinking layer", layerId);
-    
-    // In this implementation, the actual unlinking is done in the Timeline component
-    // This function just provides a callback interface to the main App component
 
     if (layerId) {
       try {
-        // This is now just a notification to update the UI state
-        console.log("App: Received unlink notification for layer", layerId);
-        
-        // The actual unlinking is handled in Timeline.tsx
-        // Here we just update UI state to show that the operation completed
+        console.log("App: Processing unlink request for layer", layerId);
         
         // Indicate saving is in progress
         setSaving(true);

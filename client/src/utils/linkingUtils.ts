@@ -493,69 +493,120 @@ export function unlinkLayer(
   frames: Record<string, AnimationLayer[]>,
   layerId: string
 ): Record<string, AnimationLayer[]> {
-  // Make a deep copy of the frames to avoid mutating the original
-  const updatedFrames = JSON.parse(JSON.stringify(frames));
-  
-  // Find the layer to unlink
-  let targetLayer: AnimationLayer | null = null;
-  let frameId: string | null = null;
-  let layerIndex: number = -1;
-  
-  Object.keys(updatedFrames).forEach(fId => {
-    const lIndex = updatedFrames[fId].findIndex(
-      (layer: AnimationLayer) => layer.id === layerId
-    );
-    if (lIndex !== -1) {
-      targetLayer = updatedFrames[fId][lIndex] as AnimationLayer;
-      frameId = fId;
-      layerIndex = lIndex;
-    }
-  });
-  
-  // If layer not found or not linked, return unchanged
-  if (!targetLayer || !('linkedLayer' in targetLayer) || layerIndex === -1 || !frameId) {
-    return frames;
-  }
-  
-  // Type assertion to ensure TypeScript understands this is an AnimationLayer with linkedLayer
-  const targetLayerWithLinks = targetLayer as AnimationLayer & { linkedLayer: LinkedLayerInfo };
-  
-  // Get the group ID before unlinking
-  const groupId = targetLayerWithLinks.linkedLayer.groupId;
-  const wasMain = targetLayerWithLinks.linkedLayer.isMain;
-  
-  // Create a new layer without the linkedLayer property
-  // This is better than using delete which can cause TypeScript issues
-  const { linkedLayer, ...layerWithoutLink } = targetLayerWithLinks;
-  
-  // Update targetLayer with the changes 
-  targetLayer = layerWithoutLink as AnimationLayer;
-  
-  // Update the frame with the modified layer
-  updatedFrames[frameId][layerIndex] = targetLayer;
-  
-  // If this was the main layer, assign a new main layer in the group
-  if (wasMain) {
-    let foundNewMain = false;
+  try {
+    console.log(`🔄 unlinkLayer: Starting to unlink layer ${layerId}`);
     
-    // Look for another layer in the same group to make main
+    // Make a deep copy of the frames to avoid mutating the original
+    const updatedFrames = JSON.parse(JSON.stringify(frames));
+    
+    // Enhanced debugging - log the structure of frames
+    console.log(`🔄 unlinkLayer: Working with ${Object.keys(updatedFrames).length} frames`);
     Object.keys(updatedFrames).forEach(fId => {
-      if (foundNewMain) return;
+      console.log(`🔄 unlinkLayer: Frame ${fId} has ${updatedFrames[fId]?.length || 0} layers`);
+    });
+    
+    // Find the layer to unlink
+    let targetLayer: AnimationLayer | null = null;
+    let frameId: string | null = null;
+    let layerIndex: number = -1;
+    
+    Object.keys(updatedFrames).forEach(fId => {
+      if (!updatedFrames[fId]) {
+        console.warn(`🔄 unlinkLayer: Frame ${fId} has no layers array`);
+        return;
+      }
       
-      updatedFrames[fId].forEach((layer: AnimationLayer, idx: number) => {
+      const lIndex = updatedFrames[fId].findIndex(
+        (layer: AnimationLayer) => layer.id === layerId
+      );
+      if (lIndex !== -1) {
+        targetLayer = updatedFrames[fId][lIndex] as AnimationLayer;
+        frameId = fId;
+        layerIndex = lIndex;
+        console.log(`🔄 unlinkLayer: Found layer ${layerId} in frame ${fId} at index ${lIndex}`);
+      }
+    });
+    
+    // If layer not found or not linked, return unchanged
+    if (!targetLayer) {
+      console.warn(`🔄 unlinkLayer: Target layer ${layerId} not found in any frame`);
+      return frames;
+    }
+    
+    if (!('linkedLayer' in targetLayer)) {
+      console.warn(`🔄 unlinkLayer: Layer ${layerId} is not linked (no linkedLayer property)`);
+      return frames;
+    }
+    
+    if (layerIndex === -1 || !frameId) {
+      console.warn(`🔄 unlinkLayer: Invalid layer index (${layerIndex}) or frameId (${frameId})`);
+      return frames;
+    }
+    
+    // Type assertion to ensure TypeScript understands this is an AnimationLayer with linkedLayer
+    const targetLayerWithLinks = targetLayer as AnimationLayer & { linkedLayer: LinkedLayerInfo };
+    console.log(`🔄 unlinkLayer: Layer details:`, {
+      name: targetLayerWithLinks.name,
+      isMain: targetLayerWithLinks.linkedLayer.isMain,
+      syncMode: targetLayerWithLinks.linkedLayer.syncMode,
+      groupId: targetLayerWithLinks.linkedLayer.groupId
+    });
+    
+    // Get the group ID before unlinking
+    const groupId = targetLayerWithLinks.linkedLayer.groupId;
+    const wasMain = targetLayerWithLinks.linkedLayer.isMain;
+    
+    // Create a new layer without the linkedLayer property
+    // This is better than using delete which can cause TypeScript issues
+    const { linkedLayer, ...layerWithoutLink } = targetLayerWithLinks;
+    console.log(`🔄 unlinkLayer: Successfully removed linkedLayer property`);
+    
+    // Update targetLayer with the changes 
+    targetLayer = layerWithoutLink as AnimationLayer;
+    
+    // Update the frame with the modified layer
+    updatedFrames[frameId][layerIndex] = targetLayer;
+    console.log(`🔄 unlinkLayer: Updated layer in frame ${frameId}`);
+    
+    // If this was the main layer, assign a new main layer in the group
+    if (wasMain) {
+      console.log(`🔄 unlinkLayer: This was the main layer, looking for a new main layer`);
+      let foundNewMain = false;
+      
+      // Look for another layer in the same group to make main
+      Object.keys(updatedFrames).forEach(fId => {
         if (foundNewMain) return;
         
-        if (layer.linkedLayer && layer.linkedLayer.groupId === groupId) {
-          // Make this the new main layer
-          layer.linkedLayer.isMain = true;
-          updatedFrames[fId][idx] = layer;
-          foundNewMain = true;
+        if (!updatedFrames[fId]) {
+          console.warn(`🔄 unlinkLayer: Frame ${fId} has no layers array during main reassignment`);
+          return;
         }
+        
+        updatedFrames[fId].forEach((layer: AnimationLayer, idx: number) => {
+          if (foundNewMain) return;
+          
+          if (layer.linkedLayer && layer.linkedLayer.groupId === groupId) {
+            // Make this the new main layer
+            layer.linkedLayer.isMain = true;
+            updatedFrames[fId][idx] = layer;
+            foundNewMain = true;
+            console.log(`🔄 unlinkLayer: Assigned new main layer: ${layer.id} in frame ${fId}`);
+          }
+        });
       });
-    });
+      
+      if (!foundNewMain) {
+        console.warn(`🔄 unlinkLayer: Could not find a new main layer for group ${groupId}`);
+      }
+    }
+    
+    console.log(`🔄 unlinkLayer: Successfully unlinked layer ${layerId}`);
+    return updatedFrames;
+  } catch (error) {
+    console.error(`🔄 ERROR in unlinkLayer: `, error);
+    // Return original frames on error to prevent data corruption
+    return frames;
   }
-  
-  return updatedFrames;
 }
 
 /**

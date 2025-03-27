@@ -142,30 +142,38 @@ const Timeline = ({
     forceUpdate(); // Force a re-render after linking
   }, []);
   
-  // Handle unlinking a layer
+  // Handle unlinking a layer - enhanced with debug messages
   const handleUnlinkLayer = (layerId: string) => {
-    console.log("Timeline: Unlinking layer", layerId);
-    // Use unlinking utility
-    const updatedLayers = unlinkLayer(mockLayers, layerId);
+    console.log("⚡ Timeline: UNLINKING LAYER", layerId);
     
-    // Store the updated layers in a variable to avoid race conditions
-    const updatedLayersCopy = { ...updatedLayers };
-    
-    // Update mock layers - Direct modification for backward compatibility
-    Object.keys(updatedLayersCopy).forEach(frameId => {
-      mockLayers[frameId] = updatedLayersCopy[frameId];
-    });
-    
-    // Notify parent component
-    if (onUnlinkLayer) {
-      // Add debug output to verify this is called
-      console.log("Timeline: Calling onUnlinkLayer with layerId:", layerId);
-      onUnlinkLayer(layerId);
-    } else {
-      console.warn("Timeline: onUnlinkLayer callback is not defined");
+    try {
+      // Use unlinking utility
+      const updatedLayers = unlinkLayer(mockLayers, layerId);
+      
+      // Store the updated layers in a variable to avoid race conditions
+      const updatedLayersCopy = { ...updatedLayers };
+      
+      // Update mock layers - Direct modification for backward compatibility
+      Object.keys(updatedLayersCopy).forEach(frameId => {
+        console.log(`⚡ Timeline: Updating mockLayers[${frameId}] after unlinking`);
+        mockLayers[frameId] = updatedLayersCopy[frameId];
+      });
+      
+      // Notify parent component
+      if (onUnlinkLayer) {
+        // Add debug output to verify this is called
+        console.log("⚡ Timeline: Calling parent onUnlinkLayer with layerId:", layerId);
+        onUnlinkLayer(layerId);
+      } else {
+        console.warn("⚡ Timeline: ERROR - onUnlinkLayer callback is not defined");
+        alert("Cannot unlink layer - the callback is not defined");
+      }
+    } catch (error) {
+      console.error("⚡ Timeline: ERROR unlinking layer:", error);
+      alert(`Error unlinking layer: ${error}`);
     }
     
-    console.log("Timeline: Forcing update after unlinking layer", layerId);
+    console.log("⚡ Timeline: Forcing update after unlinking layer", layerId);
     forceUpdate(); // Force a re-render after unlinking
   };
   
@@ -1253,8 +1261,29 @@ const Timeline = ({
                         : 'Not linked'
                       }
                       onClick={(e) => {
-                        e.stopPropagation(); 
-                        handleUnlinkLayer(layer.id);
+                        e.stopPropagation();
+                        // Enhanced debugging
+                        console.log("🔗🔗🔗 LINK ICON CLICKED FOR LAYER:", layer.id);
+                        console.log("🔗 Layer linked status:", !!layer.linkedLayer);
+                        if (layer.linkedLayer) {
+                          console.log("🔗 Layer linking details:", {
+                            isMain: layer.linkedLayer.isMain,
+                            syncMode: layer.linkedLayer.syncMode,
+                            groupId: layer.linkedLayer.groupId
+                          });
+                        }
+                        
+                        // Use try/catch to catch any errors during the unlink process
+                        try {
+                          // Add very visible alert
+                          alert(`LINK ICON CLICKED: Unlinking layer ${layer.id}`);
+                          // Call the handler
+                          handleUnlinkLayer(layer.id);
+                          console.log("🔗 Unlink handler completed successfully");
+                        } catch (error) {
+                          console.error("🔗 ERROR in link icon click handler:", error);
+                          alert(`Error unlinking layer: ${error}`);
+                        }
                       }}
                     >
                       <svg 
