@@ -625,9 +625,13 @@ export function syncGifFramesByNumber(
       
       // Get the target frame's ad size
       const parsedTargetId = parseGifFrameId(frame.id);
-      if (!parsedTargetId.isValid) return;
+      if (!parsedTargetId.isValid) {
+        console.warn(`syncGifFramesByNumber - Could not parse target frame ID: ${frame.id}, skipping`);
+        return;
+      }
       
       const targetAdSize = frame.adSizeId || parsedTargetId.adSizeId;
+      console.log(`syncGifFramesByNumber - Processing target frame ${frame.id} with ad size ${targetAdSize}`);
       
       // Only proceed if we have layer data for name matching
       if (!allLayers || !allLayers[targetAdSize] || !sourceLayerName) return;
@@ -642,8 +646,8 @@ export function syncGifFramesByNumber(
       }
       
       // Check if this layer has an override
-      const hasOverride = frame.overrides?.layerVisibility?.[targetLayer.id];
-      if (hasOverride) {
+      const layerHasOverride = frame.overrides?.layerVisibility?.[targetLayer.id];
+      if (layerHasOverride) {
         console.log(`Layer ${targetLayer.id} has an override in frame ${frame.id}, skipping sync`);
         return;
       }
@@ -655,13 +659,6 @@ export function syncGifFramesByNumber(
       } else if (!isHiddenInSource && isHiddenInTarget) {
         frame.hiddenLayers = frame.hiddenLayers.filter(id => id !== targetLayer.id);
       }
-      if (!parsedTargetId.isValid) {
-        console.warn(`syncGifFramesByNumber - Could not parse target frame ID: ${frame.id}, skipping`);
-        return;
-      }
-      
-      const targetAdSize = frame.adSizeId || parsedTargetId.adSizeId;
-      console.log(`syncGifFramesByNumber - Processing target frame ${frame.id} with ad size ${targetAdSize}`);
       
       // Translate the source layer ID to the target ad size
       // Use the enhanced version with name-based lookup if available
@@ -675,10 +672,10 @@ export function syncGifFramesByNumber(
       
       // Check if this layer has an override in this frame
       // Override format: frame.overrides.layerVisibility[layerId].overridden
-      const hasOverride = frame.overrides?.layerVisibility?.[targetLayerId]?.overridden || false;
+      const targetLayerHasOverride = frame.overrides?.layerVisibility?.[targetLayerId]?.overridden || false;
       
       // Only sync if there's no override
-      if (!hasOverride) {
+      if (!targetLayerHasOverride) {
         // Ensure hiddenLayers array is initialized
         if (!frame.hiddenLayers) {
           frame.hiddenLayers = [];
