@@ -206,10 +206,39 @@ const Timeline = ({
       console.log("Toggling visibility in GIF frame. Using parent ad size:", adSizeId);
       
       // Find the GIF frame
-      const gifFrameIndex = mockGifFrames.findIndex(frame => frame.id === frameId);
+      let gifFrameIndex = mockGifFrames.findIndex(frame => frame.id === frameId);
+      
+      // If the frame doesn't exist, let's create it first
       if (gifFrameIndex === -1) {
-        console.error("GIF frame not found:", frameId);
-        return;
+        console.warn("GIF frame not found:", frameId, "- recreating it");
+        
+        // Parse the ID to extract the parent ad size and frame index
+        const parts = frameId.split('-');
+        let frameIndex = 1;
+        
+        if (parts.length >= 5 && parts[2] === 'frame') {
+          // Format: gif-frame-frame-X-Y where Y is the frame index
+          frameIndex = parseInt(parts[4]) || 1;
+        } else if (parts.length >= 4) {
+          // Format: gif-frame-X-Y where Y is the frame index
+          frameIndex = parseInt(parts[3]) || 1;
+        }
+        
+        // Create a new GIF frame
+        const newGifFrame: GifFrame = {
+          id: frameId,
+          name: `Frame ${frameIndex}`,
+          selected: true,
+          delay: 1,
+          adSizeId,
+          hiddenLayers: [],
+          visibleLayerCount: mockLayers[adSizeId]?.length || 0,
+          frameIndex: frameIndex - 1
+        };
+        
+        // Add the new frame to the array
+        mockGifFrames.push(newGifFrame);
+        gifFrameIndex = mockGifFrames.length - 1;
       }
       
       const gifFrame = mockGifFrames[gifFrameIndex];
