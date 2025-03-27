@@ -1314,8 +1314,9 @@ const Timeline = ({
                         try {
                           // We need to check the current mode and handle appropriately
                           if (timelineMode === TimelineMode.GifFrames) {
-                            // In GIF Frames mode, the link icon does nothing
-                            console.log(`🔗 In GIF Frames mode - link icon does nothing.`);
+                            // In GIF Frames mode, show the dialog but don't perform the action
+                            console.log(`🔗 In GIF Frames mode - showing dialog only`);
+                            alert(`Layer unlinking is not available in GIF Frames mode.\nPlease switch to Animation mode to unlink layers.`);
                             // No actual unlinking happens in GIF Frames mode
                           } else {
                             // In Animation mode, proceed with the unlinking without alert
