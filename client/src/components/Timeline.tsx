@@ -15,7 +15,7 @@ import {
 } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import * as Tabs from '@radix-ui/react-tabs';
-import { autoLinkLayers, syncLinkedLayerAnimations, unlinkLayer } from '../utils/linkingUtils';
+import { autoLinkLayers, syncLinkedLayerAnimations, unlinkLayer, parseGifFrameId } from '../utils/linkingUtils';
 
 interface TimelineProps {
   onTimeUpdate: (time: number) => void;
@@ -144,11 +144,45 @@ const Timeline = ({
   
   // Handle unlinking a layer - enhanced with debug messages
   const handleUnlinkLayer = (layerId: string) => {
-    console.log("⚡ Timeline: UNLINKING LAYER", layerId);
+    console.log(`⚡ Timeline: UNLINKING LAYER ${layerId} in ${timelineMode} mode`);
     
     try {
+      // Add extra debugging for GIF Frames mode
+      if (timelineMode === TimelineMode.GifFrames) {
+        console.log(`⚡ Timeline: Unlinking in GIF Frames mode with selected frame: ${localSelectedFrameId}`);
+        // If we're in a GIF frame, log the parsed frame info
+        if (localSelectedFrameId && localSelectedFrameId.startsWith('gif-frame-')) {
+          try {
+            const parsed = parseGifFrameId(localSelectedFrameId);
+            console.log(`⚡ Timeline: Current GIF frame parsed: adSizeId=${parsed.adSizeId}, frameNumber=${parsed.frameNumber}, isValid=${parsed.isValid}`);
+          } catch (e) {
+            console.error("⚡ Timeline: Error parsing GIF frame ID:", e);
+          }
+        }
+      }
+      
+      // Debug the current layer before unlinking
+      let foundLayer = false;
+      Object.keys(mockLayers).forEach(frameId => {
+        const layer = mockLayers[frameId]?.find(l => l.id === layerId);
+        if (layer) {
+          foundLayer = true;
+          console.log(`⚡ Timeline: Found layer ${layerId} in frame ${frameId}:`, 
+            layer.name, 
+            layer.linkedLayer ? `(linked: ${layer.linkedLayer.syncMode}, isMain: ${layer.linkedLayer.isMain})` : "(not linked)"
+          );
+        }
+      });
+      
+      if (!foundLayer) {
+        console.warn(`⚡ Timeline: Could not find layer ${layerId} in any frame before unlinking`);
+      }
+      
       // Use unlinking utility
+      console.log(`⚡ Timeline: Calling unlinkLayer utility with ${Object.keys(mockLayers).length} frames`);
       const updatedLayers = unlinkLayer(mockLayers, layerId);
+      
+      console.log(`⚡ Timeline: unlinkLayer utility returned ${Object.keys(updatedLayers).length} frames`);
       
       // Store the updated layers in a variable to avoid race conditions
       const updatedLayersCopy = { ...updatedLayers };
@@ -165,9 +199,12 @@ const Timeline = ({
         console.log("⚡ Timeline: Calling parent onUnlinkLayer with layerId:", layerId);
         onUnlinkLayer(layerId);
       } else {
-        console.warn("⚡ Timeline: ERROR - onUnlinkLayer callback is not defined");
-        alert("Cannot unlink layer - the callback is not defined");
+        console.warn("⚡ Timeline: WARNING - onUnlinkLayer callback is not defined");
+        console.log("⚡ Timeline: This is normal in GIF Frames mode, continuing with local unlink only");
       }
+      
+      // Show a success message
+      alert(`Successfully unlinked layer ${layerId}`);
     } catch (error) {
       console.error("⚡ Timeline: ERROR unlinking layer:", error);
       alert(`Error unlinking layer: ${error}`);
@@ -1249,8 +1286,8 @@ const Timeline = ({
               >
                 <div className="flex items-center">
                   {/* Show different icons based on timeline mode */}
-                  {timelineMode === TimelineMode.Animation ? (
-                    // Link indicator for Animation mode
+                  <div className="flex items-center space-x-2">
+                    {/* Always show link icon in both modes */}
                     <span 
                       className={`mr-2 flex items-center ${layer.linkedLayer 
                         ? (layer.linkedLayer.isMain ? 'text-blue-400 bg-blue-900' : 'text-blue-300 bg-blue-800') 
@@ -1263,7 +1300,7 @@ const Timeline = ({
                       onClick={(e) => {
                         e.stopPropagation();
                         // Enhanced debugging
-                        console.log("🔗🔗🔗 LINK ICON CLICKED FOR LAYER:", layer.id);
+                        console.log(`🔗🔗🔗 LINK ICON CLICKED FOR LAYER ${layer.id} IN MODE: ${timelineMode}`);
                         console.log("🔗 Layer linked status:", !!layer.linkedLayer);
                         if (layer.linkedLayer) {
                           console.log("🔗 Layer linking details:", {
@@ -1276,7 +1313,7 @@ const Timeline = ({
                         // Use try/catch to catch any errors during the unlink process
                         try {
                           // Add very visible alert
-                          alert(`LINK ICON CLICKED: Unlinking layer ${layer.id}`);
+                          alert(`LINK ICON CLICKED: Unlinking layer ${layer.id} in mode ${timelineMode}`);
                           // Call the handler
                           handleUnlinkLayer(layer.id);
                           console.log("🔗 Unlink handler completed successfully");
@@ -1308,25 +1345,27 @@ const Timeline = ({
                         </span>
                       )}
                     </span>
-                  ) : (
-                    // Visibility toggle for GifFrames mode
-                    <span 
-                      className={`mr-2 flex items-center ${layer.visible 
-                        ? 'text-green-400 hover:text-green-300' 
-                        : 'text-neutral-500 hover:text-neutral-400'
-                      } cursor-pointer`}
-                      title={layer.visible ? 'Layer is visible (click to hide)' : 'Layer is hidden (click to show)'}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Since we're in the timeline, we need to toggle visibility in the currently selected frame
-                        if (localSelectedFrameId) {
-                          handleToggleLayerVisibility(layer.id);
-                        }
-                      }}
-                    >
-                      {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                    </span>
-                  )}
+
+                    {/* Only in GIF Frames mode - show visibility toggle */}
+                    {timelineMode === TimelineMode.GifFrames && (
+                      <span 
+                        className={`flex items-center ${layer.visible 
+                          ? 'text-green-400 hover:text-green-300' 
+                          : 'text-neutral-500 hover:text-neutral-400'
+                        } cursor-pointer`}
+                        title={layer.visible ? 'Layer is visible (click to hide)' : 'Layer is hidden (click to show)'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Since we're in the timeline, we need to toggle visibility in the currently selected frame
+                          if (localSelectedFrameId) {
+                            handleToggleLayerVisibility(layer.id);
+                          }
+                        }}
+                      >
+                        {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                      </span>
+                    )}
+                  </div>
                   
                   {/* Layer name */}
                   {layer.name}
