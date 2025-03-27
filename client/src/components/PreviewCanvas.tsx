@@ -55,64 +55,191 @@ const PreviewCanvas = ({
     }
   };
 
+  // Get the animation data for the current frame
+  const frameLayers = mockLayers[selectedFrameId] || [];
+  
+  // Find animation layers that correspond to our preview elements
+  const backgroundLayer = frameLayers.find(layer => layer.name === 'Background');
+  const headlineLayer = frameLayers.find(layer => layer.name === 'Headline' || layer.name === 'Title');
+  const subtitleLayer = frameLayers.find(layer => layer.name === 'Subhead' || layer.name === 'Tagline' || layer.name === 'Description');
+  const buttonLayer = frameLayers.find(layer => layer.name === 'CTA Button');
+  const logoLayer = frameLayers.find(layer => layer.name === 'Logo');
+  
   // Update animations when currentTime changes
   useEffect(() => {
-    // Simplified example: animate different elements with a timeline approach
-    // In a real implementation, this would follow the animation data from context
+    // Apply animation updates based on the current time and animation data from mockLayers
     
-    // Headline animation - fade in
-    if (headlineRef.current) {
-      if (currentTime < 0.5) {
-        const progress = currentTime / 0.5;
-        const easedProgress = applyEasing(progress, EasingType.EaseOut);
-        headlineRef.current.style.opacity = `${easedProgress}`;
-        headlineRef.current.style.transform = `translateY(${20 - (easedProgress * 20)}px)`;
-      } else {
-        headlineRef.current.style.opacity = '1';
-        headlineRef.current.style.transform = 'translateY(0)';
-      }
+    // Process headline animations
+    if (headlineRef.current && headlineLayer) {
+      // Reset styles to default
+      headlineRef.current.style.opacity = '0';
+      headlineRef.current.style.transform = 'translateY(0)';
+      
+      // Apply each animation in sequence
+      headlineLayer.animations.forEach(animation => {
+        const startTime = animation.startTime || 0;
+        const endTime = startTime + animation.duration;
+        
+        // If current time is within this animation's timeframe
+        if (currentTime >= startTime && currentTime <= endTime) {
+          // Calculate progress for this animation
+          const progress = (currentTime - startTime) / animation.duration;
+          const easedProgress = applyEasing(progress, animation.easing);
+          
+          // Apply different animation types
+          if (animation.type === AnimationType.Fade) {
+            headlineRef.current!.style.opacity = `${easedProgress}`;
+          } else if (animation.type === AnimationType.Scale) {
+            const scale = 0.8 + (easedProgress * 0.4); // Scale from 0.8 to 1.2
+            headlineRef.current!.style.transform = `scale(${scale})`;
+            headlineRef.current!.style.opacity = '1';
+          } else if (animation.type === AnimationType.Slide) {
+            const offset = 20 - (easedProgress * 20); // Start 20px offset, end at 0
+            headlineRef.current!.style.transform = `translateY(${offset}px)`;
+            headlineRef.current!.style.opacity = '1';
+          } else if (animation.type === AnimationType.Rotate) {
+            const rotation = easedProgress * (animation.rotation || 360);
+            headlineRef.current!.style.transform = `rotate(${rotation}deg)`;
+            headlineRef.current!.style.opacity = '1';
+          }
+        } 
+        // If we've passed this animation and it's the last one
+        else if (currentTime > endTime) {
+          // Set final state of the animation
+          if (animation.type === AnimationType.Fade) {
+            headlineRef.current!.style.opacity = '1';
+          } else if (animation.type === AnimationType.Scale) {
+            headlineRef.current!.style.transform = 'scale(1.2)';
+            headlineRef.current!.style.opacity = '1';
+          } else if (animation.type === AnimationType.Slide) {
+            headlineRef.current!.style.transform = 'translateY(0)';
+            headlineRef.current!.style.opacity = '1';
+          } else if (animation.type === AnimationType.Rotate) {
+            headlineRef.current!.style.transform = `rotate(${animation.rotation || 360}deg)`;
+            headlineRef.current!.style.opacity = '1';
+          }
+        }
+      });
     }
     
-    // Subtitle animation - fade in with delay
-    if (subtitleRef.current) {
-      if (currentTime < 0.7) {
-        subtitleRef.current.style.opacity = '0';
-      } else if (currentTime < 1.2) {
-        const progress = (currentTime - 0.7) / 0.5;
-        const easedProgress = applyEasing(progress, EasingType.EaseOut);
-        subtitleRef.current.style.opacity = `${easedProgress}`;
-      } else {
-        subtitleRef.current.style.opacity = '1';
-      }
+    // Process subtitle animations
+    if (subtitleRef.current && subtitleLayer) {
+      // Reset styles to default
+      subtitleRef.current.style.opacity = '0';
+      subtitleRef.current.style.transform = 'translateY(0)';
+      
+      // Apply each animation in sequence
+      subtitleLayer.animations.forEach(animation => {
+        const startTime = animation.startTime || 0;
+        const endTime = startTime + animation.duration;
+        
+        // If current time is within this animation's timeframe
+        if (currentTime >= startTime && currentTime <= endTime) {
+          // Calculate progress for this animation
+          const progress = (currentTime - startTime) / animation.duration;
+          const easedProgress = applyEasing(progress, animation.easing);
+          
+          // Apply different animation types
+          if (animation.type === AnimationType.Fade) {
+            subtitleRef.current!.style.opacity = `${easedProgress}`;
+          } else if (animation.type === AnimationType.Slide) {
+            const offset = 20 - (easedProgress * 20); // Start 20px offset, end at 0
+            subtitleRef.current!.style.transform = `translateY(${offset}px)`;
+            subtitleRef.current!.style.opacity = '1';
+          }
+        } 
+        // If we've passed this animation and it's the last one
+        else if (currentTime > endTime) {
+          // Set final state
+          if (animation.type === AnimationType.Fade) {
+            subtitleRef.current!.style.opacity = '1';
+          } else if (animation.type === AnimationType.Slide) {
+            subtitleRef.current!.style.transform = 'translateY(0)';
+            subtitleRef.current!.style.opacity = '1';
+          }
+        }
+      });
     }
     
-    // Button animation - scale in
-    if (buttonRef.current) {
-      if (currentTime < 1.0) {
-        buttonRef.current.style.opacity = '0';
-        buttonRef.current.style.transform = 'scale(0.8)';
-      } else if (currentTime < 1.5) {
-        const progress = (currentTime - 1.0) / 0.5;
-        const easedProgress = applyEasing(progress, EasingType.Bounce);
-        buttonRef.current.style.opacity = `${easedProgress}`;
-        buttonRef.current.style.transform = `scale(${0.8 + (0.2 * easedProgress)})`;
-      } else {
-        buttonRef.current.style.opacity = '1';
-        buttonRef.current.style.transform = 'scale(1)';
-      }
+    // Process button animations
+    if (buttonRef.current && buttonLayer) {
+      // Reset styles to default
+      buttonRef.current.style.opacity = '0';
+      buttonRef.current.style.transform = 'scale(0.8)';
+      
+      // Apply each animation in sequence
+      buttonLayer.animations.forEach(animation => {
+        const startTime = animation.startTime || 0;
+        const endTime = startTime + animation.duration;
+        
+        // If current time is within this animation's timeframe
+        if (currentTime >= startTime && currentTime <= endTime) {
+          // Calculate progress for this animation
+          const progress = (currentTime - startTime) / animation.duration;
+          const easedProgress = applyEasing(progress, animation.easing);
+          
+          // Apply different animation types
+          if (animation.type === AnimationType.Fade) {
+            buttonRef.current!.style.opacity = `${easedProgress}`;
+          } else if (animation.type === AnimationType.Scale) {
+            const scale = 0.8 + (easedProgress * 0.2); // Scale from 0.8 to 1.0
+            buttonRef.current!.style.transform = `scale(${scale})`;
+            buttonRef.current!.style.opacity = '1';
+          } else if (animation.type === AnimationType.Bounce) {
+            buttonRef.current!.style.transform = 'scale(1)';
+            buttonRef.current!.style.opacity = '1';
+          }
+        } 
+        // If we've passed this animation
+        else if (currentTime > endTime) {
+          // Set final state
+          if (animation.type === AnimationType.Fade || 
+              animation.type === AnimationType.Scale || 
+              animation.type === AnimationType.Bounce) {
+            buttonRef.current!.style.opacity = '1';
+            buttonRef.current!.style.transform = 'scale(1)';
+          }
+        }
+      });
     }
     
-    // Logo animation - fade in last
-    if (logoRef.current) {
-      if (currentTime < 1.5) {
-        logoRef.current.style.opacity = '0';
-      } else if (currentTime < 2.0) {
-        const progress = (currentTime - 1.5) / 0.5;
-        const easedProgress = applyEasing(progress, EasingType.EaseInOut);
-        logoRef.current.style.opacity = `${easedProgress}`;
-      } else {
-        logoRef.current.style.opacity = '1';
-      }
+    // Process logo animations
+    if (logoRef.current && logoLayer) {
+      // Reset styles to default
+      logoRef.current.style.opacity = '0';
+      logoRef.current.style.transform = 'rotate(0deg)';
+      
+      // Apply each animation in sequence
+      logoLayer.animations.forEach(animation => {
+        const startTime = animation.startTime || 0;
+        const endTime = startTime + animation.duration;
+        
+        // If current time is within this animation's timeframe
+        if (currentTime >= startTime && currentTime <= endTime) {
+          // Calculate progress for this animation
+          const progress = (currentTime - startTime) / animation.duration;
+          const easedProgress = applyEasing(progress, animation.easing);
+          
+          // Apply different animation types
+          if (animation.type === AnimationType.Fade) {
+            logoRef.current!.style.opacity = `${easedProgress}`;
+          } else if (animation.type === AnimationType.Rotate) {
+            const rotation = easedProgress * (animation.rotation || 360);
+            logoRef.current!.style.transform = `rotate(${rotation}deg)`;
+            logoRef.current!.style.opacity = '1';
+          }
+        } 
+        // If we've passed this animation
+        else if (currentTime > endTime) {
+          // Set final state
+          if (animation.type === AnimationType.Fade) {
+            logoRef.current!.style.opacity = '1';
+          } else if (animation.type === AnimationType.Rotate) {
+            logoRef.current!.style.transform = `rotate(${animation.rotation || 360}deg)`;
+            logoRef.current!.style.opacity = '1';
+          }
+        }
+      });
     }
   }, [currentTime]);
 
