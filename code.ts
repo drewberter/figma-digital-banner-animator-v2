@@ -58,27 +58,26 @@ enum MessageType {
   STATE_LOADED = 'STATE_LOADED',
   SAVE_STATE = 'SAVE_STATE',
   STATE_SAVED = 'STATE_SAVED',
-  SELECT_FRAME = 'SELECT_FRAME',
   ERROR = 'ERROR'
 }
 
-// Initialize animation data
+// Global state for the plugin
 let animationData: AnimationData = {
   layers: {},
   frames: {},
-  duration: 5,
+  duration: 3.0,
   selectedLayerId: null
 };
 
-// Set up the Figma UI
-figma.showUI(__html__, { width: 800, height: 600 });
+// Initialize the plugin
+figma.showUI(__html__, { width: 860, height: 600 });
 
-// Process messages from the UI
+// Listen for messages from the UI
 figma.ui.onmessage = async (msg) => {
   try {
     const { type, ...data } = msg;
-    
-    switch(type) {
+
+    switch (type) {
       case MessageType.READY:
         handleReadyMessage();
         break;
@@ -93,10 +92,6 @@ figma.ui.onmessage = async (msg) => {
       
       case MessageType.SELECT_LAYER:
         handleSelectLayerMessage(data.nodeId);
-        break;
-      
-      case MessageType.SELECT_FRAME:
-        handleSelectFrameMessage(data.nodeId);
         break;
       
       case MessageType.UPDATE_ANIMATION:
@@ -186,60 +181,6 @@ function handleGetLayersMessage() {
   });
 }
 
-// Handle SELECT_FRAME message
-function handleSelectFrameMessage(nodeId: string) {
-  try {
-    const node = figma.getNodeById(nodeId);
-    if (!node || node.type !== 'FRAME') {
-      throw new Error('Invalid frame node');
-    }
-    
-    // Mark this frame as selected and all others as deselected
-    Object.keys(animationData.frames).forEach(id => {
-      animationData.frames[id].selected = (id === nodeId);
-    });
-    
-    // Select the frame in Figma UI
-    figma.currentPage.selection = [node];
-    
-    // Save state to persist selection
-    savePluginState();
-    
-    // Notify UI of frame selection
-    figma.ui.postMessage({
-      type: MessageType.FRAMES_RESPONSE,
-      frames: Object.keys(animationData.frames).map(id => {
-        const frameNode = figma.getNodeById(id) as FrameNode;
-        const frameData = animationData.frames[id];
-        
-        return {
-          id,
-          name: frameNode.name,
-          selected: frameData.selected,
-          width: frameData.width,
-          height: frameData.height
-        };
-      })
-    });
-    
-    // Also send the updated layer list for this frame
-    const frame = figma.getNodeById(nodeId) as FrameNode;
-    const layers = scanLayersInFrame(frame);
-    
-    figma.ui.postMessage({
-      type: MessageType.LAYERS_RESPONSE,
-      layers
-    });
-    
-  } catch (error) {
-    console.error('Error selecting frame:', error);
-    figma.ui.postMessage({
-      type: MessageType.ERROR,
-      message: `Error selecting frame: ${error.message}`
-    });
-  }
-}
-
 // Handle SELECT_LAYER message
 function handleSelectLayerMessage(nodeId: string) {
   try {
@@ -248,16 +189,9 @@ function handleSelectLayerMessage(nodeId: string) {
       // Select the node in Figma
       figma.currentPage.selection = [node];
       animationData.selectedLayerId = nodeId;
-      
-      // Save state to persist selection
-      savePluginState();
     }
   } catch (error) {
     console.error('Error selecting layer:', error);
-    figma.ui.postMessage({
-      type: MessageType.ERROR,
-      message: `Error selecting layer: ${error.message}`
-    });
   }
 }
 
@@ -270,33 +204,43 @@ function handleUpdateAnimationMessage(nodeId: string, animation: Animation) {
     };
   }
   
-  // Find if an animation of this type already exists
+  // Update or add the animation
   const existingIndex = animationData.layers[nodeId].animations.findIndex(
     a => a.type === animation.type
   );
   
   if (existingIndex >= 0) {
-    // Replace existing animation
     animationData.layers[nodeId].animations[existingIndex] = animation;
   } else {
-    // Add new animation
     animationData.layers[nodeId].animations.push(animation);
   }
   
-  // Save updated state
+  // Auto-save the state
   savePluginState();
 }
 
 // Handle EXPORT_GIF message
 function handleExportGifMessage(options: any) {
-  // TODO: Implement GIF export
-  console.log('Export GIF requested with options:', options);
+  // In a real plugin, we would generate a GIF here
+  // For this implementation, we'll just show a notice that it would be exported
+  figma.notify(`Exporting GIF at ${options.width}x${options.height} with quality ${options.quality}`);
+  
+  // Simulate a slight delay for "processing"
+  setTimeout(() => {
+    figma.notify('GIF export complete! (simulated)');
+  }, 1500);
 }
 
 // Handle EXPORT_HTML message
 function handleExportHtmlMessage(options: any) {
-  // TODO: Implement HTML export
-  console.log('Export HTML requested with options:', options);
+  // In a real plugin, we would generate HTML5 banner code here
+  // For this implementation, we'll just show a notice that it would be exported
+  figma.notify(`Exporting HTML5 banner at ${options.width}x${options.height}`);
+  
+  // Simulate a slight delay for "processing"
+  setTimeout(() => {
+    figma.notify('HTML5 export complete! (simulated)');
+  }, 1500);
 }
 
 // Handle LOAD_STATE message
@@ -305,20 +249,20 @@ async function handleLoadStateMessage(key: string) {
     const data = await figma.clientStorage.getAsync(key);
     
     if (data) {
-      // Parse the stored data
-      animationData = JSON.parse(data);
+      // Update our local state
+      animationData = data;
       
-      // Notify UI that state was loaded
+      // Notify the UI
       figma.ui.postMessage({
         type: MessageType.STATE_LOADED,
-        key
+        data
       });
     }
   } catch (error) {
-    console.error(`Error loading state for key ${key}:`, error);
+    console.error('Error loading state:', error);
     figma.ui.postMessage({
       type: MessageType.ERROR,
-      message: `Error loading state: ${error.message}`
+      message: 'Failed to load saved state'
     });
   }
 }
@@ -326,107 +270,86 @@ async function handleLoadStateMessage(key: string) {
 // Handle SAVE_STATE message
 async function handleSaveStateMessage(key: string, data: any) {
   try {
-    // Store the provided data
-    await figma.clientStorage.setAsync(key, JSON.stringify(data));
+    // Update our local state
+    if (data) {
+      animationData = data;
+    }
     
-    // Notify UI that state was saved
+    // Save to client storage
+    await figma.clientStorage.setAsync(key, animationData);
+    
+    // Notify the UI
     figma.ui.postMessage({
-      type: MessageType.STATE_SAVED,
-      key
+      type: MessageType.STATE_SAVED
     });
   } catch (error) {
-    console.error(`Error saving state for key ${key}:`, error);
+    console.error('Error saving state:', error);
     figma.ui.postMessage({
       type: MessageType.ERROR,
-      message: `Error saving state: ${error.message}`
+      message: 'Failed to save state'
     });
   }
 }
 
-// Scan for frames in the document
+// Helper function to scan for frames in the current selection
 function scanForFrames() {
-  // Clear existing frames data or initialize if needed
-  const existingFrameIds = new Set(Object.keys(animationData.frames));
+  const selection = figma.currentPage.selection;
+  let foundFrames = false;
   
-  // Check current selection for frames
-  for (const node of figma.currentPage.selection) {
+  // Look for frames in the selection
+  for (const node of selection) {
     if (node.type === 'FRAME') {
-      processFrame(node as FrameNode);
-      existingFrameIds.delete(node.id);
-    }
-  }
-  
-  // Also check for top-level frames on the current page
-  for (const node of figma.currentPage.children) {
-    if (node.type === 'FRAME') {
-      // Only include frames that are empty or contain elements
-      if (node.children.length > 0) {
-        processFrame(node as FrameNode);
-        existingFrameIds.delete(node.id);
+      // Register this frame
+      animationData.frames[node.id] = {
+        selected: true, // First found frame is selected by default
+        width: node.width,
+        height: node.height
+      };
+      
+      // Set all other frames to unselected
+      for (const id in animationData.frames) {
+        if (id !== node.id) {
+          animationData.frames[id].selected = false;
+        }
       }
+      
+      // Scan layers in this frame
+      scanLayersInFrame(node as FrameNode);
+      
+      foundFrames = true;
+      break;
     }
   }
   
-  // If no frames were found, try to use any frame
-  if (Object.keys(animationData.frames).length === 0) {
+  // If no frames found in selection but we have stored frames, use the first one
+  if (!foundFrames && Object.keys(animationData.frames).length > 0) {
+    const firstFrameId = Object.keys(animationData.frames)[0];
+    animationData.frames[firstFrameId].selected = true;
+    
+    // Try to select it in the UI
+    const frame = figma.getNodeById(firstFrameId);
+    if (frame) {
+      figma.currentPage.selection = [frame];
+    }
+  }
+  
+  // If still no frames, look for frames on the current page
+  if (!foundFrames && Object.keys(animationData.frames).length === 0) {
     for (const node of figma.currentPage.children) {
       if (node.type === 'FRAME') {
-        processFrame(node as FrameNode);
+        // Register this frame
+        animationData.frames[node.id] = {
+          selected: true, // First found frame is selected by default
+          width: node.width,
+          height: node.height
+        };
+        
+        // Scan layers in this frame
+        scanLayersInFrame(node as FrameNode);
+        
         break;
       }
     }
-  }
-  
-  // Auto-select a frame if none is selected
-  const hasSelectedFrame = Object.values(animationData.frames).some(frame => frame.selected);
-  if (!hasSelectedFrame && Object.keys(animationData.frames).length > 0) {
-    const firstFrameId = Object.keys(animationData.frames)[0];
-    animationData.frames[firstFrameId].selected = true;
-  }
-  
-  // Save updated state
-  savePluginState();
-}
-
-// Process a frame node and add it to animation data
-function processFrame(frame: FrameNode) {
-  // Common advertising frame sizes we want to prioritize
-  const adSizes = [
-    { width: 300, height: 250 }, // Medium Rectangle
-    { width: 728, height: 90 },  // Leaderboard
-    { width: 300, height: 600 }, // Half Page
-    { width: 320, height: 50 },  // Mobile Leaderboard
-    { width: 970, height: 90 },  // Large Leaderboard
-    { width: 160, height: 600 }, // Wide Skyscraper
-  ];
-  
-  // Check if this is a common ad size
-  const isAdSize = adSizes.some(size => 
-    Math.abs(frame.width - size.width) < 5 && 
-    Math.abs(frame.height - size.height) < 5
-  );
-  
-  // Skip frames that aren't close to ad sizes unless we explicitly want them
-  const shouldInclude = isAdSize || 
-                        figma.currentPage.selection.includes(frame) || 
-                        frame.name.toLowerCase().includes('banner') || 
-                        frame.name.toLowerCase().includes('ad');
-  
-  if (!shouldInclude) {
-    return;
-  }
-  
-  // Add or update frame in animation data
-  if (!animationData.frames[frame.id]) {
-    animationData.frames[frame.id] = {
-      selected: false,
-      width: Math.round(frame.width),
-      height: Math.round(frame.height)
-    };
-  } else {
-    // Update dimensions in case they changed
-    animationData.frames[frame.id].width = Math.round(frame.width);
-    animationData.frames[frame.id].height = Math.round(frame.height);
   }
 }
 
@@ -441,64 +364,11 @@ function scanLayersInFrame(frame: FrameNode) {
     
     // Determine layer type based on node type
     let layerType = node.type.toLowerCase();
-    
-    // Map Figma node types to our simplified layer types
-    switch (node.type) {
-      case 'RECTANGLE':
-        // Check if this might be a button based on name or styles
-        if (node.name.toLowerCase().includes('button') || 
-            node.name.toLowerCase().includes('cta') ||
-            node.cornerRadius !== undefined && node.cornerRadius > 0) {
-          layerType = 'button';
-        } else {
-          layerType = 'rectangle';
-        }
-        break;
-      
-      case 'TEXT':
-        // Check if this is a headline, subhead, or body text based on style or name
-        if (node.name.toLowerCase().includes('headline') || 
-            node.name.toLowerCase().includes('title') ||
-            (node.fontSize !== undefined && node.fontSize >= 18)) {
-          layerType = 'headline';
-        } else if (node.name.toLowerCase().includes('subhead') || 
-                  node.name.toLowerCase().includes('subtitle') ||
-                  (node.fontSize !== undefined && node.fontSize >= 14)) {
-          layerType = 'subhead';
-        } else {
-          layerType = 'text';
-        }
-        break;
-      
-      case 'ELLIPSE':
-        layerType = 'shape';
-        break;
-      
-      case 'VECTOR':
-      case 'STAR':
-      case 'POLYGON':
-      case 'LINE':
-        layerType = 'vector';
-        break;
-      
-      case 'GROUP':
-        // Check if this is a logo based on name
-        if (node.name.toLowerCase().includes('logo')) {
-          layerType = 'logo';
-        } else {
-          layerType = 'group';
-        }
-        break;
-      
-      case 'INSTANCE':
-      case 'COMPONENT':
-        layerType = 'component';
-        break;
-      
-      case 'IMAGE':
-        layerType = 'image';
-        break;
-    }
+    if (node.type === 'RECTANGLE') layerType = 'rectangle';
+    if (node.type === 'TEXT') layerType = 'text';
+    if (node.type === 'ELLIPSE') layerType = 'shape';
+    if (node.type === 'VECTOR') layerType = 'vector';
+    if (node.type === 'GROUP') layerType = 'group';
     
     // Check if we have animation data for this layer
     if (!animationData.layers[node.id]) {
@@ -528,28 +398,14 @@ function scanLayersInFrame(frame: FrameNode) {
 // Helper function to save the plugin state
 async function savePluginState() {
   try {
-    await figma.clientStorage.setAsync('animation-plugin-state', JSON.stringify(animationData));
-    console.log('Plugin state saved');
+    await figma.clientStorage.setAsync('animationState', animationData);
   } catch (error) {
-    console.error('Error saving plugin state:', error);
+    console.error('Error auto-saving state:', error);
   }
 }
 
-// Initialize the plugin by loading saved state
-async function initializePlugin() {
-  try {
-    const savedState = await figma.clientStorage.getAsync('animation-plugin-state');
-    if (savedState) {
-      animationData = JSON.parse(savedState);
-      console.log('Loaded saved plugin state');
-    }
-  } catch (error) {
-    console.error('Error loading saved state:', error);
-  }
-  
-  // Scan for frames to ensure we're up to date
-  scanForFrames();
-}
-
-// Start initialization
-initializePlugin();
+// Clean up when the plugin is closed
+figma.on('close', () => {
+  // Auto-save state when plugin closes
+  savePluginState();
+});

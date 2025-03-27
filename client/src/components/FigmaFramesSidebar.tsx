@@ -1,7 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, ChevronDown, ChevronRight, CheckSquare, Square, ChevronLeftSquare, ChevronRightSquare } from 'lucide-react';
-import { getFrames, selectFrame, onPluginMessage } from '../lib/figmaPlugin';
-import { usePluginContext } from '../context/PluginContext';
+import { useState } from 'react';
+import { Plus, ChevronDown, ChevronRight, CheckSquare, Square, ChevronLeft, ChevronLeftSquare, ChevronRightSquare } from 'lucide-react';
 
 interface FigmaFramesSidebarProps {
   onSelectFrame: (frameId: string) => void;
@@ -13,14 +11,6 @@ interface FigmaFrameProps {
   dimensions: string;
   isSelected: boolean;
   onSelect: () => void;
-}
-
-interface FigmaFrameData {
-  id: string;
-  name: string;
-  selected: boolean;
-  width: number;
-  height: number;
 }
 
 const FigmaFrame = ({ id, name, dimensions, isSelected, onSelect }: FigmaFrameProps) => {
@@ -49,77 +39,21 @@ const FigmaFrame = ({ id, name, dimensions, isSelected, onSelect }: FigmaFramePr
 };
 
 const FigmaFramesSidebar = ({ onSelectFrame }: FigmaFramesSidebarProps) => {
-  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
+  const [selectedFrameId, setSelectedFrameId] = useState<string>('frame-1');
   const [isExpanded, setIsExpanded] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [frames, setFrames] = useState<FigmaFrameData[]>([]);
-  
-  const { initialized, isLoading } = usePluginContext();
 
-  // Request frames from Figma when component mounts
-  useEffect(() => {
-    if (initialized) {
-      // Request frames from the plugin
-      getFrames();
-      
-      // Set up listener for frames response
-      const removeListener = onPluginMessage('FRAMES_RESPONSE', (data) => {
-        console.log('Received frames from Figma:', data);
-        if (data.frames && Array.isArray(data.frames)) {
-          setFrames(data.frames);
-          
-          // Set selected frame ID from response
-          const selectedFrame = data.frames.find((frame: FigmaFrameData) => frame.selected);
-          if (selectedFrame) {
-            setSelectedFrameId(selectedFrame.id);
-            onSelectFrame(selectedFrame.id);
-          } else if (data.frames.length > 0) {
-            // If no frame is selected, select the first one
-            setSelectedFrameId(data.frames[0].id);
-            onSelectFrame(data.frames[0].id);
-          }
-        }
-      });
-      
-      return () => {
-        removeListener();
-      };
-    } else {
-      // Use mock data when not in Figma
-      const mockFrames = [
-        { id: 'frame-1', name: 'Banner 300x250', selected: true, width: 300, height: 250 },
-        { id: 'frame-2', name: 'Banner 728x90', selected: false, width: 728, height: 90 },
-        { id: 'frame-3', name: 'Banner 320x50', selected: false, width: 320, height: 50 },
-        { id: 'frame-4', name: 'Banner 160x600', selected: false, width: 160, height: 600 }
-      ];
-      
-      setFrames(mockFrames);
-      setSelectedFrameId('frame-1');
-      onSelectFrame('frame-1');
-    }
-  }, [initialized, onSelectFrame]);
+  // Sample frames data
+  const frames = [
+    { id: 'frame-1', name: 'Banner 300x250', dimensions: '300×250' },
+    { id: 'frame-2', name: 'Banner 728x90', dimensions: '728×90' },
+    { id: 'frame-3', name: 'Banner 320x50', dimensions: '320×50' },
+    { id: 'frame-4', name: 'Banner 160x600', dimensions: '160×600' }
+  ];
 
   const handleSelectFrame = (frameId: string) => {
-    // Early return if already selected
-    if (selectedFrameId === frameId) return;
-    
     setSelectedFrameId(frameId);
-    
-    // Notify parent component
     onSelectFrame(frameId);
-    
-    // Update selection in Figma
-    if (initialized) {
-      selectFrame(frameId);
-      
-      // Update local state to reflect new selection
-      setFrames(prevFrames => 
-        prevFrames.map(frame => ({
-          ...frame,
-          selected: frame.id === frameId
-        }))
-      );
-    }
   };
 
   // Toggle sidebar collapsed state
@@ -146,7 +80,7 @@ const FigmaFramesSidebar = ({ onSelectFrame }: FigmaFramesSidebarProps) => {
               key={frame.id}
               className={`w-6 h-6 mb-1 rounded-sm flex items-center justify-center cursor-pointer ${selectedFrameId === frame.id ? 'bg-[#4A7CFF]' : 'bg-neutral-800 hover:bg-neutral-700'}`}
               onClick={() => handleSelectFrame(frame.id)}
-              title={`${frame.name} (${frame.width}×${frame.height})`}
+              title={`${frame.name} (${frame.dimensions})`}
             >
               <span className="text-xs font-bold text-white">
                 {frame.id.charAt(frame.id.length - 1)}
@@ -157,21 +91,11 @@ const FigmaFramesSidebar = ({ onSelectFrame }: FigmaFramesSidebarProps) => {
         <div className="p-2 border-t border-neutral-800 w-full flex justify-center">
           <button 
             className="w-6 h-6 flex items-center justify-center rounded text-[#4A7CFF] hover:bg-neutral-800"
-            title="Refresh Frames"
-            onClick={() => initialized && getFrames()}
+            title="Add Frame"
           >
             <Plus size={16} />
           </button>
         </div>
-      </div>
-    );
-  }
-
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="w-64 bg-[#111111] border-r border-neutral-800 flex flex-col items-center justify-center">
-        <div className="text-sm text-neutral-400">Loading frames...</div>
       </div>
     );
   }
@@ -201,32 +125,23 @@ const FigmaFramesSidebar = ({ onSelectFrame }: FigmaFramesSidebarProps) => {
       
       {isExpanded && (
         <div className="flex-1 overflow-y-auto">
-          {frames.length === 0 ? (
-            <div className="p-4 text-sm text-neutral-500 text-center">
-              No frames found. Select frames in Figma to animate.
-            </div>
-          ) : (
-            frames.map((frame) => (
-              <FigmaFrame
-                key={frame.id}
-                id={frame.id}
-                name={frame.name}
-                dimensions={`${frame.width}×${frame.height}`}
-                isSelected={frame.selected}
-                onSelect={() => handleSelectFrame(frame.id)}
-              />
-            ))
-          )}
+          {frames.map((frame) => (
+            <FigmaFrame
+              key={frame.id}
+              id={frame.id}
+              name={frame.name}
+              dimensions={frame.dimensions}
+              isSelected={selectedFrameId === frame.id}
+              onSelect={() => handleSelectFrame(frame.id)}
+            />
+          ))}
         </div>
       )}
       
       <div className="p-2 border-t border-neutral-800">
-        <button 
-          className="w-full py-1 text-sm text-[#4A7CFF] rounded hover:bg-neutral-800 flex items-center justify-center"
-          onClick={() => initialized && getFrames()}
-        >
+        <button className="w-full py-1 text-sm text-[#4A7CFF] rounded hover:bg-neutral-800 flex items-center justify-center">
           <Plus size={16} className="mr-1" />
-          Refresh Frames
+          Add Frame
         </button>
       </div>
     </div>

@@ -9,40 +9,47 @@ import PresetsPanel from "./components/PresetsPanel";
 import AutoSaveIndicator from "./components/AutoSaveIndicator";
 import { AnimationProvider, useAnimationContext } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
-import { initializePlugin } from "./lib/figmaPlugin";
 
-// Main App component
-function App() {
+// Wrap the main app content in this component to access the animation context
+function AppContent() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPresetsPanelOpen, setIsPresetsPanelOpen] = useState(false);
-  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [selectedFrameId, setSelectedFrameId] = useState('frame-1');
   
   // Track auto-save state for notifications
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-
-  // Initialize plugin when component mounts
-  useEffect(() => {
-    // Initialize the Figma plugin
-    initializePlugin();
-    console.log("Figma plugin initialized from App component");
-  }, []);
-
+  
+  // Get context values that we need
+  const {
+    currentTime,
+    isPlaying,
+    setCurrentTime,
+    togglePlayback
+  } = useAnimationContext();
+  
   // Listen for auto-save events
   useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'figma-animation-plugin' && e.newValue) {
+        setLastSaved(new Date());
+        setSaving(false);
+      }
+    };
+    
+    // Also listen for console logs of auto-save
     const originalConsoleLog = console.log;
     console.log = function(...args) {
-      if (args[0] && typeof args[0] === 'string' && 
-          (args[0].includes('auto-saved') || args[0].includes('Animation state'))) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('auto-saved')) {
         setLastSaved(new Date());
         setSaving(false);
       }
       originalConsoleLog.apply(console, args);
     };
     
+    window.addEventListener('storage', handleStorage);
     return () => {
+      window.removeEventListener('storage', handleStorage);
       console.log = originalConsoleLog;
     };
   }, []);
@@ -64,10 +71,6 @@ function App() {
   const handleFrameSelect = (frameId: string) => {
     console.log('App: Selected frame:', frameId);
     setSelectedFrameId(frameId);
-    
-    // Reset playback when changing frames
-    setCurrentTime(0);
-    setIsPlaying(false);
   };
   
   // Handle timeline updates
@@ -77,58 +80,51 @@ function App() {
   
   // Handle play/pause toggle
   const handlePlayPauseToggle = (playing: boolean) => {
-    setIsPlaying(playing);
+    togglePlayback();
   };
 
-  // Wrapper component that uses the context
-  const AppContent = () => {
-    const animationContext = useAnimationContext();
-    
-    return (
-      <div className="bg-[#0A0A0A] text-white h-screen flex flex-col">
-        <Toolbar onExport={handleExport} onPreview={handlePreview} />
+  return (
+    <div className="bg-[#0A0A0A] text-white h-screen flex flex-col">
+      <Toolbar onExport={handleExport} onPreview={handlePreview} />
+      
+      <div className="flex-1 flex overflow-hidden">
+        <LeftSidebar 
+          onOpenPresets={handleOpenPresets} 
+          onSelectFrame={handleFrameSelect}
+        />
         
-        <div className="flex-1 flex overflow-hidden">
-          <LeftSidebar 
-            onOpenPresets={handleOpenPresets} 
-            onSelectFrame={handleFrameSelect}
+        <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden">
+          <PreviewCanvas 
+            selectedFrameId={selectedFrameId} 
+            currentTime={currentTime} 
           />
-          
-          <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden">
-            <PreviewCanvas 
-              selectedFrameId={selectedFrameId} 
-              currentTime={currentTime}
-              frames={animationContext.frames}
-              layers={animationContext.layers}
-            />
-            <Timeline 
-              key={selectedFrameId} // Force re-render when frame changes
-              onTimeUpdate={handleTimeUpdate}
-              onPlayPauseToggle={handlePlayPauseToggle}
-              isPlaying={isPlaying}
-              currentTime={currentTime}
-              selectedFrameId={selectedFrameId}
-              updateLayerAnimation={animationContext.updateLayerAnimation}
-            />
-          </div>
-          
-          <PropertiesPanel />
+          <Timeline 
+            onTimeUpdate={handleTimeUpdate}
+            onPlayPauseToggle={handlePlayPauseToggle}
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            selectedFrameId={selectedFrameId}
+          />
         </div>
-
-        {isExportModalOpen && (
-          <ExportModal onClose={() => setIsExportModalOpen(false)} />
-        )}
-
-        {isPresetsPanelOpen && (
-          <PresetsPanel onClose={() => setIsPresetsPanelOpen(false)} />
-        )}
         
-        {/* Auto-save indicator */}
-        <AutoSaveIndicator saving={saving} lastSaved={lastSaved} />
+        <PropertiesPanel />
       </div>
-    );
-  };
 
+      {isExportModalOpen && (
+        <ExportModal onClose={() => setIsExportModalOpen(false)} />
+      )}
+
+      {isPresetsPanelOpen && (
+        <PresetsPanel onClose={() => setIsPresetsPanelOpen(false)} />
+      )}
+      
+      {/* Auto-save indicator */}
+      <AutoSaveIndicator saving={saving} lastSaved={lastSaved} />
+    </div>
+  );
+}
+
+function App() {
   return (
     <PluginProvider>
       <AnimationProvider>

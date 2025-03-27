@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { saveToClientStorage, loadFromClientStorage } from '../lib/figmaPlugin';
 
 interface AutoSaveOptions {
   key: string;
@@ -11,8 +10,8 @@ interface AutoSaveOptions {
 }
 
 /**
- * A hook that automatically saves data to both localStorage and Figma clientStorage
- * at specified intervals and when the component unmounts.
+ * A hook that automatically saves data to localStorage at specified intervals
+ * and when the component unmounts.
  *
  * @param options AutoSaveOptions
  * @returns void
@@ -35,17 +34,9 @@ export function useAutoSave({
       // Only save if data has changed
       const serialized = JSON.stringify(data);
       if (serialized !== previousData.current) {
-        // Save to localStorage
         localStorage.setItem(key, serialized);
-        
-        // Save to Figma clientStorage
-        saveToClientStorage(key, data).catch(error => {
-          console.warn('Error saving to Figma:', error);
-        });
-        
         previousData.current = serialized;
         onSave?.(key, data);
-        console.log(`Animation state auto-saved to ${key}`);
         console.log(`Autosaved animation state for: ${key}`);
       }
     } catch (error) {
@@ -91,7 +82,7 @@ export function useAutoSave({
 }
 
 /**
- * Load saved data from localStorage and/or Figma clientStorage
+ * Load saved data from localStorage
  * 
  * @param key The key to load data from
  * @param defaultValue The default value to return if no data is found
@@ -99,15 +90,10 @@ export function useAutoSave({
  */
 export function loadSavedData<T>(key: string, defaultValue: T): T {
   try {
-    // First try to load from localStorage
     const storedData = localStorage.getItem(key);
     if (storedData) {
       return JSON.parse(storedData) as T;
     }
-    
-    // If not found in localStorage, request from Figma
-    // This is asynchronous, so we'll still return the default value for now
-    loadFromClientStorage(key);
   } catch (error) {
     console.error('Error loading data:', error);
   }

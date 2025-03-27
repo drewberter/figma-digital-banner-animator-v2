@@ -1,8 +1,129 @@
-import { AnimationProvider } from "./context/AnimationContext";
+import { useState, useEffect } from "react";
+import Toolbar from "./components/Toolbar";
+import LeftSidebar from "./components/LeftSidebar";
+import PreviewCanvas from "./components/PreviewCanvas";
+import Timeline from "./components/Timeline";
+import PropertiesPanel from "./components/PropertiesPanel";
+import ExportModal from "./components/ExportModal";
+import PresetsPanel from "./components/PresetsPanel";
+import AutoSaveIndicator from "./components/AutoSaveIndicator";
+import { AnimationProvider, useAnimationContext } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
-import AppContent from "./components/AppContent";
 
-// Main App component
+// Wrap the main app content in this component to access the animation context
+function AppContent() {
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isPresetsPanelOpen, setIsPresetsPanelOpen] = useState(false);
+  const [selectedFrameId, setSelectedFrameId] = useState('frame-1');
+  
+  // Track auto-save state for notifications
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  
+  // Get context values that we need
+  const {
+    currentTime,
+    isPlaying,
+    setCurrentTime,
+    togglePlayback
+  } = useAnimationContext();
+  
+  // Listen for auto-save events
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'figma-animation-plugin' && e.newValue) {
+        setLastSaved(new Date());
+        setSaving(false);
+      }
+    };
+    
+    // Also listen for console logs of auto-save
+    const originalConsoleLog = console.log;
+    console.log = function(...args) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('auto-saved')) {
+        setLastSaved(new Date());
+        setSaving(false);
+      }
+      originalConsoleLog.apply(console, args);
+    };
+    
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      console.log = originalConsoleLog;
+    };
+  }, []);
+
+  const handleExport = () => {
+    setIsExportModalOpen(true);
+  };
+
+  const handlePreview = () => {
+    // Toggle preview mode
+    console.log("Toggle preview mode");
+  };
+  
+  const handleOpenPresets = () => {
+    setIsPresetsPanelOpen(true);
+  };
+  
+  // Handle frame selection from left sidebar
+  const handleFrameSelect = (frameId: string) => {
+    console.log('App: Selected frame:', frameId);
+    setSelectedFrameId(frameId);
+  };
+  
+  // Handle timeline updates
+  const handleTimeUpdate = (time: number) => {
+    setCurrentTime(time);
+  };
+  
+  // Handle play/pause toggle
+  const handlePlayPauseToggle = (playing: boolean) => {
+    togglePlayback();
+  };
+
+  return (
+    <div className="bg-[#0A0A0A] text-white h-screen flex flex-col">
+      <Toolbar onExport={handleExport} onPreview={handlePreview} />
+      
+      <div className="flex-1 flex overflow-hidden">
+        <LeftSidebar 
+          onOpenPresets={handleOpenPresets} 
+          onSelectFrame={handleFrameSelect}
+        />
+        
+        <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden">
+          <PreviewCanvas 
+            selectedFrameId={selectedFrameId} 
+            currentTime={currentTime} 
+          />
+          <Timeline 
+            onTimeUpdate={handleTimeUpdate}
+            onPlayPauseToggle={handlePlayPauseToggle}
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            selectedFrameId={selectedFrameId}
+          />
+        </div>
+        
+        <PropertiesPanel />
+      </div>
+
+      {isExportModalOpen && (
+        <ExportModal onClose={() => setIsExportModalOpen(false)} />
+      )}
+
+      {isPresetsPanelOpen && (
+        <PresetsPanel onClose={() => setIsPresetsPanelOpen(false)} />
+      )}
+      
+      {/* Auto-save indicator */}
+      <AutoSaveIndicator saving={saving} lastSaved={lastSaved} />
+    </div>
+  );
+}
+
 function App() {
   return (
     <PluginProvider>
