@@ -1,14 +1,14 @@
 import { useRef, useEffect } from 'react';
-import { mockFrames, mockLayers } from '../mock/animationData';
 import { AnimationType, EasingType } from '../types/animation';
+import { useAnimationContext } from '../context/AnimationContext';
 
 interface PreviewCanvasProps {
-  selectedFrameId?: string;
+  selectedFrameId?: string | null;
   currentTime?: number;
 }
 
 const PreviewCanvas = ({ 
-  selectedFrameId = 'frame-1',
+  selectedFrameId = null,
   currentTime = 0
 }: PreviewCanvasProps) => {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -17,8 +17,13 @@ const PreviewCanvas = ({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
   
-  // Find the selected frame or default to the first one
-  const selectedFrame = mockFrames.find(frame => frame.id === selectedFrameId) || mockFrames[0];
+  // Get animation context
+  const animationContext = useAnimationContext();
+  
+  // Find the selected frame from context or default to the first one
+  const selectedFrame = selectedFrameId
+    ? animationContext.frames.find(frame => frame.id === selectedFrameId)
+    : animationContext.frames.find(frame => frame.selected) || null;
   
   // Set up canvas dimensions based on selected frame
   const frameWidth = selectedFrame?.width || 300;
@@ -55,8 +60,8 @@ const PreviewCanvas = ({
     }
   };
 
-  // Get the animation data for the current frame
-  const frameLayers = mockLayers[selectedFrameId] || [];
+  // Get the animation data from context
+  const frameLayers = animationContext.layers;
   
   // Find animation layers that correspond to our preview elements
   const backgroundLayer = frameLayers.find(layer => layer.name === 'Background');
@@ -68,183 +73,250 @@ const PreviewCanvas = ({
   // Helper function to find and apply animations for a layer
   const processAnimations = (
     element: HTMLElement | null,
-    layer: typeof headlineLayer,
-    defaultOpacity = '0',
-    defaultTransform = ''
+    layer: any,
+    currentTime: number
   ) => {
     if (!element || !layer) return;
     
-    // Find the active animation if any
-    let activeAnimation = null;
-    let finalAnimation = null;
-    let animationApplied = false;
+    // Reset element styles
+    element.style.opacity = '1';
+    element.style.transform = 'none';
     
-    // Sort animations by start time to ensure they're processed in order
-    const sortedAnimations = [...layer.animations].sort((a, b) => {
-      const startA = a.startTime || 0;
-      const startB = b.startTime || 0;
-      return startA - startB;
-    });
-    
-    // Reset styles to default initially
-    element.style.opacity = defaultOpacity;
-    if (defaultTransform) element.style.transform = defaultTransform;
-    
-    // Find the active animation
-    for (const animation of sortedAnimations) {
-      const startTime = animation.startTime || 0;
-      const endTime = startTime + animation.duration;
+    // Process each animation
+    for (const animation of layer.animations) {
+      const { type, startTime = 0, duration, easing } = animation;
       
-      // Active animation takes precedence
-      if (currentTime >= startTime && currentTime <= endTime) {
-        activeAnimation = animation;
-        break;
-      }
-      // Keep track of the latest animation we've passed
-      else if (currentTime > endTime) {
-        finalAnimation = animation;
-      }
-    }
-    
-    // Apply active animation if found
-    if (activeAnimation) {
-      const startTime = activeAnimation.startTime || 0;
-      const progress = (currentTime - startTime) / activeAnimation.duration;
-      const easedProgress = applyEasing(progress, activeAnimation.easing);
+      // Calculate progress (0-1) based on current time, start time, and duration
+      const animationEndTime = startTime + duration;
       
-      // Apply different animation types
-      if (activeAnimation.type === AnimationType.Fade) {
-        element.style.opacity = `${easedProgress}`;
-        animationApplied = true;
-      } else if (activeAnimation.type === AnimationType.Scale) {
-        const scale = 0.8 + (easedProgress * 0.4); // Scale from 0.8 to 1.2
-        element.style.transform = `scale(${scale})`;
-        element.style.opacity = '1';
-        animationApplied = true;
-      } else if (activeAnimation.type === AnimationType.Slide) {
-        let offset = 20 - (easedProgress * 20); // Start 20px offset, end at 0
-        let direction = activeAnimation.direction || 'right';
-        
-        if (direction === 'right') {
-          element.style.transform = `translateX(${-offset}px)`;
-        } else if (direction === 'left') {
-          element.style.transform = `translateX(${offset}px)`;
-        } else if (direction === 'top') {
-          element.style.transform = `translateY(${offset}px)`;
-        } else if (direction === 'bottom') {
-          element.style.transform = `translateY(${-offset}px)`;
+      // Skip if animation hasn't started yet or is already complete
+      if (currentTime < startTime || currentTime > animationEndTime) {
+        // For fade animations that haven't started yet, set initial opacity to 0
+        if (type === AnimationType.Fade && currentTime < startTime) {
+          element.style.opacity = '0';
         }
-        
-        element.style.opacity = '1';
-        animationApplied = true;
-      } else if (activeAnimation.type === AnimationType.Rotate) {
-        const rotation = easedProgress * (activeAnimation.rotation || 360);
-        element.style.transform = `rotate(${rotation}deg)`;
-        element.style.opacity = '1';
-        animationApplied = true;
-      } else if (activeAnimation.type === AnimationType.Bounce) {
-        // Simple bounce effect
-        const bounceScale = 1 + (Math.sin(easedProgress * Math.PI * 2) * 0.1);
-        element.style.transform = `scale(${bounceScale})`;
-        element.style.opacity = '1';
-        animationApplied = true;
-      } else if (activeAnimation.type === AnimationType.Pulse) {
-        // Simple pulse effect - opacity pulsing
-        const pulseOpacity = 0.7 + (Math.sin(easedProgress * Math.PI * 2) * 0.3);
-        element.style.opacity = `${pulseOpacity}`;
-        animationApplied = true;
+        continue;
       }
-    } 
-    // If no active animation but we've passed one, show the final state
-    else if (finalAnimation) {
-      if (finalAnimation.type === AnimationType.Fade) {
-        element.style.opacity = '1';
-      } else if (finalAnimation.type === AnimationType.Scale) {
-        element.style.transform = 'scale(1.2)';
-        element.style.opacity = '1';
-      } else if (finalAnimation.type === AnimationType.Slide) {
-        element.style.transform = 'translateY(0)';
-        element.style.opacity = '1';
-      } else if (finalAnimation.type === AnimationType.Rotate) {
-        element.style.transform = `rotate(${finalAnimation.rotation || 360}deg)`;
-        element.style.opacity = '1';
-      } else if (finalAnimation.type === AnimationType.Bounce || 
-                finalAnimation.type === AnimationType.Pulse) {
-        element.style.transform = 'scale(1)';
-        element.style.opacity = '1';
+      
+      const rawProgress = (currentTime - startTime) / duration;
+      const progress = applyEasing(rawProgress, easing as EasingType);
+      
+      // Apply animation effect based on type
+      switch (type) {
+        case AnimationType.Fade:
+          element.style.opacity = progress.toString();
+          break;
+          
+        case AnimationType.Scale:
+          const scale = 1 + (animation.scale ? (animation.scale - 1) * progress : progress);
+          element.style.transform = `${element.style.transform} scale(${scale})`;
+          break;
+          
+        case AnimationType.Slide:
+          const direction = animation.direction || 'left';
+          let translateX = 0;
+          let translateY = 0;
+          
+          // Calculate the slide distance as % of container
+          const distance = 100 * (1 - progress);
+          
+          switch (direction) {
+            case 'left':
+              translateX = -distance;
+              break;
+            case 'right':
+              translateX = distance;
+              break;
+            case 'up':
+              translateY = -distance;
+              break;
+            case 'down':
+              translateY = distance;
+              break;
+          }
+          
+          element.style.transform = `${element.style.transform} translate(${translateX}%, ${translateY}%)`;
+          break;
+          
+        case AnimationType.Rotate:
+          const rotation = (animation.rotation || 360) * progress;
+          element.style.transform = `${element.style.transform} rotate(${rotation}deg)`;
+          break;
+          
+        case AnimationType.Bounce:
+          // Apply a bouncing effect at the end of the animation
+          if (progress > 0.8) {
+            const bounce = Math.sin((progress - 0.8) * Math.PI * 5) * 0.2;
+            element.style.transform = `${element.style.transform} translateY(${-bounce * 20}px)`;
+          }
+          break;
+          
+        case AnimationType.Pulse:
+          // Scale up and down based on sine wave
+          const pulse = 1 + Math.sin(progress * Math.PI * 2) * 0.1;
+          element.style.transform = `${element.style.transform} scale(${pulse})`;
+          break;
       }
-      animationApplied = true;
-    }
-    
-    // If no animation applied, keep element in default state
-    if (!animationApplied) {
-      element.style.opacity = defaultOpacity;
-      if (defaultTransform) element.style.transform = defaultTransform;
     }
   };
   
-  // Update animations when currentTime changes
+  // Apply animations on each render based on current time
   useEffect(() => {
-    // Process animations for each element
-    processAnimations(headlineRef.current, headlineLayer, '0', 'translateY(0)');
-    processAnimations(subtitleRef.current, subtitleLayer, '0', 'translateY(0)');
-    processAnimations(buttonRef.current, buttonLayer, '0', 'scale(0.8)');
-    processAnimations(logoRef.current, logoLayer, '0', 'rotate(0deg)');
-  }, [currentTime, selectedFrameId]);
-
-  return (
-    <div className="h-full bg-neutral-900 flex items-center justify-center overflow-hidden">
-      <div className="flex flex-col items-center">
-        <div className="mb-4 text-sm text-neutral-500">
-          Time: {currentTime.toFixed(1)}s
-        </div>
-        
-        {/* Canvas preview area */}
-        <div
+    processAnimations(canvasRef.current, backgroundLayer, currentTime);
+    processAnimations(headlineRef.current, headlineLayer, currentTime);
+    processAnimations(subtitleRef.current, subtitleLayer, currentTime);
+    processAnimations(buttonRef.current, buttonLayer, currentTime);
+    processAnimations(logoRef.current, logoLayer, currentTime);
+  }, [currentTime, backgroundLayer, headlineLayer, subtitleLayer, buttonLayer, logoLayer]);
+  
+  // Get all appropriate classes based on frame size
+  const getFrameClasses = () => {
+    let classes = 'bg-white flex flex-col items-center justify-between p-4 overflow-hidden';
+    
+    // Add specific sizing classes
+    if (frameWidth === 300 && frameHeight === 250) {
+      classes += ' relative'; // Medium Rectangle has headline/subtitle centered
+    } else if (frameWidth === 728 && frameHeight === 90) {
+      classes += ' flex-row'; // Leaderboard uses row layout instead of column
+    } else if (frameWidth === 320 && frameHeight === 50) {
+      classes += ' flex-row items-center justify-between'; // Mobile leaderboard
+    } else if (frameWidth === 160 && frameHeight === 600) {
+      classes += ' justify-start'; // Skyscraper
+    }
+    
+    return classes;
+  };
+  
+  // Handle different layouts based on frame dimensions
+  if (frameWidth === 728 && frameHeight === 90) {
+    // Leaderboard layout (horizontal)
+    return (
+      <div 
+        className="w-full h-full flex items-center justify-center bg-neutral-800 p-4 overflow-auto"
+      >
+        <div 
           ref={canvasRef}
-          className="bg-white rounded shadow-lg overflow-hidden"
-          style={{
-            width: `${frameWidth}px`,
-            height: `${frameHeight}px`
+          className={getFrameClasses()}
+          style={{ 
+            width: `${frameWidth}px`, 
+            height: `${frameHeight}px`,
+            backgroundColor: '#f0f0f0'
           }}
         >
-          {/* Demo content showing a typical banner structure */}
-          <div className="relative w-full h-full bg-gradient-to-br from-blue-500 to-indigo-700">
-            {/* Headline text */}
-            <div className="absolute top-10 left-0 right-0 text-center">
-              <h2 ref={headlineRef} className="text-white text-2xl font-bold mb-2 transition-all duration-300">
-                Amazing Offer
-              </h2>
-              <p ref={subtitleRef} className="text-white text-sm transition-all duration-300">
-                Limited time only!
-              </p>
+          <div className="flex-1 flex items-center">
+            <div ref={logoRef} className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xl mr-6">
+              Logo
             </div>
-            
-            {/* CTA Button */}
-            <div className="absolute bottom-12 left-0 right-0 flex justify-center">
-              <button 
-                ref={buttonRef}
-                className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-medium transition-all duration-300"
-              >
-                Shop Now
-              </button>
-            </div>
-            
-            {/* Logo */}
-            <div className="absolute bottom-2 left-0 right-0 flex justify-center">
-              <div ref={logoRef} className="text-white text-xs opacity-75 transition-all duration-300">
-                LOGO
-              </div>
+            <div className="flex-1">
+              <h2 ref={headlineRef} className="text-xl font-bold text-gray-800">Experience Amazing Products</h2>
+              <p ref={subtitleRef} className="text-sm text-gray-600">Limited time offer - Act now!</p>
             </div>
           </div>
-        </div>
-        
-        <div className="mt-4 text-xs text-neutral-400">
-          {selectedFrame.width} × {selectedFrame.height}
+          <button 
+            ref={buttonRef}
+            className="px-6 py-2 bg-blue-600 text-white font-medium rounded hover:bg-blue-700"
+          >
+            Shop Now
+          </button>
         </div>
       </div>
-    </div>
-  );
+    );
+  } else if (frameWidth === 320 && frameHeight === 50) {
+    // Mobile leaderboard (small horizontal)
+    return (
+      <div 
+        className="w-full h-full flex items-center justify-center bg-neutral-800 p-4 overflow-auto"
+      >
+        <div 
+          ref={canvasRef}
+          className={getFrameClasses()}
+          style={{ 
+            width: `${frameWidth}px`, 
+            height: `${frameHeight}px`,
+            backgroundColor: '#f0f0f0' 
+          }}
+        >
+          <div ref={logoRef} className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
+            Logo
+          </div>
+          <div className="flex-1 mx-2 overflow-hidden">
+            <h2 ref={headlineRef} className="text-sm font-bold text-gray-800 truncate">Experience Amazing</h2>
+            <p ref={subtitleRef} className="text-xs text-gray-600 truncate">Limited time offer!</p>
+          </div>
+          <button 
+            ref={buttonRef}
+            className="px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 whitespace-nowrap"
+          >
+            Shop
+          </button>
+        </div>
+      </div>
+    );
+  } else if (frameWidth === 160 && frameHeight === 600) {
+    // Skyscraper (vertical)
+    return (
+      <div 
+        className="w-full h-full flex items-center justify-center bg-neutral-800 p-4 overflow-auto"
+      >
+        <div 
+          ref={canvasRef}
+          className={getFrameClasses()}
+          style={{ 
+            width: `${frameWidth}px`, 
+            height: `${frameHeight}px`,
+            backgroundColor: '#f0f0f0' 
+          }}
+        >
+          <div ref={logoRef} className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xl mt-4 mb-8">
+            Logo
+          </div>
+          <div className="text-center mb-8">
+            <h2 ref={headlineRef} className="text-xl font-bold text-gray-800 mb-2">Experience Amazing</h2>
+            <p ref={subtitleRef} className="text-sm text-gray-600">Limited time offer - Act now and save!</p>
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <button 
+              ref={buttonRef}
+              className="px-6 py-3 bg-blue-600 text-white font-medium rounded hover:bg-blue-700"
+            >
+              Shop Now
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  } else {
+    // Default layout (medium rectangle)
+    return (
+      <div 
+        className="w-full h-full flex items-center justify-center bg-neutral-800 p-4 overflow-auto"
+      >
+        <div 
+          ref={canvasRef}
+          className={getFrameClasses()}
+          style={{ 
+            width: `${frameWidth}px`, 
+            height: `${frameHeight}px`,
+            backgroundColor: '#f0f0f0' 
+          }}
+        >
+          <div ref={logoRef} className="absolute top-4 right-4 w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
+            Logo
+          </div>
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <h2 ref={headlineRef} className="text-2xl font-bold text-gray-800 text-center mb-2">Experience Amazing</h2>
+            <p ref={subtitleRef} className="text-base text-gray-600 text-center mb-6">Limited time offer - Act now!</p>
+            <button 
+              ref={buttonRef}
+              className="px-6 py-3 bg-blue-600 text-white font-medium rounded hover:bg-blue-700"
+            >
+              Shop Now
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 };
 
 export default PreviewCanvas;

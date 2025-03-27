@@ -1,15 +1,15 @@
 import { useState, useRef, useEffect, useReducer } from 'react';
 import { Play, Pause, SkipBack, Clock } from 'lucide-react';
-import { mockLayers } from '../mock/animationData';
 import { Animation, AnimationType, EasingType } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import { useAnimationContext } from '../context/AnimationContext';
 
 interface TimelineProps {
   onTimeUpdate: (time: number) => void;
   onPlayPauseToggle: (playing: boolean) => void;
   isPlaying: boolean;
   currentTime: number;
-  selectedFrameId?: string;
+  selectedFrameId?: string | null;
 }
 
 const Timeline = ({
@@ -17,19 +17,22 @@ const Timeline = ({
   onPlayPauseToggle,
   isPlaying,
   currentTime,
-  selectedFrameId = 'frame-1' // Default to frame-1 if no frame ID is provided
+  selectedFrameId = null // Default to null if no frame ID is provided
 }: TimelineProps) => {
   // Create a forceUpdate function for timeline component
   const [, forceUpdate] = useReducer(x => x + 1, 0);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
-  const duration = 5; // Fixed duration for now
+  
+  // Get animation context
+  const animationContext = useAnimationContext();
+  const duration = animationContext.duration || 5; // Fixed duration or from context
   
   const [isDragging, setIsDragging] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   
   // Get the layers for the current frame
-  const frameLayers = mockLayers[selectedFrameId] || [];
+  const frameLayers = animationContext.layers;
   
   // Reference objects for drag state and positioning
   const dragState = useRef({
@@ -52,6 +55,13 @@ const Timeline = ({
     
     return () => clearTimeout(timer);
   }, []);
+
+  // Update selected layer in context when it changes
+  useEffect(() => {
+    if (selectedLayerId) {
+      animationContext.selectLayer(selectedLayerId);
+    }
+  }, [selectedLayerId, animationContext]);
   
   // Calculate time marker positions
   const timeMarkers = [];
@@ -63,7 +73,7 @@ const Timeline = ({
     });
   }
   
-  // Generate keyframes for visualization (dummy keyframes)
+  // Generate keyframes for visualization (TODO: use actual keyframes from context)
   const keyframes = [
     { time: 0.5, properties: {} },
     { time: 2.0, properties: {} },
@@ -157,12 +167,15 @@ const Timeline = ({
       const pixelsPerSecond = timelineRef.current.clientWidth / duration;
       const timeDelta = deltaX / pixelsPerSecond;
       
-      const { isDraggingAnimation, isResizingLeft, isResizingRight, originalStartTime, originalDuration } = dragState.current;
+      const { isDraggingAnimation, isResizingLeft, isResizingRight, originalStartTime, originalDuration, layerId, animationIndex } = dragState.current;
       
-      // Clone the layers for modification
-      const updatedLayers = [...frameLayers];
-      const layerIndex = updatedLayers.findIndex(l => l.id === dragState.current.layerId);
-      if (layerIndex === -1) return;
+      if (!layerId) return;
+      
+      const layer = frameLayers.find(l => l.id === layerId);
+      if (!layer) return;
+      
+      // Clone the animation for modification
+      const updatedAnimation = {...layer.animations[animationIndex]};
       
       // Update the animation times based on drag operation
       if (isDraggingAnimation) {
@@ -172,7 +185,7 @@ const Timeline = ({
         // Clamp to ensure animation stays within bounds
         newStartTime = Math.max(0, Math.min(duration - originalDuration, newStartTime));
         
-        updatedLayers[layerIndex].animations[dragState.current.animationIndex].startTime = newStartTime;
+        updatedAnimation.startTime = newStartTime;
       } else if (isResizingLeft) {
         // Resize from left edge (change start time and duration)
         let newStartTime = originalStartTime + timeDelta;
@@ -187,8 +200,8 @@ const Timeline = ({
         // Clamp to ensure animation stays within bounds
         newStartTime = Math.max(0, newStartTime);
         
-        updatedLayers[layerIndex].animations[dragState.current.animationIndex].startTime = newStartTime;
-        updatedLayers[layerIndex].animations[dragState.current.animationIndex].duration = newDuration;
+        updatedAnimation.startTime = newStartTime;
+        updatedAnimation.duration = newDuration;
       } else if (isResizingRight) {
         // Resize from right edge (change duration only)
         let newDuration = originalDuration + timeDelta;
@@ -196,11 +209,11 @@ const Timeline = ({
         // Enforce minimum duration and keep within bounds
         newDuration = Math.max(0.1, Math.min(duration - originalStartTime, newDuration));
         
-        updatedLayers[layerIndex].animations[dragState.current.animationIndex].duration = newDuration;
+        updatedAnimation.duration = newDuration;
       }
       
-      // Update mockLayers with the change
-      mockLayers[selectedFrameId] = updatedLayers;
+      // Update the animation in the context
+      animationContext.updateLayerAnimation(layerId, updatedAnimation);
       
       // Force a re-render
       forceUpdate();
@@ -212,6 +225,9 @@ const Timeline = ({
     const handleAnimationDragEnd = () => {
       document.removeEventListener('mousemove', handleAnimationDragMove);
       document.removeEventListener('mouseup', handleAnimationDragEnd);
+      
+      // Save animation state after changes
+      animationContext.saveAnimationState();
     };
     
     document.addEventListener('mousemove', handleAnimationDragMove);
@@ -231,11 +247,14 @@ const Timeline = ({
       easing: EasingType.EaseOut, // Default easing
     };
     
-    // Add the animation to the layer
-    layer.animations.push(newAnimation);
+    // Add the animation to the layer using context
+    animationContext.updateLayerAnimation(layerId, newAnimation);
     
     // Force a re-render
     forceUpdate();
+    
+    // Save animation state after adding new animation
+    animationContext.saveAnimationState();
   };
 
   // Handle deleting an animation from a layer
@@ -243,11 +262,20 @@ const Timeline = ({
     const layer = frameLayers.find(l => l.id === layerId);
     if (!layer) return;
     
+    // Make a copy of the layer's animations array
+    const updatedAnimations = [...layer.animations];
+    
     // Remove the animation
-    layer.animations.splice(animIndex, 1);
+    updatedAnimations.splice(animIndex, 1);
+    
+    // Update the layer with the modified animations array
+    animationContext.updateLayer(layerId, { animations: updatedAnimations });
     
     // Force a re-render
     forceUpdate();
+    
+    // Save animation state after deletion
+    animationContext.saveAnimationState();
   };
 
   // Handle changing an animation's type
@@ -255,11 +283,20 @@ const Timeline = ({
     const layer = frameLayers.find(l => l.id === layerId);
     if (!layer) return;
     
-    // Update the animation type
-    layer.animations[animIndex].type = type;
+    // Create updated animation with new type
+    const updatedAnimation = {
+      ...layer.animations[animIndex],
+      type
+    };
+    
+    // Update the animation using context
+    animationContext.updateLayerAnimation(layerId, updatedAnimation);
     
     // Force a re-render
     forceUpdate();
+    
+    // Save animation state after type change
+    animationContext.saveAnimationState();
   };
 
   return (
@@ -410,19 +447,19 @@ const Timeline = ({
                           Delete Animation
                         </ContextMenu.Item>
                         
-                        <ContextMenu.Separator className="h-px bg-neutral-700 my-1" />
+                        <ContextMenu.Separator className="h-px bg-neutral-700" />
                         
                         <ContextMenu.Sub>
-                          <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
-                            <span>Change Type</span>
-                            <span>▶</span>
+                          <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer flex items-center justify-between focus:outline-none focus:bg-blue-600">
+                            Change Type
+                            <span className="text-neutral-400">▶</span>
                           </ContextMenu.SubTrigger>
                           <ContextMenu.Portal>
-                            <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
+                            <ContextMenu.SubContent className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden">
                               {Object.values(AnimationType).map((type) => (
                                 <ContextMenu.Item 
                                   key={type}
-                                  className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                                  className={`text-sm px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600 ${animation.type === type ? 'text-blue-400' : 'text-white'}`}
                                   onClick={() => handleChangeAnimationType(layer.id, animIndex, type)}
                                 >
                                   {type}
@@ -436,23 +473,22 @@ const Timeline = ({
                   </ContextMenu.Root>
                 ))}
                 
-                {/* Create a right-click context menu for empty areas to add new animations */}
+                {/* Empty layer context menu - used to add new animations */}
                 <ContextMenu.Root>
                   <ContextMenu.Trigger asChild>
-                    {/* Empty area span to capture right-click */}
-                    <span className="absolute inset-0" />
+                    <div className="absolute inset-0 cursor-pointer"></div>
                   </ContextMenu.Trigger>
                   <ContextMenu.Portal>
                     <ContextMenu.Content 
                       className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50"
                     >
                       <ContextMenu.Sub>
-                        <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
-                          <span>Add Animation</span>
-                          <span>▶</span>
+                        <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer flex items-center justify-between focus:outline-none focus:bg-blue-600">
+                          Add Animation
+                          <span className="text-neutral-400">▶</span>
                         </ContextMenu.SubTrigger>
                         <ContextMenu.Portal>
-                          <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
+                          <ContextMenu.SubContent className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden">
                             {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
                               <ContextMenu.Item 
                                 key={type}
@@ -468,16 +504,16 @@ const Timeline = ({
                     </ContextMenu.Content>
                   </ContextMenu.Portal>
                 </ContextMenu.Root>
-                
-                {/* Only show keyframes for selected layer */}
-                {selectedLayerId === layer.id && keyframes.map((keyframe, keyIndex) => (
-                  <div 
-                    key={keyIndex}
-                    className="absolute w-3 h-3 top-3.5 -ml-1.5 rounded-sm bg-yellow-500 border border-yellow-600"
-                    style={{ left: `${timeToPosition(keyframe.time)}px` }}
-                  ></div>
-                ))}
               </div>
+            ))}
+            
+            {/* Keyframe indicator lines */}
+            {keyframes.map((keyframe) => (
+              <div
+                key={keyframe.time}
+                className="absolute top-0 bottom-0 w-px bg-green-500 opacity-50"
+                style={{ left: `${timeToPosition(keyframe.time)}px` }}
+              />
             ))}
           </div>
         </div>

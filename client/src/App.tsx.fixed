@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Toolbar from "./components/Toolbar";
 import LeftSidebar from "./components/LeftSidebar";
 import PreviewCanvas from "./components/PreviewCanvas";
@@ -9,11 +9,12 @@ import PresetsPanel from "./components/PresetsPanel";
 import AutoSaveIndicator from "./components/AutoSaveIndicator";
 import { AnimationProvider } from "./context/AnimationContext";
 import { PluginProvider } from "./context/PluginContext";
+import { initializePlugin } from "./lib/figmaPlugin";
 
 function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPresetsPanelOpen, setIsPresetsPanelOpen] = useState(false);
-  const [selectedFrameId, setSelectedFrameId] = useState('frame-1');
+  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   
@@ -21,8 +22,15 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
+  // Initialize plugin when component mounts
+  useEffect(() => {
+    // Initialize the Figma plugin
+    initializePlugin();
+    console.log("Figma plugin initialized from App component");
+  }, []);
+
   // Listen for auto-save events
-  useState(() => {
+  useEffect(() => {
     const originalConsoleLog = console.log;
     console.log = function(...args) {
       if (args[0] && typeof args[0] === 'string' && 
@@ -36,7 +44,7 @@ function App() {
     return () => {
       console.log = originalConsoleLog;
     };
-  });
+  }, []);
 
   const handleExport = () => {
     setIsExportModalOpen(true);
