@@ -55,6 +55,11 @@ export enum LinkSyncMode {
   Independent = 'Independent' // No synchronization
 }
 
+export enum TimelineMode {
+  Animation = 'Animation', // Standard timeline mode for editing animations
+  FrameStyle = 'FrameStyle' // Mode for managing layer visibility across frames
+}
+
 export interface LinkedLayerInfo {
   groupId: string;        // Unique identifier for the linked group
   syncMode: LinkSyncMode; // How animations are synchronized

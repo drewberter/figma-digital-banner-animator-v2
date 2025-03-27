@@ -1,8 +1,15 @@
 import { useState, useRef, useEffect, useReducer } from 'react';
-import { Play, Pause, SkipBack, Clock, LogIn, LogOut } from 'lucide-react';
+import { Play, Pause, SkipBack, Clock, LogIn, LogOut, Eye, EyeOff, Layers, Zap } from 'lucide-react';
 import { mockLayers } from '../mock/animationData';
-import { Animation, AnimationType, EasingType, AnimationMode } from '../types/animation';
+import { 
+  Animation, 
+  AnimationType, 
+  EasingType, 
+  AnimationMode,
+  TimelineMode 
+} from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import * as Tabs from '@radix-ui/react-tabs';
 import { autoLinkLayers, syncLinkedLayerAnimations, unlinkLayer } from '../utils/linkingUtils';
 
 interface TimelineProps {
@@ -29,6 +36,9 @@ const Timeline = ({
   // Create a forceUpdate function for timeline component
   const [, forceUpdate] = useReducer(x => x + 1, 0);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  
+  // Add state for timeline mode (Animation or Frame Style)
+  const [timelineMode, setTimelineMode] = useState<TimelineMode>(TimelineMode.Animation);
   
   // Duration state
   const [duration, setDuration] = useState(5); // Default duration of 5 seconds
@@ -72,6 +82,28 @@ const Timeline = ({
       onUnlinkLayer(layerId);
     }
     forceUpdate(); // Force a re-render after unlinking
+  };
+  
+  // Handle toggling layer visibility in the current frame
+  const handleToggleLayerVisibility = (layerId: string) => {
+    console.log("Toggling visibility for layer", layerId, "in frame", selectedFrameId);
+    
+    // Find the current frame
+    const currentFrameIndex = Object.keys(mockLayers).findIndex(frameId => frameId === selectedFrameId);
+    if (currentFrameIndex === -1) return;
+    
+    const frame = mockLayers[selectedFrameId];
+    const layerIndex = frame.findIndex(l => l.id === layerId);
+    if (layerIndex === -1) return;
+    
+    // Toggle the layer's visibility
+    frame[layerIndex].visible = !frame[layerIndex].visible;
+    
+    // Update the layers for the current frame
+    mockLayers[selectedFrameId] = [...frame];
+    
+    // Force a re-render
+    forceUpdate();
   };
   
   // Get the layers for the current frame
@@ -447,64 +479,109 @@ const Timeline = ({
       {/* Top controls */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-neutral-800">
         <div className="flex items-center">
-          <button 
-            className="w-8 h-8 flex items-center justify-center rounded text-neutral-300 hover:bg-neutral-800"
-            onClick={() => onPlayPauseToggle(!isPlaying)}
-          >
-            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-          </button>
-          <button 
-            className="w-8 h-8 flex items-center justify-center rounded text-neutral-300 hover:bg-neutral-800 ml-1"
-            onClick={() => onTimeUpdate(0)}
-          >
-            <SkipBack size={16} />
-          </button>
-          <div className="flex items-center ml-4 text-sm text-neutral-400">
-            <Clock size={14} className="mr-1" />
-            <span className="font-mono">{currentTime.toFixed(1)}</span>
-            <span className="mx-1">/</span>
-            
-            {/* Duration display/edit control */}
-            {showDurationInput ? (
-              <input
-                type="number"
-                className="w-12 bg-neutral-800 text-white font-mono text-sm rounded px-1 py-0.5 border border-neutral-700"
-                value={duration}
-                min={1}
-                max={30}
-                step={1}
-                autoFocus
-                onChange={(e) => {
-                  const newDuration = Math.max(1, Math.min(30, Number(e.target.value)));
-                  setDuration(newDuration);
-                  // Call the parent component's onDurationChange callback if provided
-                  if (onDurationChange) {
-                    onDurationChange(newDuration);
-                  }
-                }}
-                onBlur={() => setShowDurationInput(false)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setShowDurationInput(false);
-                  }
-                }}
-              />
-            ) : (
-              <span 
-                className="font-mono cursor-pointer hover:text-white hover:underline" 
-                onClick={() => setShowDurationInput(true)}
-                title="Click to change duration"
-              >
-                {duration.toFixed(1)}s
-              </span>
-            )}
+          {/* Timeline Mode Toggle */}
+          <div className="mr-5 flex items-center">
+            <Tabs.Root 
+              value={timelineMode} 
+              onValueChange={(value) => setTimelineMode(value as TimelineMode)}
+              className="flex bg-neutral-800 rounded-md p-0.5"
+            >
+              <Tabs.List className="flex">
+                <Tabs.Trigger
+                  value={TimelineMode.Animation}
+                  className={`px-3 py-1 text-xs rounded-md flex items-center ${
+                    timelineMode === TimelineMode.Animation 
+                      ? 'bg-[#4A7CFF] text-white' 
+                      : 'text-neutral-300 hover:bg-neutral-700'
+                  }`}
+                >
+                  <Zap size={12} className="mr-1" />
+                  Animation
+                </Tabs.Trigger>
+                <Tabs.Trigger
+                  value={TimelineMode.FrameStyle}
+                  className={`px-3 py-1 text-xs rounded-md flex items-center ${
+                    timelineMode === TimelineMode.FrameStyle 
+                      ? 'bg-[#4A7CFF] text-white' 
+                      : 'text-neutral-300 hover:bg-neutral-700'
+                  }`}
+                >
+                  <Layers size={12} className="mr-1" />
+                  Frame Style
+                </Tabs.Trigger>
+              </Tabs.List>
+            </Tabs.Root>
           </div>
+          
+          {/* Animation controls - only show in Animation mode */}
+          {timelineMode === TimelineMode.Animation && (
+            <>
+              <button 
+                className="w-8 h-8 flex items-center justify-center rounded text-neutral-300 hover:bg-neutral-800"
+                onClick={() => onPlayPauseToggle(!isPlaying)}
+              >
+                {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+              </button>
+              <button 
+                className="w-8 h-8 flex items-center justify-center rounded text-neutral-300 hover:bg-neutral-800 ml-1"
+                onClick={() => onTimeUpdate(0)}
+              >
+                <SkipBack size={16} />
+              </button>
+              <div className="flex items-center ml-4 text-sm text-neutral-400">
+                <Clock size={14} className="mr-1" />
+                <span className="font-mono">{currentTime.toFixed(1)}</span>
+                <span className="mx-1">/</span>
+                
+                {/* Duration display/edit control */}
+                {showDurationInput ? (
+                  <input
+                    type="number"
+                    className="w-12 bg-neutral-800 text-white font-mono text-sm rounded px-1 py-0.5 border border-neutral-700"
+                    value={duration}
+                    min={1}
+                    max={30}
+                    step={1}
+                    autoFocus
+                    onChange={(e) => {
+                      const newDuration = Math.max(1, Math.min(30, Number(e.target.value)));
+                      setDuration(newDuration);
+                      // Call the parent component's onDurationChange callback if provided
+                      if (onDurationChange) {
+                        onDurationChange(newDuration);
+                      }
+                    }}
+                    onBlur={() => setShowDurationInput(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setShowDurationInput(false);
+                      }
+                    }}
+                  />
+                ) : (
+                  <span 
+                    className="font-mono cursor-pointer hover:text-white hover:underline" 
+                    onClick={() => setShowDurationInput(true)}
+                    title="Click to change duration"
+                  >
+                    {duration.toFixed(1)}s
+                  </span>
+                )}
+              </div>
+            </>
+          )}
         </div>
         
         <div className="flex items-center space-x-3">
-          <button className="text-sm text-blue-400 hover:text-blue-300">
-            Add Keyframe
-          </button>
+          {timelineMode === TimelineMode.Animation ? (
+            <button className="text-sm text-blue-400 hover:text-blue-300">
+              Add Keyframe
+            </button>
+          ) : (
+            <span className="text-xs text-neutral-400">
+              Toggle layer visibility per frame
+            </span>
+          )}
         </div>
       </div>
       
@@ -528,56 +605,89 @@ const Timeline = ({
               <div className="flex items-center">
                 {/* Layer name with linked indicator */}
                 <span className="flex items-center">
-                  {/* Link indicator - clickable to toggle link state */}
-                  <span 
-                    className={`mr-2 flex items-center ${layer.linkedLayer 
-                      ? (layer.linkedLayer.isMain ? 'text-blue-400 bg-blue-900' : 'text-blue-300 bg-blue-800') 
-                      : 'text-neutral-600'
-                    } ${layer.linkedLayer ? 'bg-opacity-60 px-1 py-0.5 rounded-sm cursor-pointer hover:bg-opacity-80' : 'cursor-pointer hover:text-neutral-400'}`}
-                    title={layer.linkedLayer 
-                      ? `Click to unlink (${layer.linkedLayer.isMain ? 'Main' : 'Secondary'}) - ${layer.linkedLayer.syncMode} sync` 
-                      : 'Not linked'
-                    }
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent selection of layer
-                      // Call our local handleUnlinkLayer function which updates the state
-                      handleUnlinkLayer(layer.id);
-                      console.log("Timeline: Clicked to unlink layer", layer.id);
-                    }}
-                  >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      width="14" 
-                      height="14" 
-                      viewBox="0 0 24 24" 
-                      fill={layer.linkedLayer ? "#3B82F6" : "none"} 
-                      stroke={layer.linkedLayer ? "#3B82F6" : "currentColor"} 
-                      strokeWidth="2" 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round"
+                  {/* Show different icon based on mode */}
+                  {timelineMode === TimelineMode.Animation ? (
+                    /* Link indicator - clickable to toggle link state */
+                    <span 
+                      className={`mr-2 flex items-center ${layer.linkedLayer 
+                        ? (layer.linkedLayer.isMain ? 'text-blue-400 bg-blue-900' : 'text-blue-300 bg-blue-800') 
+                        : 'text-neutral-600'
+                      } ${layer.linkedLayer ? 'bg-opacity-60 px-1 py-0.5 rounded-sm cursor-pointer hover:bg-opacity-80' : 'cursor-pointer hover:text-neutral-400'}`}
+                      title={layer.linkedLayer 
+                        ? `Click to unlink (${layer.linkedLayer.isMain ? 'Main' : 'Secondary'}) - ${layer.linkedLayer.syncMode} sync` 
+                        : 'Not linked'
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent selection of layer
+                        // Call our local handleUnlinkLayer function which updates the state
+                        handleUnlinkLayer(layer.id);
+                        console.log("Timeline: Clicked to unlink layer", layer.id);
+                      }}
                     >
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                    </svg>
-                    
-                    {/* Only show label if actually linked */}
-                    {layer.linkedLayer && (
-                      <span className="ml-1 text-xs font-bold">
-                        {layer.linkedLayer.isMain ? 'M' : 'L'}
-                      </span>
-                    )}
-                  </span>
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill={layer.linkedLayer ? "#3B82F6" : "none"} 
+                        stroke={layer.linkedLayer ? "#3B82F6" : "currentColor"} 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      >
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                      </svg>
+                      
+                      {/* Only show label if actually linked */}
+                      {layer.linkedLayer && (
+                        <span className="ml-1 text-xs font-bold">
+                          {layer.linkedLayer.isMain ? 'M' : 'L'}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    /* Visibility toggle - clickable to toggle visibility */
+                    <span 
+                      className={`mr-2 flex items-center ${layer.visible 
+                        ? 'text-green-400 hover:text-green-300' 
+                        : 'text-neutral-500 hover:text-neutral-400'
+                      } cursor-pointer`}
+                      title={layer.visible ? 'Layer is visible (click to hide)' : 'Layer is hidden (click to show)'}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent selection of layer
+                        handleToggleLayerVisibility(layer.id);
+                      }}
+                    >
+                      {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                    </span>
+                  )}
                   {layer.name}
                 </span>
               </div>
               
-              {/* Layer sync mode indicators (no separate unlink button) */}
-              {layer.linkedLayer && (
-                <div className="flex space-x-1">
-                  <span className="text-xs text-blue-300 px-1 py-0.5 rounded-sm bg-blue-900 bg-opacity-30">
-                    {layer.linkedLayer.syncMode}
-                  </span>
-                </div>
+              {/* Right side indicators/controls - different based on mode */}
+              {timelineMode === TimelineMode.Animation ? (
+                // Animation mode - show layer sync
+                layer.linkedLayer && (
+                  <div className="flex space-x-1">
+                    <span className="text-xs text-blue-300 px-1 py-0.5 rounded-sm bg-blue-900 bg-opacity-30">
+                      {layer.linkedLayer.syncMode}
+                    </span>
+                  </div>
+                )
+              ) : (
+                // Frame Style mode - visibility toggle button
+                <button
+                  className={`p-1 rounded ${layer.visible ? 'text-green-400 hover:bg-neutral-700' : 'text-neutral-500 hover:bg-neutral-700'}`}
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent selection of layer
+                    handleToggleLayerVisibility(layer.id);
+                  }}
+                  title={layer.visible ? 'Hide layer' : 'Show layer'}
+                >
+                  {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
               )}
             </div>
           ))}
@@ -621,137 +731,151 @@ const Timeline = ({
           <div 
             className="flex-1 bg-neutral-900 rounded cursor-pointer relative overflow-auto"
             style={{ minWidth: '400px', maxWidth: '100%' }} /* Ensure a reasonable size with scrolling */
-            onClick={handleTimelineClick}
+            onClick={timelineMode === TimelineMode.Animation ? handleTimelineClick : undefined}
             ref={timelineRef}
           >
-            {/* Display multiple animation tracks - one for each layer */}
-            {frameLayers.map((layer) => (
-              <ContextMenu.Root key={layer.id}>
-                <ContextMenu.Trigger asChild>
-                  <div 
-                    className={`h-10 relative ${selectedLayerId === layer.id ? 'bg-[#1A1A1A]' : ''}`}
-                  >
-                    {/* Animation blocks with drag handles */}
-                    {layer.animations.map((animation, animIndex) => (
-                      <ContextMenu.Root key={animIndex}>
-                        <ContextMenu.Trigger asChild>
-                          {renderAnimationBlock(layer, animation, animIndex)}
-                        </ContextMenu.Trigger>
-                        
-                        {/* Context menu for individual animation blocks */}
+            {timelineMode === TimelineMode.Animation ? (
+              // Animation Mode - Show animation tracks
+              frameLayers.map((layer) => (
+                <ContextMenu.Root key={layer.id}>
+                  <ContextMenu.Trigger asChild>
+                    <div 
+                      className={`h-10 relative ${selectedLayerId === layer.id ? 'bg-[#1A1A1A]' : ''}`}
+                    >
+                      {/* Animation blocks with drag handles */}
+                      {layer.animations.map((animation, animIndex) => (
+                        <ContextMenu.Root key={animIndex}>
+                          <ContextMenu.Trigger asChild>
+                            {renderAnimationBlock(layer, animation, animIndex)}
+                          </ContextMenu.Trigger>
+                          
+                          {/* Context menu for individual animation blocks */}
+                          <ContextMenu.Portal>
+                            <ContextMenu.Content 
+                              className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50"
+                            >
+                              <ContextMenu.Item 
+                                className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                                onClick={() => handleDeleteAnimation(layer.id, animIndex)}
+                              >
+                                Delete Animation
+                              </ContextMenu.Item>
+                              
+                              <ContextMenu.Separator className="h-px bg-neutral-700 my-1" />
+                              
+                              <ContextMenu.Item 
+                                className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                                onClick={() => handleToggleAnimationMode(layer.id, animIndex)}
+                              >
+                                {animation.mode === AnimationMode.Exit 
+                                  ? 'Convert to Entrance' 
+                                  : 'Convert to Exit'}
+                              </ContextMenu.Item>
+                              
+                              <ContextMenu.Separator className="h-px bg-neutral-700 my-1" />
+                              
+                              <ContextMenu.Sub>
+                                <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
+                                  <span>Change Type</span>
+                                  <span>▶</span>
+                                </ContextMenu.SubTrigger>
+                                <ContextMenu.Portal>
+                                  <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
+                                    {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
+                                      <ContextMenu.Item 
+                                        key={type}
+                                        className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                                        onClick={() => handleChangeAnimationType(layer.id, animIndex, type)}
+                                      >
+                                        {type}
+                                      </ContextMenu.Item>
+                                    ))}
+                                  </ContextMenu.SubContent>
+                                </ContextMenu.Portal>
+                              </ContextMenu.Sub>
+                            </ContextMenu.Content>
+                          </ContextMenu.Portal>
+                        </ContextMenu.Root>
+                      ))}
+                      
+                      {/* Only show keyframes for selected layer */}
+                      {selectedLayerId === layer.id && keyframes.map((keyframe, keyIndex) => (
+                        <div 
+                          key={keyIndex}
+                          className="absolute w-3 h-3 top-3.5 -ml-1.5 rounded-sm bg-yellow-500 border border-yellow-600"
+                          style={{ left: `${timeToPosition(keyframe.time)}px` }}
+                        ></div>
+                      ))}
+                    </div>
+                  </ContextMenu.Trigger>
+                  
+                  {/* Context menu for layer track (empty area) */}
+                  <ContextMenu.Portal>
+                    <ContextMenu.Content 
+                      className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50"
+                    >
+                      <ContextMenu.Sub>
+                        <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
+                          <span className="flex items-center">
+                            <LogIn size={14} className="mr-1.5" />
+                            Add Entrance Animation
+                          </span>
+                          <span>▶</span>
+                        </ContextMenu.SubTrigger>
                         <ContextMenu.Portal>
-                          <ContextMenu.Content 
-                            className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50"
-                          >
-                            <ContextMenu.Item 
-                              className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                              onClick={() => handleDeleteAnimation(layer.id, animIndex)}
-                            >
-                              Delete Animation
-                            </ContextMenu.Item>
-                            
-                            <ContextMenu.Separator className="h-px bg-neutral-700 my-1" />
-                            
-                            <ContextMenu.Item 
-                              className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                              onClick={() => handleToggleAnimationMode(layer.id, animIndex)}
-                            >
-                              {animation.mode === AnimationMode.Exit 
-                                ? 'Convert to Entrance' 
-                                : 'Convert to Exit'}
-                            </ContextMenu.Item>
-                            
-                            <ContextMenu.Separator className="h-px bg-neutral-700 my-1" />
-                            
-                            <ContextMenu.Sub>
-                              <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
-                                <span>Change Type</span>
-                                <span>▶</span>
-                              </ContextMenu.SubTrigger>
-                              <ContextMenu.Portal>
-                                <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
-                                  {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
-                                    <ContextMenu.Item 
-                                      key={type}
-                                      className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                                      onClick={() => handleChangeAnimationType(layer.id, animIndex, type)}
-                                    >
-                                      {type}
-                                    </ContextMenu.Item>
-                                  ))}
-                                </ContextMenu.SubContent>
-                              </ContextMenu.Portal>
-                            </ContextMenu.Sub>
-                          </ContextMenu.Content>
+                          <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
+                            {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
+                              <ContextMenu.Item 
+                                key={type}
+                                className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                                onClick={() => handleAddAnimationToLayer(layer.id, type, AnimationMode.Entrance)}
+                              >
+                                {type}
+                              </ContextMenu.Item>
+                            ))}
+                          </ContextMenu.SubContent>
                         </ContextMenu.Portal>
-                      </ContextMenu.Root>
-                    ))}
-                    
-                    {/* Only show keyframes for selected layer */}
-                    {selectedLayerId === layer.id && keyframes.map((keyframe, keyIndex) => (
-                      <div 
-                        key={keyIndex}
-                        className="absolute w-3 h-3 top-3.5 -ml-1.5 rounded-sm bg-yellow-500 border border-yellow-600"
-                        style={{ left: `${timeToPosition(keyframe.time)}px` }}
-                      ></div>
-                    ))}
-                  </div>
-                </ContextMenu.Trigger>
-                
-                {/* Context menu for layer track (empty area) */}
-                <ContextMenu.Portal>
-                  <ContextMenu.Content 
-                    className="min-w-[180px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50"
-                  >
-                    <ContextMenu.Sub>
-                      <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
-                        <span className="flex items-center">
-                          <LogIn size={14} className="mr-1.5" />
-                          Add Entrance Animation
-                        </span>
-                        <span>▶</span>
-                      </ContextMenu.SubTrigger>
-                      <ContextMenu.Portal>
-                        <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
-                          {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
-                            <ContextMenu.Item 
-                              key={type}
-                              className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                              onClick={() => handleAddAnimationToLayer(layer.id, type, AnimationMode.Entrance)}
-                            >
-                              {type}
-                            </ContextMenu.Item>
-                          ))}
-                        </ContextMenu.SubContent>
-                      </ContextMenu.Portal>
-                    </ContextMenu.Sub>
-                    
-                    <ContextMenu.Sub>
-                      <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
-                        <span className="flex items-center">
-                          <LogOut size={14} className="mr-1.5" />
-                          Add Exit Animation
-                        </span>
-                        <span>▶</span>
-                      </ContextMenu.SubTrigger>
-                      <ContextMenu.Portal>
-                        <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
-                          {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
-                            <ContextMenu.Item 
-                              key={type}
-                              className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                              onClick={() => handleAddAnimationToLayer(layer.id, type, AnimationMode.Exit)}
-                            >
-                              {type}
-                            </ContextMenu.Item>
-                          ))}
-                        </ContextMenu.SubContent>
-                      </ContextMenu.Portal>
-                    </ContextMenu.Sub>
-                  </ContextMenu.Content>
-                </ContextMenu.Portal>
-              </ContextMenu.Root>
-            ))}
+                      </ContextMenu.Sub>
+                      
+                      <ContextMenu.Sub>
+                        <ContextMenu.SubTrigger className="text-sm text-white px-3 py-2 flex items-center justify-between hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600">
+                          <span className="flex items-center">
+                            <LogOut size={14} className="mr-1.5" />
+                            Add Exit Animation
+                          </span>
+                          <span>▶</span>
+                        </ContextMenu.SubTrigger>
+                        <ContextMenu.Portal>
+                          <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
+                            {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
+                              <ContextMenu.Item 
+                                key={type}
+                                className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
+                                onClick={() => handleAddAnimationToLayer(layer.id, type, AnimationMode.Exit)}
+                              >
+                                {type}
+                              </ContextMenu.Item>
+                            ))}
+                          </ContextMenu.SubContent>
+                        </ContextMenu.Portal>
+                      </ContextMenu.Sub>
+                    </ContextMenu.Content>
+                  </ContextMenu.Portal>
+                </ContextMenu.Root>
+              ))
+            ) : (
+              // Frame Style Mode - Show layer visibility status area
+              <div className="p-4 flex flex-col items-center justify-center h-full text-neutral-400">
+                <div className="flex flex-col items-center space-y-3">
+                  <Layers size={32} className="text-neutral-600 mb-2" />
+                  <h3 className="text-lg font-medium text-neutral-300">Frame Style Mode</h3>
+                  <p className="text-sm text-center max-w-md">
+                    Use the eye icons in the layer panel to toggle visibility for each layer in this frame.
+                    These settings will be saved with the current frame.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
