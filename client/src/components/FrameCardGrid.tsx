@@ -12,6 +12,7 @@ interface FrameCardGridProps {
   onAddFrame: () => void;
   onDuplicateFrame: (frameId: string) => void;
   onDeleteFrame: (frameId: string) => void;
+  onDelayChange?: (frameId: string, delay: number) => void;
 }
 
 const FrameCardGrid = ({
@@ -22,7 +23,8 @@ const FrameCardGrid = ({
   onToggleLayerVisibility,
   onAddFrame,
   onDuplicateFrame,
-  onDeleteFrame
+  onDeleteFrame,
+  onDelayChange
 }: FrameCardGridProps) => {
   // Create an array of frame entries for easier mapping
   const frameEntries = Object.entries(frames).map(([id, frame]) => ({
@@ -42,6 +44,7 @@ const FrameCardGrid = ({
           onToggleLayerVisibility={(layerId) => onToggleLayerVisibility(frame.id, layerId)}
           onDuplicate={() => onDuplicateFrame(frame.id)}
           onDelete={() => onDeleteFrame(frame.id)}
+          onDelayChange={onDelayChange}
         />
       ))}
 
@@ -104,22 +107,30 @@ const FrameCard = ({
           <div className="relative z-10 p-3 flex flex-col items-center justify-center w-full h-full">
             {/* Headline */}
             {layers.find(l => l.name === 'Headline' && l.visible) && (
-              <div className="text-lg font-bold text-white mb-1 text-center">Headline Text</div>
+              <div className="text-lg font-bold text-white mb-1 text-center">
+                {frame.headlineText || "Headline Text"}
+              </div>
             )}
             
             {/* Subhead */}
             {layers.find(l => l.name === 'Subhead' && l.visible) && (
-              <div className="text-xs text-white mb-2 text-center">Subhead description text</div>
+              <div className="text-xs text-white mb-2 text-center">
+                {frame.description || "Subhead description text"}
+              </div>
             )}
             
             {/* CTA Button */}
             {layers.find(l => l.name === 'CTA Button' && l.visible) && (
-              <div className="bg-yellow-500 text-black text-xs px-2 py-1 rounded mb-2">CTA Button</div>
+              <div className="bg-yellow-500 text-black text-xs px-2 py-1 rounded mb-2">
+                {frame.buttonText || "Shop Now"}
+              </div>
             )}
             
             {/* Logo */}
             {layers.find(l => l.name === 'Logo' && l.visible) && (
-              <div className="mt-auto text-xs bg-white text-black px-2 py-1 rounded-full">Logo</div>
+              <div className="mt-auto text-xs bg-white text-black px-2 py-1 rounded-full">
+                {frame.logoText || "LOGO"}
+              </div>
             )}
           </div>
         </div>

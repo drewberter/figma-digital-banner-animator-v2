@@ -314,33 +314,47 @@ const PreviewCanvas = ({
               transformOrigin: 'top left'
             }}
           >
-            {/* Demo content showing a typical banner structure */}
-            <div className="relative w-full h-full bg-gradient-to-br from-blue-500 to-indigo-700">
-              {/* Headline text */}
+            {/* Dynamic content based on visible layers */}
+            <div className="relative w-full h-full">
+              {/* Background - only show if visible */}
+              {backgroundLayer && backgroundLayer.visible && (
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-700"></div>
+              )}
+              
+              {/* Headline text - only show if visible */}
               <div className="absolute top-10 left-0 right-0 text-center">
-                <h2 ref={headlineRef} className="text-white text-2xl font-bold mb-2 transition-all duration-300">
-                  Amazing Offer
-                </h2>
-                <p ref={subtitleRef} className="text-white text-sm transition-all duration-300">
-                  Limited time only!
-                </p>
+                {headlineLayer && headlineLayer.visible && (
+                  <h2 ref={headlineRef} className="text-white text-2xl font-bold mb-2 transition-all duration-300">
+                    {selectedFrame.headlineText || "Amazing Offer"}
+                  </h2>
+                )}
+                
+                {subtitleLayer && subtitleLayer.visible && (
+                  <p ref={subtitleRef} className="text-white text-sm transition-all duration-300">
+                    {selectedFrame.description || "Limited time only!"}
+                  </p>
+                )}
               </div>
               
-              {/* CTA Button */}
+              {/* CTA Button - only show if visible */}
               <div className="absolute bottom-12 left-0 right-0 flex justify-center">
-                <button 
-                  ref={buttonRef}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-medium transition-all duration-300"
-                >
-                  Shop Now
-                </button>
+                {buttonLayer && buttonLayer.visible && (
+                  <button 
+                    ref={buttonRef}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-medium transition-all duration-300"
+                  >
+                    Shop Now
+                  </button>
+                )}
               </div>
               
-              {/* Logo */}
+              {/* Logo - only show if visible */}
               <div className="absolute bottom-2 left-0 right-0 flex justify-center">
-                <div ref={logoRef} className="text-white text-xs opacity-75 transition-all duration-300">
-                  LOGO
-                </div>
+                {logoLayer && logoLayer.visible && (
+                  <div ref={logoRef} className="text-white text-xs bg-white text-black px-2 py-1 rounded-full transition-all duration-300">
+                    LOGO
+                  </div>
+                )}
               </div>
             </div>
           </div>
