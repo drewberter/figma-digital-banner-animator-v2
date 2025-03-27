@@ -89,6 +89,7 @@ export interface AnimationFrame {
   imageUrl?: string;
   hiddenLayers?: string[]; // IDs of layers that should be hidden in this frame
   size?: string; // Identifier for frame size category (e.g., '300x250', '728x90')
+  delay?: number; // Delay in seconds before animations start for this frame
 }
 
 export interface Preset {

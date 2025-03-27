@@ -2,12 +2,14 @@ import { useState, useRef, useEffect, useReducer } from 'react';
 import { Play, Pause, SkipBack, Clock, LogIn, LogOut, Eye, EyeOff, Layers, Zap, Plus } from 'lucide-react';
 import { mockLayers } from '../mock/animationData';
 import FrameEditDialog from './FrameEditDialog';
+import FrameCardGrid from './FrameCardGrid';
 import { 
   Animation, 
   AnimationType, 
   EasingType, 
   AnimationMode,
-  TimelineMode 
+  TimelineMode,
+  AnimationFrame
 } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -472,6 +474,127 @@ const Timeline = ({
     console.log("Added new frame:", newFrame.id);
   };
 
+  // Handle creating a new blank frame for the frame card grid
+  const handleAddBlankFrame = () => {
+    // Generate sequential frame number
+    const existingFrameCount = Object.keys(mockLayers).length;
+    const frameNumber = existingFrameCount + 1;
+    
+    // Create new frame with unique ID
+    const newFrameId = `frame-${Date.now()}`;
+    const newFrame = {
+      id: newFrameId,
+      name: `Frame ${frameNumber}`,
+      selected: true,
+      width: 300,
+      height: 250,
+      headlineText: '',
+      description: '',
+      hiddenLayers: []
+    };
+    
+    // Clone layers from current frame as a starting point
+    const currentFrame = mockLayers[selectedFrameId];
+    if (currentFrame) {
+      mockLayers[newFrameId] = currentFrame.map(layer => ({
+        ...layer,
+        visible: true // Start with all layers visible
+      }));
+    }
+    
+    // Set this as the selected frame
+    // In a real app with context, we would update the selected frame ID in the context
+    
+    // Force a re-render
+    forceUpdate();
+    
+    console.log("Added new blank frame:", newFrameId);
+  };
+
+  // Handle duplicating a frame
+  const handleDuplicateFrame = (frameId: string) => {
+    const sourceFrame = mockLayers[frameId];
+    if (!sourceFrame) return;
+    
+    // Generate a new frame ID
+    const newFrameId = `frame-${Date.now()}`;
+    
+    // Get existing frame count for naming
+    const existingFrameCount = Object.keys(mockLayers).length;
+    const frameNumber = existingFrameCount + 1;
+    
+    // Clone the source frame's layers
+    mockLayers[newFrameId] = sourceFrame.map(layer => ({
+      ...layer
+    }));
+    
+    // Force a re-render
+    forceUpdate();
+    
+    console.log("Duplicated frame", frameId, "to", newFrameId);
+  };
+
+  // Handle deleting a frame
+  const handleDeleteFrame = (frameId: string) => {
+    // Don't delete if it's the only frame
+    if (Object.keys(mockLayers).length <= 1) {
+      console.log("Cannot delete the only frame");
+      return;
+    }
+    
+    // Delete the frame
+    delete mockLayers[frameId];
+    
+    // If the deleted frame was selected, select another frame
+    if (frameId === selectedFrameId) {
+      const remainingFrames = Object.keys(mockLayers);
+      if (remainingFrames.length > 0) {
+        // In a real app, we would update the selected frame in context
+        console.log("Selecting new frame", remainingFrames[0]);
+      }
+    }
+    
+    // Force a re-render
+    forceUpdate();
+    
+    console.log("Deleted frame:", frameId);
+  };
+  
+  // Handle toggling a layer's visibility in a specific frame
+  const handleToggleLayerVisibilityInFrame = (frameId: string, layerId: string) => {
+    const frame = mockLayers[frameId];
+    if (!frame) return;
+    
+    const layerIndex = frame.findIndex(l => l.id === layerId);
+    if (layerIndex === -1) return;
+    
+    // Toggle the layer's visibility
+    frame[layerIndex].visible = !frame[layerIndex].visible;
+    
+    // Update the layers for this frame
+    mockLayers[frameId] = [...frame];
+    
+    // Force a re-render
+    forceUpdate();
+    
+    console.log(`Toggled visibility of layer ${layerId} in frame ${frameId} to ${frame[layerIndex].visible}`);
+  };
+  
+  // Handle changing a frame's delay
+  const handleFrameDelayChange = (frameId: string, delay: number) => {
+    // In a real application, we would update this in the global state
+    // Since we're using mock data, we'll just log it
+    console.log(`Setting delay of ${delay}s for frame ${frameId}`);
+    
+    // An object to store frame metadata (like delays)
+    // In a real app, this would be stored in the animation context
+    const frameMetadata: Record<string, { delay: number }> = {};
+    frameMetadata[frameId] = { delay };
+    
+    // Force a re-render
+    forceUpdate();
+  };
+
   // Render animation block with drag handles
   const renderAnimationBlock = (layer: any, animation: any, animIndex: number) => {
     // Determine if this is an entrance or exit animation
@@ -923,17 +1046,31 @@ const Timeline = ({
                 </ContextMenu.Root>
               ))
             ) : (
-              // Frame Style Mode - Show layer visibility status area
-              <div className="p-4 flex flex-col items-center justify-center h-full text-neutral-400">
-                <div className="flex flex-col items-center space-y-3">
-                  <Layers size={32} className="text-neutral-600 mb-2" />
-                  <h3 className="text-lg font-medium text-neutral-300">Frame Style Mode</h3>
-                  <p className="text-sm text-center max-w-md">
-                    Use the eye icons in the layer panel to toggle visibility for each layer in this frame.
-                    These settings will be saved with the current frame.
-                  </p>
-                </div>
-              </div>
+              // Frame Style Mode - Show card grid for frame management
+              <FrameCardGrid
+                frames={Object.keys(mockLayers).reduce((acc, frameId) => {
+                  // Create frame objects from mockLayers keys
+                  acc[frameId] = {
+                    id: frameId,
+                    name: `Frame ${frameId.split('-')[1] || ''}`, // Extract frame number from ID
+                    selected: frameId === selectedFrameId,
+                    width: 300, // Default width
+                    height: 250, // Default height
+                    delay: 0 // Default delay
+                  };
+                  return acc;
+                }, {} as Record<string, AnimationFrame>)}
+                layers={mockLayers}
+                selectedFrameId={selectedFrameId}
+                onFrameSelect={(frameId) => {
+                  // In a real app, this would update context state
+                  console.log("Selected frame:", frameId);
+                }}
+                onToggleLayerVisibility={handleToggleLayerVisibilityInFrame}
+                onAddFrame={handleAddBlankFrame}
+                onDuplicateFrame={handleDuplicateFrame}
+                onDeleteFrame={handleDeleteFrame}
+              />
             )}
           </div>
         </div>
