@@ -26,6 +26,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
   const [videoBitrate, setVideoBitrate] = useState(5000); // kbps
   const [videoFormat, setVideoFormat] = useState<'h264' | 'vp9'>('h264'); // Codec selection
   const [transparent, setTransparent] = useState(false); // For WebM transparency
+  const [specialGifFormat, setSpecialGifFormat] = useState(false); // Special client GIF format
   
   // Common banner sizes
   const sizes: ExportSize[] = [
@@ -49,17 +50,50 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
     };
     
     if (exportType === 'gif') {
-      const gifOptions = {
-        frames,
-        ...commonOptions,
-        quality: quality === 'high' ? 1 : quality === 'medium' ? 0.6 : 0.3,
-        dithering: quality === 'high' ? 'diffusion' : quality === 'medium' ? 'pattern' : 'none',
-        colorDepth: quality === 'high' ? 24 : quality === 'medium' ? 16 : 8,
-        loop: true
-      };
-      
-      console.log('Exporting as GIF:', gifOptions);
-      exportGif(gifOptions);
+      if (specialGifFormat) {
+        // Extract exactly 3 frames for the special format client requirements
+        // If there are more than 3 frames, take beginning, middle and end frames
+        let selectedFrames = [...frames];
+        if (frames.length > 3) {
+          const middle = Math.floor(frames.length / 2);
+          selectedFrames = [
+            frames[0],
+            frames[middle],
+            frames[frames.length - 1]
+          ];
+        } else if (frames.length < 3) {
+          // If less than 3 frames, duplicate the last frame to make up 3
+          while (selectedFrames.length < 3) {
+            selectedFrames.push(frames[frames.length - 1]);
+          }
+        }
+        
+        const specialGifOptions = {
+          frames: selectedFrames,
+          ...commonOptions,
+          quality: 1, // Always use high quality for client special format
+          dithering: 'diffusion' as 'diffusion' | 'pattern' | 'none',
+          colorDepth: 24 as 8 | 16 | 24, 
+          loop: true,
+          disposal: 'none' as 'none' | 'background' | 'previous',
+          delay: 2500 // 2.5 seconds between frames
+        };
+        
+        console.log('Exporting as Special Client GIF Format:', specialGifOptions);
+        exportGif(specialGifOptions);
+      } else {
+        const gifOptions = {
+          frames,
+          ...commonOptions,
+          quality: quality === 'high' ? 1 : quality === 'medium' ? 0.6 : 0.3,
+          dithering: (quality === 'high' ? 'diffusion' : quality === 'medium' ? 'pattern' : 'none') as 'diffusion' | 'pattern' | 'none',
+          colorDepth: (quality === 'high' ? 24 : quality === 'medium' ? 16 : 8) as 8 | 16 | 24,
+          loop: true
+        };
+        
+        console.log('Exporting as GIF:', gifOptions);
+        exportGif(gifOptions);
+      }
     } 
     else if (exportType === 'html') {
       const htmlOptions = {
@@ -68,7 +102,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
         includeClickTag: includeFallback,
         optimizeForAdNetworks,
         generateFallback: includeFallback,
-        adPlatform: optimizeForAdNetworks ? 'google' : 'generic'
+        adPlatform: (optimizeForAdNetworks ? 'google' : 'generic') as 'google' | 'meta' | 'generic'
       };
       
       console.log('Exporting as HTML5:', htmlOptions);
@@ -79,7 +113,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
         frames,
         ...commonOptions,
         videoBitrate,
-        codec: 'h264'
+        codec: 'h264' as 'h264'  // Type assertion to match the expected type
       };
       
       console.log('Exporting as MP4:', mp4Options);
@@ -90,7 +124,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
         frames,
         ...commonOptions,
         videoBitrate,
-        codec: 'vp9',
+        codec: 'vp9' as 'vp9',  // Type assertion to match the expected type
         transparent
       };
       
@@ -176,18 +210,21 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
                   <button
                     className={`flex-1 py-2 ${quality === 'low' ? 'bg-[#1a1a1a] text-neutral-200' : 'bg-[#151515] text-neutral-400'}`}
                     onClick={() => setQuality('low')}
+                    disabled={specialGifFormat}
                   >
                     Low
                   </button>
                   <button
                     className={`flex-1 py-2 ${quality === 'medium' ? 'bg-[#1a1a1a] text-neutral-200' : 'bg-[#151515] text-neutral-400'}`}
                     onClick={() => setQuality('medium')}
+                    disabled={specialGifFormat}
                   >
                     Medium
                   </button>
                   <button
                     className={`flex-1 py-2 ${quality === 'high' ? 'bg-[#1a1a1a] text-neutral-200' : 'bg-[#151515] text-neutral-400'}`}
                     onClick={() => setQuality('high')}
+                    disabled={specialGifFormat}
                   >
                     High
                   </button>
@@ -204,11 +241,30 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
                   value={fps}
                   onChange={(e) => setFps(parseInt(e.target.value))}
                   className="w-full"
+                  disabled={specialGifFormat}
                 />
                 <div className="flex justify-between text-xs text-neutral-500">
                   <span>15 fps</span>
-                  <span className="text-neutral-300">{fps} fps</span>
+                  <span className="text-neutral-300">{specialGifFormat ? "0.4 fps (2.5s delay)" : `${fps} fps`}</span>
                   <span>60 fps</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center px-3 py-3 mt-2 bg-[#1a1a1a] rounded border border-[#4A7CFF] border-opacity-30">
+                <input
+                  type="checkbox"
+                  id="specialGifFormat"
+                  checked={specialGifFormat}
+                  onChange={(e) => setSpecialGifFormat(e.target.checked)}
+                  className="mr-3"
+                />
+                <div>
+                  <label htmlFor="specialGifFormat" className="text-sm text-neutral-200 font-medium">
+                    Client Special Format
+                  </label>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    3 frames, 2.5s between frames, no disposal
+                  </p>
                 </div>
               </div>
             </>

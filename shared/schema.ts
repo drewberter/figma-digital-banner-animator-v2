@@ -110,9 +110,9 @@ export const exportGifOptionsSchema = z.object({
   height: z.number().positive(),
   quality: z.number().min(0).max(1),
   dithering: z.enum(['none', 'pattern', 'diffusion']).optional(),
-  colorDepth: z.enum(['8', '16', '24']).optional(),
+  colorDepth: z.union([z.literal(8), z.literal(16), z.literal(24)]).optional(),
   disposal: z.enum(['none', 'background', 'previous']).optional(),
-  delay: z.number().optional(),
+  delay: z.number().optional(), // In milliseconds, special client format uses 2500ms
   loop: z.union([z.number(), z.boolean()]).optional()
 });
 
