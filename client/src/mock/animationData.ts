@@ -152,6 +152,8 @@ export const mockGifFrames: GifFrame[] = [
 ];
 
 // Generate GIF frames for a specific ad size
+// Standardized format for GIF frame IDs: gif-frame-[adSizeId]-[frameNumber]
+// Example: gif-frame-frame-1-1 for the first frame of ad size "frame-1"
 export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
   // If no ad size provided, return empty array
   if (!adSizeId) return [];
@@ -163,13 +165,20 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
   // Get layers for this ad size
   const layers = mockLayers[adSizeId] || [];
   
-  // Create GIF frames based on the specific ad size
-  // For this demo, we'll create 3 frames with different layer visibility
+  // First, check if we already have GIF frames for this ad size
+  const existingFrames = mockGifFrames.filter(f => f.adSizeId === adSizeId);
+  if (existingFrames.length > 0) {
+    console.log(`Found ${existingFrames.length} existing GIF frames for ad size ${adSizeId}`);
+    return existingFrames;
+  }
+  
+  // If no existing frames, create GIF frames based on the specific ad size
+  console.log(`Creating new GIF frames for ad size ${adSizeId}`);
   const frames: GifFrame[] = [];
   
   // Create frame 1 - All layers visible
   frames.push({
-    id: `gif-frame-${adSizeId}-1`, // Format: gif-frame-[adSizeId]-[frameNumber]
+    id: `gif-frame-${adSizeId}-1`, 
     name: 'Frame 1',
     selected: true,
     delay: 1.0, // Reduced delay for better playback experience
@@ -184,10 +193,10 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
   
   // Create frame 2 - Hide one layer (e.g., subheadline)
   frames.push({
-    id: `gif-frame-${adSizeId}-2`, // Format: gif-frame-[adSizeId]-[frameNumber]
+    id: `gif-frame-${adSizeId}-2`,
     name: 'Frame 2',
     selected: false,
-    delay: 1.0, // Reduced delay for better playback experience
+    delay: 1.0,
     adSizeId: adSizeId,
     hiddenLayers: thirdLayerId ? [thirdLayerId] : [],
     visibleLayerCount: thirdLayerId ? layers.length - 1 : layers.length,
@@ -199,10 +208,10 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
   
   // Create frame 3 - Hide two layers (e.g., subheadline and logo)
   frames.push({
-    id: `gif-frame-${adSizeId}-3`, // Format: gif-frame-[adSizeId]-[frameNumber]
+    id: `gif-frame-${adSizeId}-3`,
     name: 'Frame 3',
     selected: false,
-    delay: 1.0, // Reduced delay for better playback experience
+    delay: 1.0,
     adSizeId: adSizeId,
     hiddenLayers: [
       ...(thirdLayerId ? [thirdLayerId] : []),
@@ -211,6 +220,9 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
     visibleLayerCount: layers.length - (thirdLayerId ? 1 : 0) - (lastLayerId ? 1 : 0),
     frameIndex: 2
   });
+  
+  // Add the new frames to mockGifFrames
+  mockGifFrames.push(...frames);
   
   return frames;
 }

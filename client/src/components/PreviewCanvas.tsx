@@ -301,24 +301,71 @@ const PreviewCanvas = ({
       processAnimations(logoRef.current, logoLayer, '1', 'rotate(0deg)');
     } else {
       // In GIF frame mode, all elements are fully visible without animations
-      if (headlineRef.current) {
-        headlineRef.current.style.opacity = '1';
-        headlineRef.current.style.transform = 'translateY(0)';
-      }
-      if (subtitleRef.current) {
-        subtitleRef.current.style.opacity = '1';
-        subtitleRef.current.style.transform = 'translateY(0)';
-      }
-      if (buttonRef.current) {
-        buttonRef.current.style.opacity = '1';
-        buttonRef.current.style.transform = 'scale(1)';
-      }
-      if (logoRef.current) {
-        logoRef.current.style.opacity = '1';
-        logoRef.current.style.transform = 'rotate(0deg)';
+      // But we respect the layer visibility settings from the GIF frame
+      
+      // Get the current GIF frame to read its layer visibility settings
+      if (isGifFrame) {
+        const currentGifFrame = mockGifFrames.find(f => f.id === selectedFrameId);
+        if (currentGifFrame) {
+          // Apply the frame's delay setting (for preview purposes)
+          const frameDelay = currentGifFrame.delay || 1.0;
+          console.log(`Using delay ${frameDelay}s from GIF frame:`, selectedFrameId);
+          
+          // Use the hiddenLayers array to determine visibility
+          const isHeadlineHidden = currentGifFrame.hiddenLayers.some(id => 
+            id.includes('Headline') || id.endsWith('-2'));
+          const isSubheadHidden = currentGifFrame.hiddenLayers.some(id => 
+            id.includes('Subhead') || id.endsWith('-3'));
+          const isButtonHidden = currentGifFrame.hiddenLayers.some(id => 
+            id.includes('Button') || id.endsWith('-4'));
+          const isLogoHidden = currentGifFrame.hiddenLayers.some(id => 
+            id.includes('Logo') || id.endsWith('-5'));
+          
+          // Apply visibility to each element
+          if (headlineRef.current) {
+            headlineRef.current.style.opacity = isHeadlineHidden ? '0' : '1';
+            headlineRef.current.style.transform = 'translateY(0)';
+          }
+          if (subtitleRef.current) {
+            subtitleRef.current.style.opacity = isSubheadHidden ? '0' : '1';
+            subtitleRef.current.style.transform = 'translateY(0)';
+          }
+          if (buttonRef.current) {
+            buttonRef.current.style.opacity = isButtonHidden ? '0' : '1';
+            buttonRef.current.style.transform = 'scale(1)';
+          }
+          if (logoRef.current) {
+            logoRef.current.style.opacity = isLogoHidden ? '0' : '1';
+            logoRef.current.style.transform = 'rotate(0deg)';
+          }
+        } else {
+          // If we can't find the GIF frame, make all elements visible
+          if (headlineRef.current) headlineRef.current.style.opacity = '1';
+          if (subtitleRef.current) subtitleRef.current.style.opacity = '1';
+          if (buttonRef.current) buttonRef.current.style.opacity = '1';
+          if (logoRef.current) logoRef.current.style.opacity = '1';
+        }
+      } else {
+        // Default behavior - show all elements
+        if (headlineRef.current) {
+          headlineRef.current.style.opacity = '1';
+          headlineRef.current.style.transform = 'translateY(0)';
+        }
+        if (subtitleRef.current) {
+          subtitleRef.current.style.opacity = '1';
+          subtitleRef.current.style.transform = 'translateY(0)';
+        }
+        if (buttonRef.current) {
+          buttonRef.current.style.opacity = '1';
+          buttonRef.current.style.transform = 'scale(1)';
+        }
+        if (logoRef.current) {
+          logoRef.current.style.opacity = '1';
+          logoRef.current.style.transform = 'rotate(0deg)';
+        }
       }
     }
-  }, [currentTime, selectedFrameId, timelineMode]);
+  }, [currentTime, selectedFrameId, timelineMode, isGifFrame]);
 
   // Calculate scaling factor to fit the frame within the preview area
   const calculateScaleFactor = () => {

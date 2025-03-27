@@ -823,6 +823,42 @@ const Timeline = ({
       const sourceGifFrame = mockGifFrames.find(frame => frame.id === frameId);
       if (!sourceGifFrame) {
         console.error("Source GIF frame not found:", frameId);
+        
+        // If we can't find the frame, try to extract the ad size ID from the frame ID
+        const parts = frameId.split('-');
+        let adSizeId = '';
+        
+        if (parts.length >= 4) {
+          if (parts[2] === 'frame') {
+            // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
+            adSizeId = `${parts[2]}-${parts[3]}`;
+          } else {
+            // Format is gif-frame-X-Y, determine if X is a frame number or part of the ad size ID
+            adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+          }
+        } else if (parts.length === 4) {
+          // Old format: gif-frame-1-1
+          adSizeId = `frame-${parts[2]}`;
+        }
+        
+        if (!adSizeId) {
+          console.error("Could not extract ad size ID from frame ID:", frameId);
+          return;
+        }
+        
+        // Generate a new GIF frame from the ad size
+        console.log("Creating new frame for ad size instead:", adSizeId);
+        const gifFrames = generateGifFramesForAdSize(adSizeId);
+        if (gifFrames.length === 0) {
+          console.error("Failed to generate GIF frames for ad size:", adSizeId);
+          return;
+        }
+        
+        // Select the first frame
+        if (onFrameSelect) {
+          onFrameSelect(gifFrames[0].id);
+        }
+        
         return;
       }
       
@@ -836,6 +872,8 @@ const Timeline = ({
       const newGifFrameNumber = existingGifFrames.length + 1;
       const newGifFrameId = `gif-frame-${adSizeId}-${newGifFrameNumber}`;
       
+      console.log("Creating new GIF frame with ID:", newGifFrameId);
+      
       // Clone the source GIF frame
       const newGifFrame: GifFrame = {
         ...JSON.parse(JSON.stringify(sourceGifFrame)), // Deep clone
@@ -847,6 +885,7 @@ const Timeline = ({
       
       // Add the new GIF frame to mockGifFrames
       mockGifFrames.push(newGifFrame);
+      console.log("Added new GIF frame. Total frames:", mockGifFrames.length);
       
       // Select the new frame
       if (onFrameSelect) {
@@ -918,21 +957,24 @@ const Timeline = ({
       // Deleting a GIF frame
       console.log("Deleting GIF frame:", frameId);
       
-      // Find the frame index in mockGifFrames
-      const frameIndex = mockGifFrames.findIndex(frame => frame.id === frameId);
-      if (frameIndex === -1) {
+      // Create a new array without the frame to be deleted (immutable approach)
+      const frameToDelete = mockGifFrames.find(frame => frame.id === frameId);
+      if (!frameToDelete) {
         console.error("Could not find GIF frame to delete:", frameId);
         return;
       }
       
-      // Get the frame to find its parent ad size
-      const frame = mockGifFrames[frameIndex];
+      // Create a copy of the array without the frame to delete
+      const updatedFrames = mockGifFrames.filter(frame => frame.id !== frameId);
       
-      // Remove the frame from mockGifFrames
-      mockGifFrames.splice(frameIndex, 1);
+      // Update the global array with the new filtered array
+      mockGifFrames.length = 0; // Clear the array
+      mockGifFrames.push(...updatedFrames); // Add the updated frames
+      
+      console.log("GIF frame deleted. Remaining frames:", mockGifFrames.length);
       
       // If this was the last gif frame in this ad size, we need to select another ad size
-      const remainingGifFrames = mockGifFrames.filter(f => f.adSizeId === frame.adSizeId);
+      const remainingGifFrames = mockGifFrames.filter(f => f.adSizeId === frameToDelete.adSizeId);
       
       // Choose a new frame to select
       if (remainingGifFrames.length > 0) {
@@ -943,29 +985,47 @@ const Timeline = ({
       } else {
         // No more GIF frames for this ad size, select the ad size itself
         if (onFrameSelect) {
-          onFrameSelect(frame.adSizeId);
+          onFrameSelect(frameToDelete.adSizeId);
+          
+          // Also switch back to Animation mode if no more frames
+          if (onTimelineModeChange) {
+            onTimelineModeChange(TimelineMode.Animation);
+          }
         }
       }
-      
-      // Force a re-render
-      forceUpdate();
     } else {
       // Deleting an animation frame (ad size)
+      console.log("Deleting regular ad size frame:", frameId);
+      
+      // Make sure this isn't the last frame
+      if (Object.keys(mockLayers).length <= 1) {
+        console.error("Cannot delete the last frame");
+        return;
+      }
+      
       // Remove the frame from mockLayers
       delete mockLayers[frameId];
       
-      // Remove any associated GIF frames that use this ad size
-      const gifFramesToRemove = mockGifFrames.filter(frame => frame.adSizeId === frameId);
-      gifFramesToRemove.forEach(frame => {
-        const index = mockGifFrames.indexOf(frame);
-        if (index !== -1) {
-          mockGifFrames.splice(index, 1);
-        }
-      });
+      // Also remove the frame from mockFrames array
+      const frameIndex = mockFrames.findIndex(f => f.id === frameId);
+      if (frameIndex !== -1) {
+        mockFrames.splice(frameIndex, 1);
+      }
       
-      // Force a re-render
-      forceUpdate();
+      // Remove any associated GIF frames that use this ad size
+      const updatedGifFrames = mockGifFrames.filter(frame => frame.adSizeId !== frameId);
+      mockGifFrames.length = 0; // Clear the array
+      mockGifFrames.push(...updatedGifFrames); // Add the updated frames
+      
+      // Choose the next frame to select
+      const remainingFrameIds = Object.keys(mockLayers);
+      if (remainingFrameIds.length > 0 && onFrameSelect) {
+        onFrameSelect(remainingFrameIds[0]);
+      }
     }
+    
+    // Force a re-render
+    forceUpdate();
   };
   
   // Render the animation block with drag handles
