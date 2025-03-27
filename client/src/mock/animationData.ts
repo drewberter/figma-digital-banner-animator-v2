@@ -120,30 +120,30 @@ export const mockFrames: AnimationFrame[] = [
 // Initial mock GIF frames
 export const mockGifFrames: GifFrame[] = [
   {
-    id: 'gif-frame-1-1',
+    id: 'gif-frame-frame-1-1',
     name: 'Frame 1',
     selected: true,
-    delay: 2.5,
+    delay: 1.0, // Reduced delay for better playback experience
     adSizeId: 'frame-1',
     hiddenLayers: [],
     visibleLayerCount: 5,
     frameIndex: 0
   },
   {
-    id: 'gif-frame-1-2',
+    id: 'gif-frame-frame-1-2',
     name: 'Frame 2',
     selected: false,
-    delay: 2.5,
+    delay: 1.0, // Reduced delay for better playback experience
     adSizeId: 'frame-1', 
     hiddenLayers: ['layer-1-3'],
     visibleLayerCount: 4,
     frameIndex: 1
   },
   {
-    id: 'gif-frame-1-3',
+    id: 'gif-frame-frame-1-3',
     name: 'Frame 3',
     selected: false,
-    delay: 2.5,
+    delay: 1.0, // Reduced delay for better playback experience
     adSizeId: 'frame-1',
     hiddenLayers: ['layer-1-3', 'layer-1-5'],
     visibleLayerCount: 3,
@@ -172,7 +172,7 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
     id: `gif-frame-${adSizeId}-1`, // Format: gif-frame-[adSizeId]-[frameNumber]
     name: 'Frame 1',
     selected: true,
-    delay: 2.5,
+    delay: 1.0, // Reduced delay for better playback experience
     adSizeId: adSizeId,
     hiddenLayers: [],
     visibleLayerCount: layers.length,
@@ -187,7 +187,7 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
     id: `gif-frame-${adSizeId}-2`, // Format: gif-frame-[adSizeId]-[frameNumber]
     name: 'Frame 2',
     selected: false,
-    delay: 2.5,
+    delay: 1.0, // Reduced delay for better playback experience
     adSizeId: adSizeId,
     hiddenLayers: thirdLayerId ? [thirdLayerId] : [],
     visibleLayerCount: thirdLayerId ? layers.length - 1 : layers.length,
@@ -202,7 +202,7 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
     id: `gif-frame-${adSizeId}-3`, // Format: gif-frame-[adSizeId]-[frameNumber]
     name: 'Frame 3',
     selected: false,
-    delay: 2.5,
+    delay: 1.0, // Reduced delay for better playback experience
     adSizeId: adSizeId,
     hiddenLayers: [
       ...(thirdLayerId ? [thirdLayerId] : []),
