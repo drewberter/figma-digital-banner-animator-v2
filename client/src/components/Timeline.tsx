@@ -11,6 +11,8 @@ interface TimelineProps {
   currentTime: number;
   selectedFrameId?: string;
   onDurationChange?: (duration: number) => void;
+  onLinkLayers?: () => void;
+  onUnlinkLayer?: (layerId: string) => void;
 }
 
 const Timeline = ({
@@ -19,7 +21,9 @@ const Timeline = ({
   isPlaying,
   currentTime,
   selectedFrameId = 'frame-1', // Default to frame-1 if no frame ID is provided
-  onDurationChange
+  onDurationChange,
+  onLinkLayers,
+  onUnlinkLayer
 }: TimelineProps) => {
   // Create a forceUpdate function for timeline component
   const [, forceUpdate] = useReducer(x => x + 1, 0);
@@ -420,9 +424,23 @@ const Timeline = ({
           </div>
         </div>
         
-        <div className="flex items-center">
+        <div className="flex items-center space-x-3">
           <button className="text-sm text-blue-400 hover:text-blue-300">
             Add Keyframe
+          </button>
+          <button 
+            className="text-sm flex items-center text-green-400 hover:text-green-300"
+            onClick={() => {
+              if (onLinkLayers) {
+                onLinkLayers();
+              } else {
+                // Fallback if no handler is provided
+                alert('Auto-linking layers with the same name across frames');
+              }
+            }}
+          >
+            <span>🔗</span>
+            <span className="ml-1">Link Layers</span>
           </button>
         </div>
       </div>
@@ -439,11 +457,44 @@ const Timeline = ({
             <div 
               key={layer.id}
               onClick={() => setSelectedLayerId(layer.id)}
-              className={`h-10 flex items-center px-2 rounded cursor-pointer 
+              className={`h-10 flex items-center justify-between px-2 rounded cursor-pointer 
                 ${selectedLayerId === layer.id ? 'bg-neutral-800' : 'hover:bg-neutral-700'} 
-                text-sm ${selectedLayerId === layer.id ? 'text-white' : 'text-neutral-300'}`}
+                text-sm ${selectedLayerId === layer.id ? 'text-white' : 'text-neutral-300'}
+                ${layer.linkedLayer ? 'border-l-2 border-blue-500' : ''}`}
             >
-              {layer.name}
+              <div className="flex items-center">
+                {/* Show linked indicator if layer is linked */}
+                {layer.linkedLayer && (
+                  <span 
+                    className={`mr-1 text-xs px-1 rounded ${layer.linkedLayer.isMain ? 'bg-blue-600' : 'bg-blue-500'}`}
+                    title={`Linked layer (${layer.linkedLayer.isMain ? 'Main' : 'Secondary'}) - ${layer.linkedLayer.syncMode} sync`}
+                  >
+                    {layer.linkedLayer.isMain ? 'M' : 'L'}
+                  </span>
+                )}
+                {layer.name}
+              </div>
+              
+              {/* Layer link status indicators & actions */}
+              {layer.linkedLayer && (
+                <div className="flex space-x-1">
+                  <button
+                    className="text-xs text-neutral-400 hover:text-white"
+                    title="Unlink layer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onUnlinkLayer) {
+                        onUnlinkLayer(layer.id);
+                      } else {
+                        // Fallback if no handler is provided
+                        alert(`Unlinking layer: ${layer.name}`);
+                      }
+                    }}
+                  >
+                    <span className="text-xs">⊗</span>
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

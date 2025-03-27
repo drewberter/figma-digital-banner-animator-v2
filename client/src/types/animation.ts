@@ -29,8 +29,9 @@ export enum AnimationMode {
 }
 
 export interface Animation {
+  id?: string;            // Unique identifier for the animation
   type: AnimationType;
-  mode?: AnimationMode; // Entrance or Exit animation
+  mode?: AnimationMode;   // Entrance or Exit animation
   startTime?: number;
   duration: number;
   delay?: number;
@@ -44,7 +45,21 @@ export interface Animation {
     x: number;
     y: number;
   };
+  isOverridden?: boolean; // Whether this animation has been overridden in a linked layer
   customData?: Record<string, any>;
+}
+
+export enum LinkSyncMode {
+  Full = 'Full',         // Fully synchronize all animations
+  Partial = 'Partial',   // Synchronize specific animations
+  Independent = 'Independent' // No synchronization
+}
+
+export interface LinkedLayerInfo {
+  groupId: string;        // Unique identifier for the linked group
+  syncMode: LinkSyncMode; // How animations are synchronized
+  isMain: boolean;        // Whether this is the main/master layer in the group
+  overrides: string[];    // IDs of animations that are overridden (not synced)
 }
 
 export interface AnimationLayer {
@@ -55,6 +70,7 @@ export interface AnimationLayer {
   locked: boolean;
   animations: Animation[];
   keyframes: Keyframe[];
+  linkedLayer?: LinkedLayerInfo; // Information about layer linking
 }
 
 export interface AnimationFrame {

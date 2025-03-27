@@ -1,6 +1,14 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { Animation, AnimationLayer, AnimationFrame, Keyframe } from '../types/animation';
+import { Animation, AnimationLayer, AnimationFrame, Keyframe, LinkSyncMode } from '../types/animation';
 import { useAutoSave, loadSavedData } from '../hooks/useAutoSave';
+import { v4 as uuidv4 } from 'uuid';
+import { 
+  autoLinkLayers, 
+  syncLinkedLayerAnimations, 
+  setAnimationOverride,
+  unlinkLayer as unlinkLayerUtil,
+  setSyncMode as setSyncModeUtil 
+} from '../utils/linkingUtils';
 
 // Define the context type
 interface AnimationContextType {
@@ -31,6 +39,12 @@ interface AnimationContextType {
   addKeyframe: (layerId: string, time: number) => void;
   deleteKeyframe: (layerId: string, time: number) => void;
   setCurrentTime: (time: number) => void;
+  
+  // Layer Linking
+  linkLayersByName: () => void;
+  unlinkLayer: (layerId: string) => void;
+  setSyncMode: (layerId: string, mode: LinkSyncMode) => void;
+  toggleAnimationOverride: (layerId: string, animationId: string) => void;
   
   // Playback
   togglePlayback: () => void;
@@ -92,13 +106,27 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
 
   // Get current frame
   const currentFrame = frames.find(frame => frame.selected) || null;
+  
+  // Initialize a frames-to-layers mapping for linking operations
+  const [framesLayers, setFramesLayers] = useState<Record<string, AnimationLayer[]>>(() => {
+    // Create mapping from mock data
+    const framesToLayers: Record<string, AnimationLayer[]> = {};
+    
+    // Assume mockLayers already has frame IDs as keys
+    Object.keys(mockLayers).forEach(frameId => {
+      framesToLayers[frameId] = mockLayers[frameId];
+    });
+    
+    return framesToLayers;
+  });
 
   // Set up auto-save with our custom hook
   const animationState = {
     layers,
     frames,
     selectedLayerId,
-    duration
+    duration,
+    framesLayers
   };
   
   useAutoSave({
@@ -205,21 +233,30 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
 
   // Update a layer's animation
   const updateLayerAnimation = useCallback((layerId: string, animation: Animation) => {
+    // Ensure animation has a unique ID
+    const animationWithId = animation.id ? animation : {
+      ...animation,
+      id: uuidv4()  // Generate a unique ID if none exists
+    };
+    
     setLayers(prev => 
       prev.map(layer => {
         if (layer.id !== layerId) return layer;
         
         // Find if an animation of this type already exists
-        const existingIndex = layer.animations.findIndex(a => a.type === animation.type);
+        const existingIndex = layer.animations.findIndex(a => a.type === animationWithId.type);
         
         if (existingIndex >= 0) {
-          // Replace existing animation
+          // Replace existing animation, but keep the existing ID
           const updatedAnimations = [...layer.animations];
-          updatedAnimations[existingIndex] = animation;
+          updatedAnimations[existingIndex] = {
+            ...animationWithId,
+            id: layer.animations[existingIndex].id || animationWithId.id
+          };
           return { ...layer, animations: updatedAnimations };
         } else {
           // Add new animation
-          return { ...layer, animations: [...layer.animations, animation] };
+          return { ...layer, animations: [...layer.animations, animationWithId] };
         }
       })
     );
@@ -318,6 +355,152 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Layer linking methods
+  const linkLayersByName = useCallback(() => {
+    // First, organize layers by frame
+    const frameLayersMap: Record<string, AnimationLayer[]> = {};
+    
+    frames.forEach(frame => {
+      const frameLayers = layers.filter(layer => {
+        // This is a placeholder - in a real implementation we'd have layer-to-frame mapping
+        // For now, we'll assume all layers belong to the current frame
+        return frame.selected;
+      });
+      frameLayersMap[frame.id] = frameLayers;
+    });
+    
+    // Auto-link layers with the same name across frames
+    const linkedFramesLayers = autoLinkLayers(frameLayersMap);
+    
+    // Apply the links to our layers
+    const newLayers = [...layers];
+    Object.entries(linkedFramesLayers).forEach(([frameId, frameLayers]) => {
+      frameLayers.forEach(layer => {
+        const layerIndex = newLayers.findIndex(l => l.id === layer.id);
+        if (layerIndex !== -1) {
+          newLayers[layerIndex] = {...layer};
+        }
+      });
+    });
+    
+    setLayers(newLayers);
+  }, [frames, layers]);
+  
+  const unlinkLayer = useCallback((layerId: string) => {
+    // First, organize layers by frame for our utility function
+    const frameLayersMap: Record<string, AnimationLayer[]> = {};
+    frames.forEach(frame => {
+      frameLayersMap[frame.id] = layers.filter(layer => frame.selected); // Simplification
+    });
+    
+    // Apply the unlink operation
+    const updatedFramesLayers = unlinkLayerUtil(frameLayersMap, layerId);
+    
+    // Now flatten the updated frame layers back to our layer state
+    const updatedLayers: AnimationLayer[] = [];
+    Object.values(updatedFramesLayers).forEach(frameLayers => {
+      frameLayers.forEach(layer => {
+        // Only add if not already in the list (prevents duplicates)
+        if (!updatedLayers.some(l => l.id === layer.id)) {
+          updatedLayers.push(layer);
+        }
+      });
+    });
+    
+    // Update only the layers that changed
+    setLayers(prev => 
+      prev.map(layer => {
+        const updatedLayer = updatedLayers.find(l => l.id === layer.id);
+        return updatedLayer || layer;
+      })
+    );
+  }, [frames, layers]);
+  
+  const handleSyncModeChange = useCallback((layerId: string, mode: LinkSyncMode) => {
+    // First, organize layers by frame for our utility function
+    const frameLayersMap: Record<string, AnimationLayer[]> = {};
+    frames.forEach(frame => {
+      frameLayersMap[frame.id] = layers.filter(layer => frame.selected); // Simplification
+    });
+    
+    // Apply the sync mode change
+    const updatedFramesLayers = setSyncModeUtil(frameLayersMap, layerId, mode);
+    
+    // Now flatten the updated frame layers back to our layer state
+    const updatedLayers: AnimationLayer[] = [];
+    Object.values(updatedFramesLayers).forEach(frameLayers => {
+      frameLayers.forEach(layer => {
+        // Only add if not already in the list (prevents duplicates)
+        if (!updatedLayers.some(l => l.id === layer.id)) {
+          updatedLayers.push(layer);
+        }
+      });
+    });
+    
+    // Update only the layers that changed
+    setLayers(prev => 
+      prev.map(layer => {
+        const updatedLayer = updatedLayers.find(l => l.id === layer.id);
+        return updatedLayer || layer;
+      })
+    );
+    
+    // If we're changing to Full sync, we need to synchronize animations
+    if (mode === LinkSyncMode.Full) {
+      // Apply the synced animations
+      const syncedFramesLayers = syncLinkedLayerAnimations(frameLayersMap, layerId);
+      
+      // Now flatten again to get the synced layers
+      const syncedLayers: AnimationLayer[] = [];
+      Object.values(syncedFramesLayers).forEach(frameLayers => {
+        frameLayers.forEach(layer => {
+          // Only add if not already in the list (prevents duplicates)
+          if (!syncedLayers.some(l => l.id === layer.id)) {
+            syncedLayers.push(layer);
+          }
+        });
+      });
+      
+      // Update only the layers that changed during sync
+      setLayers(prev => 
+        prev.map(layer => {
+          const syncedLayer = syncedLayers.find(l => l.id === layer.id);
+          return syncedLayer || layer;
+        })
+      );
+    }
+  }, [frames, layers]);
+  
+  const toggleAnimationOverride = useCallback((layerId: string, animationId: string) => {
+    // First, organize layers by frame for our utility function
+    const frameLayersMap: Record<string, AnimationLayer[]> = {};
+    frames.forEach(frame => {
+      frameLayersMap[frame.id] = layers.filter(layer => frame.selected); // Simplification
+    });
+    
+    // Apply the animation override toggle
+    const updatedFramesLayers = setAnimationOverride(frameLayersMap, layerId, animationId);
+    
+    // Now flatten the updated frame layers back to our layer state
+    const updatedLayers: AnimationLayer[] = [];
+    Object.values(updatedFramesLayers).forEach(frameLayers => {
+      frameLayers.forEach(layer => {
+        // Only add if not already in the list (prevents duplicates)
+        if (!updatedLayers.some(l => l.id === layer.id)) {
+          updatedLayers.push(layer);
+        }
+      });
+    });
+    
+    // Update only the layers that changed
+    setLayers(prev => 
+      prev.map(layer => {
+        const updatedLayer = updatedLayers.find(l => l.id === layer.id);
+        return updatedLayer || layer;
+      })
+    );
+  }, [frames, layers]);
+
   const contextValue: AnimationContextType = {
     layers,
     frames,
@@ -346,6 +529,12 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
     addKeyframe,
     deleteKeyframe,
     setCurrentTime,
+    
+    // Layer linking methods
+    linkLayersByName,
+    unlinkLayer,
+    setSyncMode: handleSyncModeChange,
+    toggleAnimationOverride,
     
     // Playback methods
     togglePlayback,
