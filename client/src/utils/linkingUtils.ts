@@ -69,51 +69,67 @@ export function translateLayerId(
     console.warn(`translateLayerId: Non-standard layer ID prefix: ${layerId}`);
     return layerId; // Return original ID as fallback
   }
-  
-  // Extract the source ad size ID parts from the layer ID
-  // For example, if layerId is "layer-frame-1-header" and sourceAdSizeId is "frame-1"
-  const sourceAdSizeParts = sourceAdSizeId.split('-');
-  const targetAdSizeParts = targetAdSizeId.split('-');
-  
+
   // We need to identify the format pattern of the layer ID
   let targetLayerId = '';
   
-  // Check if the ad size segment in layer ID matches the source ad size
-  if (layerIdParts[1] === sourceAdSizeParts[0] && 
-      layerIdParts[2] === sourceAdSizeParts[1]) {
-    // Standard format where ad size is split into two parts in the layer ID
-    // e.g., "layer-frame-1-header" -> "layer-frame-2-header"
-    
-    // Extract the layer specific part (after the ad size parts)
-    const layerSpecificPart = layerIdParts.slice(3).join('-');
-    
-    // Reconstruct with target ad size
-    targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
-  } else if (layerIdParts[1] === sourceAdSizeId) {
-    // Format where ad size is a single segment in the layer ID
-    // e.g., "layer-frame1-header" -> "layer-frame2-header"
-    
-    // Extract the layer specific part
-    const layerSpecificPart = layerIdParts.slice(2).join('-');
-    
-    // Reconstruct with target ad size
-    targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
-  } else {
-    // If the layer ID doesn't clearly follow the expected pattern
-    // Try to match the index pattern (layer-X-Y where X is the ad size number)
-    
-    // Simple number-based replacement
-    // e.g., "layer-1-2" -> "layer-2-2" when moving from ad size 1 to 2
-    const sourceAdSizeNumber = sourceAdSizeId.split('-')[1];
-    const targetAdSizeNumber = targetAdSizeId.split('-')[1];
-    
+  // First, try matching the common pattern like "layer-2-3", where
+  // 2 is the ad size number and 3 is the layer index
+  const sourceAdSizeNumber = sourceAdSizeId.split('-')[1];
+  const targetAdSizeNumber = targetAdSizeId.split('-')[1];
+  
+  if (layerIdParts.length === 3) {
+    // This appears to be the pattern like "layer-2-3"
+    // Check if the second segment matches the source ad size number
     if (layerIdParts[1] === sourceAdSizeNumber) {
-      layerIdParts[1] = targetAdSizeNumber;
-      targetLayerId = layerIdParts.join('-');
+      // This is most likely a match! Keep the last part (layer index/position)
+      // and just replace the ad size number
+      const layerPosition = layerIdParts[2];
+      targetLayerId = `layer-${targetAdSizeNumber}-${layerPosition}`;
+      console.log(`translateLayerId: Common format match. Keeping layer position ${layerPosition}`);
     } else {
-      // If nothing else works, just use the original layer ID
-      console.warn(`translateLayerId: Unable to translate layer ID ${layerId} from ${sourceAdSizeId} to ${targetAdSizeId}`);
-      targetLayerId = layerId;
+      // Try other approaches below
+      console.log(`translateLayerId: Layer ID ${layerId} has 3 parts but second part ${layerIdParts[1]} doesn't match source ad size number ${sourceAdSizeNumber}`);
+    }
+  }
+  
+  // If we haven't found a match yet, try other patterns
+  if (!targetLayerId) {
+    const sourceAdSizeParts = sourceAdSizeId.split('-');
+    const targetAdSizeParts = targetAdSizeId.split('-');
+    
+    // Check if the ad size segment in layer ID matches the source ad size pattern
+    if (layerIdParts[1] === sourceAdSizeParts[0] && 
+        layerIdParts[2] === sourceAdSizeParts[1]) {
+      // Standard format where ad size is split into two parts in the layer ID
+      // e.g., "layer-frame-1-header" -> "layer-frame-2-header"
+      
+      // Extract the layer specific part (after the ad size parts)
+      const layerSpecificPart = layerIdParts.slice(3).join('-');
+      
+      // Reconstruct with target ad size
+      targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
+    } else if (layerIdParts[1] === sourceAdSizeId) {
+      // Format where ad size is a single segment in the layer ID
+      // e.g., "layer-frame1-header" -> "layer-frame2-header"
+      
+      // Extract the layer specific part
+      const layerSpecificPart = layerIdParts.slice(2).join('-');
+      
+      // Reconstruct with target ad size
+      targetLayerId = `layer-${targetAdSizeId}-${layerSpecificPart}`;
+    } else {
+      // Special case for layer names with semantic meaning
+      // Try to keep the same component name (last part) across frames
+      // For example, match "layer-2-headline" to "layer-3-headline"
+      const lastPart = layerIdParts[layerIdParts.length - 1];
+      if (['headline', 'background', 'button', 'logo', 'subhead', 'cta'].includes(lastPart.toLowerCase())) {
+        targetLayerId = `layer-${targetAdSizeNumber}-${lastPart}`;
+      } else {
+        // If layer ID doesn't match any known patterns, log a warning and use original
+        console.warn(`translateLayerId: Unable to translate layer ID ${layerId} from ${sourceAdSizeId} to ${targetAdSizeId}`);
+        targetLayerId = layerId;
+      }
     }
   }
   
