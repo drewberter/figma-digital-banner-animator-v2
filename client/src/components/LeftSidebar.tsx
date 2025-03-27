@@ -204,7 +204,7 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
         </div>
       </div>
       
-      {/* Unified Ad Sizes & Frames Section */}
+      {/* Ad Sizes Section */}
       <div className="border-b border-neutral-800">
         <div 
           className="p-2 flex items-center justify-between cursor-pointer hover:bg-neutral-800"
@@ -246,24 +246,22 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
               
               // Individual ad size item with collapsible frames
               const isAdSizeSelected = selectedAdSizeId === adSize.id;
-              
-              // Track expanded state for each ad size (in a real app, would use a map)
-              const [isExpanded, setIsExpanded] = useState(true);
+              const isExpanded = expandedAdSizes[adSize.id] || false;
               
               return (
                 <div key={adSize.id} className="mb-2">
                   {/* Ad Size Header */}
                   <div 
                     className={`pl-2 pr-2 py-1 flex items-center cursor-pointer hover:bg-neutral-800 ${isAdSizeSelected ? 'bg-neutral-800' : ''}`}
-                    onClick={() => {
-                      selectAdSize(adSize.id);
-                      setIsExpanded(true); // Auto-expand when selected
-                    }}
+                    onClick={() => selectAdSize(adSize.id)}
                   >
-                    <div className="mr-1" onClick={(e) => {
-                      e.stopPropagation();
-                      setIsExpanded(!isExpanded);
-                    }}>
+                    <div 
+                      className="mr-1" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleAdSizeExpanded(adSize.id);
+                      }}
+                    >
                       {isExpanded ? 
                         <ChevronDown size={14} className="text-neutral-400" /> : 
                         <ChevronRight size={14} className="text-neutral-400" />
@@ -315,6 +313,11 @@ const LeftSidebar = ({ onOpenPresets, onSelectFrame }: LeftSidebarProps) => {
                           setSelectedFrameId(newFrame.id);
                           if (onSelectFrame) {
                             onSelectFrame(newFrame.id);
+                          }
+                          
+                          // Make sure this ad size is expanded
+                          if (!isExpanded) {
+                            toggleAdSizeExpanded(adSize.id);
                           }
                         }
                       }}
