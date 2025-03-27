@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { X, Download, ChevronUp, ChevronDown, Play, Pause } from 'lucide-react';
 import { exportGif, exportHtml, exportMp4, exportWebm } from '../utils/exportUtils';
 import { useAnimationContext } from '../context/AnimationContext';
+import { AnimationFrame } from '../types/animation';
+import FrameSelector from './FrameSelector';
+import FrameEditDialog from './FrameEditDialog';
 
 interface ExportModalProps {
   onClose: () => void;
@@ -33,6 +36,67 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [previewFrame, setPreviewFrame] = useState(0);
   const previewInterval = useRef<number | null>(null);
+  
+  // Animation frame management for multiple GIF frames 
+  const [gifFrames, setGifFrames] = useState<AnimationFrame[]>([]);
+  const [selectedGifFrameId, setSelectedGifFrameId] = useState<string | null>(null);
+  const [isFrameDialogOpen, setIsFrameDialogOpen] = useState(false);
+  const [editingFrameId, setEditingFrameId] = useState<string | null>(null);
+  
+  // Frame management functions
+  const handleAddFrame = () => {
+    setEditingFrameId(null);
+    setIsFrameDialogOpen(true);
+  };
+  
+  const handleEditFrame = (frameId: string) => {
+    setEditingFrameId(frameId);
+    setIsFrameDialogOpen(true);
+  };
+  
+  const handleDeleteFrame = (frameId: string) => {
+    setGifFrames(gifFrames.filter(frame => frame.id !== frameId));
+    if (selectedGifFrameId === frameId) {
+      setSelectedGifFrameId(gifFrames.length > 1 ? gifFrames[0].id : null);
+    }
+  };
+  
+  const handleSelectFrame = (frameId: string) => {
+    setSelectedGifFrameId(frameId);
+  };
+  
+  const handleSaveFrame = (frameData: { name: string, headlineText: string, description?: string }) => {
+    if (editingFrameId) {
+      // Update existing frame
+      setGifFrames(gifFrames.map(frame => 
+        frame.id === editingFrameId 
+          ? { 
+              ...frame, 
+              name: frameData.name, 
+              headlineText: frameData.headlineText,
+              description: frameData.description
+            }
+          : frame
+      ));
+    } else {
+      // Add new frame
+      const newFrame: AnimationFrame = {
+        id: `gif-frame-${Date.now()}`,
+        name: frameData.name,
+        selected: false,
+        width: currentFrame?.width || 300,
+        height: currentFrame?.height || 250,
+        headlineText: frameData.headlineText,
+        description: frameData.description
+      };
+      
+      const updatedFrames = [...gifFrames, newFrame];
+      setGifFrames(updatedFrames);
+      setSelectedGifFrameId(newFrame.id);
+    }
+    
+    setIsFrameDialogOpen(false);
+  };
   
   // When frameCount is active, disable the fps control
   const isFpsDisabled = specialGifFormat || (showAdvancedGifOptions && frameCount > 0);
@@ -69,9 +133,15 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
     } else {
       setPreviewPlaying(true);
       const delay = specialGifFormat ? 2500 : showAdvancedGifOptions ? frameDelay : (1000 / fps);
-      previewInterval.current = window.setInterval(() => {
-        setPreviewFrame(prev => (prev + 1) % frames.length);
-      }, delay);
+      
+      // Using appropriate frame source for preview
+      const frameSource = gifFrames.length > 0 ? gifFrames : frames;
+      
+      if (frameSource.length > 0) {
+        previewInterval.current = window.setInterval(() => {
+          setPreviewFrame(prev => (prev + 1) % frameSource.length);
+        }, delay);
+      }
     }
   };
   
@@ -87,21 +157,25 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
     };
     
     if (exportType === 'gif') {
+      // Check if we're using custom content frames or original Figma frames
+      const useContentFrames = gifFrames.length > 0;
+      const framesSource = useContentFrames ? gifFrames : frames;
+      
       if (specialGifFormat) {
         // Extract exactly 3 frames for the special format client requirements
         // If there are more than 3 frames, take beginning, middle and end frames
-        let selectedFrames = [...frames];
-        if (frames.length > 3) {
-          const middle = Math.floor(frames.length / 2);
+        let selectedFrames = [...framesSource];
+        if (framesSource.length > 3) {
+          const middle = Math.floor(framesSource.length / 2);
           selectedFrames = [
-            frames[0],
-            frames[middle],
-            frames[frames.length - 1]
+            framesSource[0],
+            framesSource[middle],
+            framesSource[framesSource.length - 1]
           ];
-        } else if (frames.length < 3) {
+        } else if (framesSource.length < 3) {
           // If less than 3 frames, duplicate the last frame to make up 3
           while (selectedFrames.length < 3) {
-            selectedFrames.push(frames[frames.length - 1]);
+            selectedFrames.push(framesSource[framesSource.length - 1] || framesSource[0]);
           }
         }
         
@@ -113,22 +187,23 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
           colorDepth: 24 as 8 | 16 | 24, 
           loop: true,
           disposal: 'none' as 'none' | 'background' | 'previous',
-          delay: 2500 // 2.5 seconds between frames
+          delay: 2500, // 2.5 seconds between frames
+          useCustomContent: useContentFrames
         };
         
         console.log('Exporting as Special Client GIF Format:', specialGifOptions);
         exportGif(specialGifOptions);
       } else {
         // Select frames if frameCount is specified in advanced options
-        let selectedFrames = [...frames];
-        if (showAdvancedGifOptions && frameCount > 0 && frameCount < frames.length) {
+        let selectedFrames = [...framesSource];
+        if (showAdvancedGifOptions && frameCount > 0 && frameCount < framesSource.length) {
           // Calculate frames to include with even distribution
-          const step = frames.length / frameCount;
+          const step = framesSource.length / frameCount;
           selectedFrames = [];
           
           for (let i = 0; i < frameCount; i++) {
-            const index = Math.min(Math.floor(i * step), frames.length - 1);
-            selectedFrames.push(frames[index]);
+            const index = Math.min(Math.floor(i * step), framesSource.length - 1);
+            selectedFrames.push(framesSource[index]);
           }
         }
         
@@ -141,6 +216,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
                      quality === 'medium' ? 'pattern' : 'none') as 'diffusion' | 'pattern' | 'none',
           colorDepth: (quality === 'high' ? 24 : quality === 'medium' ? 16 : 8) as 8 | 16 | 24,
           loop: true,
+          useCustomContent: useContentFrames,
           // Add advanced options if they're visible
           ...(showAdvancedGifOptions && {
             delay: frameDelay,
@@ -201,7 +277,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50">
-      <div className="bg-[#111111] rounded-lg w-[500px] flex flex-col">
+      <div className="bg-[#111111] rounded-lg w-[500px] max-h-[90vh] flex flex-col overflow-hidden">
         <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
           <h2 className="text-lg font-medium text-white">Export Animation</h2>
           <button 
@@ -212,7 +288,7 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
           </button>
         </div>
         
-        <div className="p-5 space-y-5">
+        <div className="p-5 space-y-5 flex-1 overflow-y-auto">
           <div>
             <label className="block text-sm text-neutral-300 mb-2">Export Format</label>
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -283,7 +359,26 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
                 </button>
               </div>
               <div className="bg-black rounded-md h-[120px] flex items-center justify-center overflow-hidden">
-                {frames.length > 0 ? (
+                {/* Show custom content frames if available, otherwise show animation frames */}
+                {gifFrames.length > 0 ? (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <div className="text-xs text-neutral-500 absolute bottom-2 right-2">
+                      Frame {previewFrame + 1}/{gifFrames.length}
+                    </div>
+                    <div className="w-[80%] h-[80%] bg-[#1a1a1a] flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-neutral-200 font-medium mb-1">
+                          {gifFrames[previewFrame % gifFrames.length]?.headlineText || 'No headline'}
+                        </div>
+                        {gifFrames[previewFrame % gifFrames.length]?.description && (
+                          <div className="text-neutral-400 text-xs">
+                            {gifFrames[previewFrame % gifFrames.length]?.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : frames.length > 0 ? (
                   <div className="relative w-full h-full flex items-center justify-center">
                     <div className="text-xs text-neutral-500 absolute bottom-2 right-2">
                       Frame {previewFrame + 1}/{frames.length}
@@ -355,6 +450,16 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
                   <span>60 fps</span>
                 </div>
               </div>
+              
+              {/* Frame Content Selector for creating multi-frame banners */}
+              <FrameSelector 
+                frames={gifFrames}
+                onFrameAdd={handleAddFrame}
+                onFrameEdit={handleEditFrame}
+                onFrameDelete={handleDeleteFrame}
+                onFrameSelect={handleSelectFrame}
+                selectedFrameId={selectedGifFrameId}
+              />
               
               <div className="flex items-center px-3 py-3 mt-2 bg-[#1a1a1a] rounded border border-[#4A7CFF] border-opacity-30">
                 <input
@@ -619,6 +724,15 @@ const ExportModal = ({ onClose }: ExportModalProps) => {
           </button>
         </div>
       </div>
+      
+      {/* Frame Edit Dialog for adding/editing GIF content frames */}
+      <FrameEditDialog
+        isOpen={isFrameDialogOpen}
+        onClose={() => setIsFrameDialogOpen(false)}
+        onSave={handleSaveFrame}
+        frame={editingFrameId ? gifFrames.find(f => f.id === editingFrameId) : undefined}
+        isEditing={!!editingFrameId}
+      />
     </div>
   );
 };

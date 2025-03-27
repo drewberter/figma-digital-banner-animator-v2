@@ -17,6 +17,7 @@ interface GifExportOptions {
   disposal?: 'none' | 'background' | 'previous';
   delay?: number;
   loop?: number | boolean;
+  useCustomContent?: boolean; // Whether frames are custom content frames
 }
 
 // HTML5 Export options
@@ -54,8 +55,35 @@ interface WebmExportOptions {
 // Export animation as GIF
 export async function exportGif(options: GifExportOptions): Promise<void> {
   try {
-    // Forward the export request to the plugin
-    pluginExportGif(options);
+    const { frames, useCustomContent, ...otherOptions } = options;
+    
+    // If frames are custom content frames, we need to modify them for export
+    if (useCustomContent) {
+      // Create a modified version of frames that includes the custom content
+      const processedFrames = frames.map(frame => {
+        // Generate a frame with custom content from the original frame data
+        return {
+          ...frame,
+          // Add custom content properties so the plugin can use them
+          customContent: {
+            headlineText: frame.headlineText || '',
+            description: frame.description || '',
+            isCustomContent: true
+          }
+        };
+      });
+      
+      // Forward the export request to the plugin with processed frames
+      pluginExportGif({ 
+        ...otherOptions, 
+        frames: processedFrames,
+        // Include a flag to let the plugin know these are content-specific frames
+        hasCustomContent: true
+      });
+    } else {
+      // Standard animation frames, forward as is
+      pluginExportGif(options);
+    }
   } catch (error) {
     console.error('Error exporting GIF:', error);
     throw error;

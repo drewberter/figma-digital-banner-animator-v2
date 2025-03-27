@@ -79,6 +79,9 @@ export interface AnimationFrame {
   selected: boolean;
   width: number;
   height: number;
+  headlineText?: string;
+  description?: string;
+  imageUrl?: string;
 }
 
 export interface Preset {
