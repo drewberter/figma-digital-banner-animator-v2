@@ -121,7 +121,14 @@ const PreviewCanvas = ({
       
       // Apply different animation types
       if (activeAnimation.type === AnimationType.Fade) {
-        element.style.opacity = `${animationProgress}`;
+        // For entrance animations, we want 0->1 opacity
+        // For exit animations, we want 1->0 opacity (handled by animationProgress)
+        if (isExit) {
+          element.style.opacity = `${animationProgress}`;
+        } else {
+          // For entrance, start at 0 and fade in
+          element.style.opacity = `${easedProgress}`;
+        }
         animationApplied = true;
       } else if (activeAnimation.type === AnimationType.Scale) {
         // For entrance: 0.8 to 1.2, for exit: 1.2 to 0.8
@@ -217,10 +224,11 @@ const PreviewCanvas = ({
   // Update animations when currentTime changes
   useEffect(() => {
     // Process animations for each element
-    processAnimations(headlineRef.current, headlineLayer, '0', 'translateY(0)');
-    processAnimations(subtitleRef.current, subtitleLayer, '0', 'translateY(0)');
-    processAnimations(buttonRef.current, buttonLayer, '0', 'scale(0.8)');
-    processAnimations(logoRef.current, logoLayer, '0', 'rotate(0deg)');
+    // Use '1' as the default opacity to make elements visible by default
+    processAnimations(headlineRef.current, headlineLayer, '1', 'translateY(0)');
+    processAnimations(subtitleRef.current, subtitleLayer, '1', 'translateY(0)');
+    processAnimations(buttonRef.current, buttonLayer, '1', 'scale(1)');
+    processAnimations(logoRef.current, logoLayer, '1', 'rotate(0deg)');
   }, [currentTime, selectedFrameId]);
 
   return (

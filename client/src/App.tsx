@@ -74,6 +74,31 @@ function App() {
   // Handle play/pause toggle
   const handlePlayPauseToggle = (playing: boolean) => {
     setIsPlaying(playing);
+    
+    // If we're starting playback, set up the animation loop
+    if (playing) {
+      const startTime = performance.now();
+      const initialTime = currentTime;
+      
+      const animationFrame = (now: number) => {
+        if (!playing) return;
+        
+        const elapsed = (now - startTime) / 1000; // Convert to seconds
+        const newTime = initialTime + elapsed;
+        
+        // If we reach the end of the timeline, stop playing
+        if (newTime >= 5) { // Using same duration as timeline (5 seconds)
+          setCurrentTime(5);
+          setIsPlaying(false);
+          return;
+        }
+        
+        setCurrentTime(newTime);
+        requestAnimationFrame(animationFrame);
+      };
+      
+      requestAnimationFrame(animationFrame);
+    }
   };
 
   return (
