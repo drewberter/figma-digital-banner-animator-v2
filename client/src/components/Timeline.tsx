@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useReducer } from 'react';
+import React, { useState, useRef, useEffect, useReducer } from 'react';
 import { Play, Pause, SkipBack, Clock, LogIn, LogOut, Eye, EyeOff, Layers, Zap, Plus } from 'lucide-react';
 import { mockLayers } from '../mock/animationData';
 import FrameEditDialog from './FrameEditDialog';
@@ -9,7 +9,8 @@ import {
   EasingType, 
   AnimationMode,
   TimelineMode,
-  AnimationFrame
+  AnimationFrame,
+  AnimationLayer
 } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -113,6 +114,27 @@ const Timeline = ({
     
     // Update the layers for the current frame
     mockLayers[selectedFrameId] = [...frame];
+    
+    // Force a re-render
+    forceUpdate();
+  };
+
+  // Handle toggling layer visibility in a specific frame
+  const handleToggleLayerVisibilityInFrame = (frameId: string, layerId: string) => {
+    console.log("Toggling visibility for layer", layerId, "in frame", frameId);
+    
+    // Find the frame
+    const frame = mockLayers[frameId];
+    if (!frame) return;
+    
+    const layerIndex = frame.findIndex(l => l.id === layerId);
+    if (layerIndex === -1) return;
+    
+    // Toggle the layer's visibility
+    frame[layerIndex].visible = !frame[layerIndex].visible;
+    
+    // Update the layers for the frame
+    mockLayers[frameId] = [...frame];
     
     // Force a re-render
     forceUpdate();
@@ -441,355 +463,216 @@ const Timeline = ({
     const frameNumber = existingFrameCount + 1;
     
     // Create new frame with unique ID and sequential name
-    const newFrame = {
-      id: `frame-${Date.now()}`,
-      name: `Frame ${frameNumber}`,
-      selected: true,
-      width: 300, // Default width
-      height: 250, // Default height
-      headlineText: frameData.headlineText,
-      description: frameData.description || '',
-      hiddenLayers: frameData.hiddenLayers || []
-    };
+    const newFrameId = `frame-${Date.now()}`;
     
-    // Add the frame to the data structure
-    // Here, since we are in the mock data structure, we need to:
-    // 1. Clone the layers from the current frame
-    const currentFrame = mockLayers[selectedFrameId];
-    if (currentFrame) {
-      // Create a copy of the current frame's layers for the new frame
-      mockLayers[newFrame.id] = currentFrame.map(layer => ({
-        ...layer,
-        // if hiddenLayers includes this layer's id, mark it as invisible
-        visible: frameData.hiddenLayers?.includes(layer.id) ? false : layer.visible
-      }));
-    }
+    // Clone the layers from the first frame
+    const baseFrame = Object.values(mockLayers)[0] || [];
+    mockLayers[newFrameId] = JSON.parse(JSON.stringify(baseFrame)); // Deep clone
+    
+    // Force a re-render
+    forceUpdate();
     
     // Close the dialog
     setIsFrameDialogOpen(false);
-    
-    // Force a re-render
-    forceUpdate();
-    
-    console.log("Added new frame:", newFrame.id);
   };
-
-  // Handle creating a new blank frame for the frame card grid
+  
+  // Handle adding a blank frame
   const handleAddBlankFrame = () => {
-    // Generate sequential frame number
-    const existingFrameCount = Object.keys(mockLayers).length;
-    const frameNumber = existingFrameCount + 1;
+    // Create a new blank frame without needing a dialog
+    handleAddFrame({
+      name: 'New Frame',
+      headlineText: 'New Frame Headline',
+      description: 'Description for the new frame'
+    });
+  };
+  
+  // Handle duplicating a frame and its layers
+  const handleDuplicateFrame = (frameId: string) => {
+    // Clone the selected frame's layers
+    const sourceLayers = mockLayers[frameId];
+    if (!sourceLayers) return;
     
     // Create new frame with unique ID
     const newFrameId = `frame-${Date.now()}`;
-    const newFrame = {
-      id: newFrameId,
-      name: `Frame ${frameNumber}`,
-      selected: true,
-      width: 300,
-      height: 250,
-      headlineText: '',
-      description: '',
-      hiddenLayers: []
-    };
     
-    // Clone layers from current frame as a starting point
-    const currentFrame = mockLayers[selectedFrameId];
-    if (currentFrame) {
-      mockLayers[newFrameId] = currentFrame.map(layer => ({
-        ...layer,
-        visible: true // Start with all layers visible
-      }));
-    }
-    
-    // Set this as the selected frame
-    // In a real app with context, we would update the selected frame ID in the context
+    // Deep clone the layers
+    mockLayers[newFrameId] = JSON.parse(JSON.stringify(sourceLayers));
     
     // Force a re-render
     forceUpdate();
-    
-    console.log("Added new blank frame:", newFrameId);
   };
-
-  // Handle duplicating a frame
-  const handleDuplicateFrame = (frameId: string) => {
-    const sourceFrame = mockLayers[frameId];
-    if (!sourceFrame) return;
-    
-    // Generate a new frame ID
-    const newFrameId = `frame-${Date.now()}`;
-    
-    // Get existing frame count for naming
-    const existingFrameCount = Object.keys(mockLayers).length;
-    const frameNumber = existingFrameCount + 1;
-    
-    // Clone the source frame's layers
-    mockLayers[newFrameId] = sourceFrame.map(layer => ({
-      ...layer
-    }));
-    
-    // Force a re-render
-    forceUpdate();
-    
-    console.log("Duplicated frame", frameId, "to", newFrameId);
-  };
-
+  
   // Handle deleting a frame
   const handleDeleteFrame = (frameId: string) => {
-    // Don't delete if it's the only frame
-    if (Object.keys(mockLayers).length <= 1) {
-      console.log("Cannot delete the only frame");
-      return;
-    }
-    
-    // Delete the frame
+    // Remove the frame from mockLayers
     delete mockLayers[frameId];
     
-    // If the deleted frame was selected, select another frame
-    if (frameId === selectedFrameId) {
-      const remainingFrames = Object.keys(mockLayers);
-      if (remainingFrames.length > 0) {
-        // In a real app, we would update the selected frame in context
-        console.log("Selecting new frame", remainingFrames[0]);
-      }
-    }
-    
     // Force a re-render
     forceUpdate();
-    
-    console.log("Deleted frame:", frameId);
   };
   
-  // Handle toggling a layer's visibility in a specific frame
-  const handleToggleLayerVisibilityInFrame = (frameId: string, layerId: string) => {
-    const frame = mockLayers[frameId];
-    if (!frame) return;
+  // Render the animation block with drag handles
+  const renderAnimationBlock = (layer: AnimationLayer, animation: Animation, animIndex: number) => {
+    // Animation start time (default to 0 if undefined)
+    const startTime = animation.startTime || 0;
     
-    const layerIndex = frame.findIndex(l => l.id === layerId);
-    if (layerIndex === -1) return;
-    
-    // Toggle the layer's visibility
-    frame[layerIndex].visible = !frame[layerIndex].visible;
-    
-    // Update the layers for this frame
-    mockLayers[frameId] = [...frame];
-    
-    // Force a re-render
-    forceUpdate();
-    
-    console.log(`Toggled visibility of layer ${layerId} in frame ${frameId} to ${frame[layerIndex].visible}`);
-  };
-  
-  // Handle changing a frame's delay
-  const handleFrameDelayChange = (frameId: string, delay: number) => {
-    // In a real application, we would update this in the global state
-    // Since we're using mock data, we'll just log it
-    console.log(`Setting delay of ${delay}s for frame ${frameId}`);
-    
-    // An object to store frame metadata (like delays)
-    // In a real app, this would be stored in the animation context
-    const frameMetadata: Record<string, { delay: number }> = {};
-    frameMetadata[frameId] = { delay };
-    
-    // Force a re-render
-    forceUpdate();
-  };
-
-  // Render animation block with drag handles
-  const renderAnimationBlock = (layer: any, animation: any, animIndex: number) => {
-    // Determine if this is an entrance or exit animation
+    // For entrance animations, use blue color
+    // For exit animations, use red color
     const isExit = animation.mode === AnimationMode.Exit;
-    const blockColor = isExit 
-      ? 'bg-[#FF5A5A] hover:bg-[#FF6A6A]' // Red for exit animations
-      : 'bg-[#2A5BFF] hover:bg-[#3A6BFF]'; // Blue for entrance animations
-    const borderColor = isExit ? 'border-[#FF7A7A]' : 'border-[#4A7CFF]';
+    const blockColor = isExit ? 'bg-red-500' : 'bg-blue-500';
+    const blockBorder = isExit ? 'border-red-600' : 'border-blue-600';
+    
+    // Apply opacity if the animation is overridden in a linked layer
+    const isOverridden = animation.isOverridden;
+    const blockOpacity = isOverridden ? 'opacity-40' : '';
     
     return (
       <div 
         key={animIndex}
-        className={`absolute h-6 top-2 rounded
-          ${selectedLayerId === layer.id 
-            ? `${blockColor} bg-opacity-70 border ${borderColor}` 
-            : `${blockColor} bg-opacity-30 border ${borderColor}`
-          } 
-          cursor-move`}
+        className={`absolute h-6 rounded flex items-center ${blockColor} ${blockBorder} ${blockOpacity} cursor-move border text-xs text-white overflow-hidden`}
         style={{
-          left: `${timeToPosition(animation.startTime || 0)}px`,
-          width: `${timeToPosition(animation.duration)}px`
+          left: `${timeToPosition(startTime)}px`,
+          width: `${timeToPosition(animation.duration)}px`,
+          top: '8px'
         }}
         onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'move')}
       >
         {/* Left resize handle */}
         <div 
-          className="absolute left-0 top-0 bottom-0 w-2 cursor-w-resize hover:bg-opacity-70" 
+          className="w-2 h-full cursor-w-resize"
           onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'resize-left')}
-        ></div>
+        />
         
-        {/* Animation content */}
-        <div className="px-2 text-xs text-white truncate flex items-center justify-between w-full h-full pointer-events-none">
-          <span className="flex items-center">
-            {isExit ? <LogOut size={12} className="mr-1" /> : <LogIn size={12} className="mr-1" />}
-            {animation.type}
-          </span>
-          {animation.duration >= 0.5 && (
-            <span className="text-xs opacity-75 ml-1">
-              {animation.duration.toFixed(1)}s
-            </span>
-          )}
+        {/* Animation label */}
+        <div className="flex-1 px-1 whitespace-nowrap overflow-hidden">
+          {animation.type}
+          {animation.mode === AnimationMode.Exit && <span className="ml-1 text-xs">(exit)</span>}
         </div>
         
         {/* Right resize handle */}
         <div 
-          className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize hover:bg-opacity-70" 
+          className="w-2 h-full cursor-e-resize"
           onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'resize-right')}
-        ></div>
+        />
       </div>
     );
   };
-
+  
   return (
-    <div className="w-full h-full flex flex-col bg-neutral-900 overflow-hidden">
-      {/* Top controls */}
-      <div className="h-12 px-4 flex items-center justify-between border-b border-neutral-800">
-        <div className="flex items-center">
-          {/* Timeline Mode Toggle */}
-          <div className="mr-5 flex items-center">
-            <Tabs.Root 
-              value={timelineMode} 
-              onValueChange={(value) => handleTimelineModeChange(value as TimelineMode)}
-              className="flex bg-neutral-800 rounded-md p-0.5"
-            >
-              <Tabs.List className="flex">
-                <Tabs.Trigger
-                  value={TimelineMode.Animation}
-                  className={`px-3 py-1 text-xs rounded-md flex items-center ${
-                    timelineMode === TimelineMode.Animation 
-                      ? 'bg-[#4A7CFF] text-white' 
-                      : 'text-neutral-300 hover:bg-neutral-700'
-                  }`}
-                >
-                  <Zap size={12} className="mr-1" />
-                  Animation
-                </Tabs.Trigger>
-                <Tabs.Trigger
-                  value={TimelineMode.FrameStyle}
-                  className={`px-3 py-1 text-xs rounded-md flex items-center ${
-                    timelineMode === TimelineMode.FrameStyle 
-                      ? 'bg-[#4A7CFF] text-white' 
-                      : 'text-neutral-300 hover:bg-neutral-700'
-                  }`}
-                >
-                  <Layers size={12} className="mr-1" />
-                  Frame Style
-                </Tabs.Trigger>
-              </Tabs.List>
-            </Tabs.Root>
-          </div>
-          
-          {/* Animation controls - only show in Animation mode */}
-          {timelineMode === TimelineMode.Animation && (
+    <div className="flex flex-col h-full bg-black text-white border-t border-neutral-800">
+      {/* Timeline Controls */}
+      <div className="flex justify-between items-center p-2 border-b border-neutral-800">
+        {/* Mode Toggle */}
+        <div className="flex space-x-2">
+          <Tabs.Root defaultValue="animation" onValueChange={(value) => handleTimelineModeChange(value === 'animation' ? TimelineMode.Animation : TimelineMode.FrameStyle)}>
+            <Tabs.List className="flex p-1 bg-neutral-800 rounded-md" aria-label="Timeline Mode">
+              <Tabs.Trigger
+                value="animation"
+                className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+                          ${timelineMode === TimelineMode.Animation ? 'bg-blue-600 text-white' : 'text-neutral-300 hover:text-white'}`}
+              >
+                <Zap className="w-4 h-4 mr-1.5" />
+                Animation
+              </Tabs.Trigger>
+              <Tabs.Trigger
+                value="frameStyle"
+                className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+                          ${timelineMode === TimelineMode.FrameStyle ? 'bg-blue-600 text-white' : 'text-neutral-300 hover:text-white'}`}
+              >
+                <Layers className="w-4 h-4 mr-1.5" />
+                Frame Style
+              </Tabs.Trigger>
+            </Tabs.List>
+          </Tabs.Root>
+        </div>
+        
+        {/* Action Buttons based on mode */}
+        <div className="flex space-x-2">
+          {timelineMode === TimelineMode.Animation ? (
+            // Animation mode controls
             <>
-              <button 
-                className="w-8 h-8 flex items-center justify-center rounded text-neutral-300 hover:bg-neutral-800"
-                onClick={() => onPlayPauseToggle(!isPlaying)}
-              >
-                {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-              </button>
-              <button 
-                className="w-8 h-8 flex items-center justify-center rounded text-neutral-300 hover:bg-neutral-800 ml-1"
-                onClick={() => onTimeUpdate(0)}
-              >
-                <SkipBack size={16} />
-              </button>
-              <div className="flex items-center ml-4 text-sm text-neutral-400">
-                <Clock size={14} className="mr-1" />
-                <span className="font-mono">{currentTime.toFixed(1)}</span>
-                <span className="mx-1">/</span>
-                
-                {/* Duration display/edit control */}
+              {/* Playback controls */}
+              <div className="flex rounded-md bg-neutral-800 overflow-hidden">
+                <button 
+                  className="p-2 hover:bg-neutral-700 text-neutral-300 hover:text-white"
+                  onClick={() => onTimeUpdate(0)}
+                  title="Reset timeline to start"
+                >
+                  <SkipBack size={16} />
+                </button>
+                <button 
+                  className="p-2 hover:bg-neutral-700 text-neutral-300 hover:text-white"
+                  onClick={() => onPlayPauseToggle(!isPlaying)}
+                  title={isPlaying ? "Pause animation" : "Play animation"}
+                >
+                  {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                </button>
+              </div>
+              
+              {/* Duration control */}
+              <div className="flex items-center rounded-md bg-neutral-800 px-2 text-sm">
                 {showDurationInput ? (
-                  <input
-                    type="number"
-                    className="w-12 bg-neutral-800 text-white font-mono text-sm rounded px-1 py-0.5 border border-neutral-700"
+                  <input 
+                    type="number" 
                     value={duration}
                     min={1}
                     max={30}
-                    step={1}
-                    autoFocus
+                    className="w-12 bg-neutral-900 text-white border border-neutral-700 rounded px-1"
                     onChange={(e) => {
                       const newDuration = Math.max(1, Math.min(30, Number(e.target.value)));
                       setDuration(newDuration);
-                      // Call the parent component's onDurationChange callback if provided
-                      if (onDurationChange) {
-                        onDurationChange(newDuration);
-                      }
                     }}
                     onBlur={() => setShowDurationInput(false)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        setShowDurationInput(false);
-                      }
-                    }}
+                    autoFocus
                   />
                 ) : (
-                  <span 
-                    className="font-mono cursor-pointer hover:text-white hover:underline" 
+                  <div 
+                    className="flex items-center gap-1 cursor-pointer" 
                     onClick={() => setShowDurationInput(true)}
-                    title="Click to change duration"
+                    title="Click to edit duration"
                   >
-                    {duration.toFixed(1)}s
-                  </span>
+                    <Clock size={14} className="text-neutral-400" />
+                    <span>{duration}s</span>
+                  </div>
                 )}
               </div>
             </>
-          )}
-        </div>
-        
-        <div className="flex items-center space-x-3">
-          {timelineMode === TimelineMode.Animation ? (
-            <button className="text-sm text-blue-400 hover:text-blue-300">
-              Add Keyframe
-            </button>
           ) : (
-            <div className="flex items-center space-x-3">
-              <span className="text-xs text-neutral-400">
-                Toggle layer visibility per frame
-              </span>
-              <button 
-                className="px-3 py-1 bg-[#4A7CFF] text-white text-xs rounded-md flex items-center hover:bg-[#3A6CEE]"
-                onClick={() => setIsFrameDialogOpen(true)}
-              >
-                <Plus size={12} className="mr-1" />
-                Add Frame
-              </button>
-            </div>
+            // Frame Style mode controls
+            <button 
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-md flex items-center text-sm font-medium"
+              onClick={() => setIsFrameDialogOpen(true)}
+              title="Add new frame"
+            >
+              <Plus size={16} className="mr-1" />
+              Add Frame
+            </button>
           )}
         </div>
       </div>
       
       {/* Timeline content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Layer track names */}
-        <div className="w-48 border-r border-neutral-800 flex flex-col">
-          <div className="h-8 border-b border-neutral-800 bg-neutral-900 px-2 text-xs text-neutral-500 flex items-end">
-            Layers
-          </div>
-          
-          {frameLayers.map(layer => (
-            <div 
-              key={layer.id}
-              onClick={() => setSelectedLayerId(layer.id)}
-              className={`h-10 flex items-center justify-between px-2 rounded cursor-pointer 
-                ${selectedLayerId === layer.id ? 'bg-neutral-800' : 'hover:bg-neutral-700'} 
-                text-sm ${selectedLayerId === layer.id ? 'text-white' : 'text-neutral-300'}
-                ${layer.linkedLayer ? 'border-l-2 border-blue-500' : ''}`}
-            >
-              <div className="flex items-center">
-                {/* Layer name with linked indicator */}
-                <span className="flex items-center">
-                  {/* Show different icon based on mode */}
+        {/* Layer track names - only show in Animation mode */}
+        {timelineMode === TimelineMode.Animation && (
+          <div className="w-48 border-r border-neutral-800 flex flex-col">
+            <div className="h-8 border-b border-neutral-800 bg-neutral-900 px-2 text-xs text-neutral-500 flex items-end">
+              Layers
+            </div>
+            
+            {frameLayers.map(layer => (
+              <div 
+                key={layer.id}
+                onClick={() => setSelectedLayerId(layer.id)}
+                className={`h-10 flex items-center justify-between px-2 rounded cursor-pointer 
+                  ${selectedLayerId === layer.id ? 'bg-neutral-800' : 'hover:bg-neutral-700'} 
+                  text-sm ${selectedLayerId === layer.id ? 'text-white' : 'text-neutral-300'}
+                  ${layer.linkedLayer ? 'border-l-2 border-blue-500' : ''}`}
+              >
+                <div className="flex items-center">
+                  {/* Show different icons based on timeline mode */}
                   {timelineMode === TimelineMode.Animation ? (
-                    /* Link indicator - clickable to toggle link state */
+                    // Link indicator for Animation mode
                     <span 
                       className={`mr-2 flex items-center ${layer.linkedLayer 
                         ? (layer.linkedLayer.isMain ? 'text-blue-400 bg-blue-900' : 'text-blue-300 bg-blue-800') 
@@ -800,10 +683,8 @@ const Timeline = ({
                         : 'Not linked'
                       }
                       onClick={(e) => {
-                        e.stopPropagation(); // Prevent selection of layer
-                        // Call our local handleUnlinkLayer function which updates the state
+                        e.stopPropagation(); 
                         handleUnlinkLayer(layer.id);
-                        console.log("Timeline: Clicked to unlink layer", layer.id);
                       }}
                     >
                       <svg 
@@ -829,7 +710,7 @@ const Timeline = ({
                       )}
                     </span>
                   ) : (
-                    /* Visibility toggle - clickable to toggle visibility */
+                    // Visibility toggle for FrameStyle mode
                     <span 
                       className={`mr-2 flex items-center ${layer.visible 
                         ? 'text-green-400 hover:text-green-300' 
@@ -837,82 +718,88 @@ const Timeline = ({
                       } cursor-pointer`}
                       title={layer.visible ? 'Layer is visible (click to hide)' : 'Layer is hidden (click to show)'}
                       onClick={(e) => {
-                        e.stopPropagation(); // Prevent selection of layer
+                        e.stopPropagation();
                         handleToggleLayerVisibility(layer.id);
                       }}
                     >
                       {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
                     </span>
                   )}
+                  
+                  {/* Layer name */}
                   {layer.name}
-                </span>
-              </div>
-              
-              {/* Right side indicators/controls - different based on mode */}
-              {timelineMode === TimelineMode.Animation ? (
-                // Animation mode - show layer sync
-                layer.linkedLayer && (
-                  <div className="flex space-x-1">
-                    <span className="text-xs text-blue-300 px-1 py-0.5 rounded-sm bg-blue-900 bg-opacity-30">
-                      {layer.linkedLayer.syncMode}
-                    </span>
-                  </div>
-                )
-              ) : (
-                // Frame Style mode - visibility toggle button
-                <button
-                  className={`p-1 rounded ${layer.visible ? 'text-green-400 hover:bg-neutral-700' : 'text-neutral-500 hover:bg-neutral-700'}`}
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent selection of layer
-                    handleToggleLayerVisibility(layer.id);
-                  }}
-                  title={layer.visible ? 'Hide layer' : 'Show layer'}
-                >
-                  {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-        
-        {/* Timeline area */}
-        <div className="flex-1 flex flex-col relative">
-          {/* Time markers */}
-          <div className="h-8 flex items-end border-b border-neutral-800 relative">
-            {timeMarkers.map(({ time, isMajor }) => (
-              <div 
-                key={time}
-                className="absolute bottom-0 flex flex-col items-center"
-                style={{ left: `${timeToPosition(time)}px` }}
-              >
-                <div 
-                  className={`h-${isMajor ? '4' : '2'} w-px bg-neutral-700`}
-                ></div>
-                {isMajor && (
-                  <div className="text-xs text-neutral-500 mb-1">
-                    {time}s
-                  </div>
+                </div>
+                
+                {/* Right side icons based on mode */}
+                {timelineMode === TimelineMode.Animation ? (
+                  // Animation mode - show layer sync status
+                  layer.linkedLayer && (
+                    <div className="flex space-x-1">
+                      <span className="text-xs text-blue-300 px-1 py-0.5 rounded-sm bg-blue-900 bg-opacity-30">
+                        {layer.linkedLayer.syncMode}
+                      </span>
+                    </div>
+                  )
+                ) : (
+                  // Frame Style mode - show visibility toggle
+                  <button
+                    className={`p-1 rounded ${layer.visible ? 'text-green-400 hover:bg-neutral-700' : 'text-neutral-500 hover:bg-neutral-700'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleLayerVisibility(layer.id);
+                    }}
+                    title={layer.visible ? 'Hide layer' : 'Show layer'}
+                  >
+                    {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                  </button>
                 )}
               </div>
             ))}
           </div>
+        )}
+        
+        {/* Timeline area */}
+        <div className="flex-1 flex flex-col relative">
+          {/* Only show time markers in Animation mode */}
+          {timelineMode === TimelineMode.Animation && (
+            <div className="h-8 flex items-end border-b border-neutral-800 relative">
+              {timeMarkers.map(({ time, isMajor }) => (
+                <div 
+                  key={time}
+                  className="absolute bottom-0 flex flex-col items-center"
+                  style={{ left: `${timeToPosition(time)}px` }}
+                >
+                  <div 
+                    className={`h-${isMajor ? '4' : '2'} w-px bg-neutral-700`}
+                  ></div>
+                  {isMajor && (
+                    <div className="text-xs text-neutral-500 mb-1">
+                      {time}s
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           
-          {/* Playhead */}
-          <div 
-            className="absolute top-0 bottom-0 w-0.5 bg-[#4A7CFF] z-10"
-            style={{ left: `${timeToPosition(currentTime)}px` }}
-            ref={playheadRef}
-          >
+          {/* Playhead - only show in Animation mode */}
+          {timelineMode === TimelineMode.Animation && (
             <div 
-              className="w-4 h-4 -ml-1.5 -mt-1 bg-[#4A7CFF] rounded-full cursor-move"
-              onMouseDown={handlePlayheadMouseDown}
-            ></div>
-          </div>
+              className="absolute top-0 bottom-0 w-0.5 bg-[#4A7CFF] z-10"
+              style={{ left: `${timeToPosition(currentTime)}px` }}
+              ref={playheadRef}
+            >
+              <div 
+                className="w-4 h-4 -ml-1.5 -mt-1 bg-[#4A7CFF] rounded-full cursor-move"
+                onMouseDown={handlePlayheadMouseDown}
+              ></div>
+            </div>
+          )}
           
-          {/* Timeline Track */}
+          {/* Timeline Track or Frame Cards */}
           <div 
             className="flex-1 bg-neutral-900 rounded cursor-pointer relative overflow-auto"
-            style={{ minWidth: '400px', maxWidth: '100%' }} /* Ensure a reasonable size with scrolling */
+            style={{ minWidth: '400px', maxWidth: '100%' }}
             onClick={timelineMode === TimelineMode.Animation ? handleTimelineClick : undefined}
             ref={timelineRef}
           >
@@ -1082,8 +969,8 @@ const Timeline = ({
         onClose={() => setIsFrameDialogOpen(false)}
         onSave={handleAddFrame}
         isEditing={false}
-        timelineMode={TimelineMode.FrameStyle}
         availableLayers={frameLayers}
+        timelineMode={timelineMode}
       />
     </div>
   );
