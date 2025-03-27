@@ -169,7 +169,7 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
   
   // Create frame 1 - All layers visible
   frames.push({
-    id: `gif-${adSizeId}-frame-1`,
+    id: `gif-frame-${adSizeId}-1`, // Format: gif-frame-[adSizeId]-[frameNumber]
     name: 'Frame 1',
     selected: true,
     delay: 2.5,
@@ -184,7 +184,7 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
   
   // Create frame 2 - Hide one layer (e.g., subheadline)
   frames.push({
-    id: `gif-${adSizeId}-frame-2`,
+    id: `gif-frame-${adSizeId}-2`, // Format: gif-frame-[adSizeId]-[frameNumber]
     name: 'Frame 2',
     selected: false,
     delay: 2.5,
@@ -199,7 +199,7 @@ export function generateGifFramesForAdSize(adSizeId: string): GifFrame[] {
   
   // Create frame 3 - Hide two layers (e.g., subheadline and logo)
   frames.push({
-    id: `gif-${adSizeId}-frame-3`,
+    id: `gif-frame-${adSizeId}-3`, // Format: gif-frame-[adSizeId]-[frameNumber]
     name: 'Frame 3',
     selected: false,
     delay: 2.5,

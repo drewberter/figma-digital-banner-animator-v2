@@ -271,7 +271,10 @@ function App() {
               
               // Set time within this frame (accounting for this frame's delay)
               // Get the parent ad size ID from the GIF frame ID
-              const adSizeId = frameId.split('-')[1]; // Extract "frame-X" from "gif-frame-X-frame-Y"
+              // Format is "gif-frame-frameX-Y"
+              const parts = frameId.split('-');
+              // The adSizeId should be after "gif-frame-"
+              const adSizeId = parts.length > 2 ? parts[2] : 'frame-1';
               
               // Get frames for this ad size
               const relevantFrames = generateGifFramesForAdSize(adSizeId);

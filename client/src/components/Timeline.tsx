@@ -56,9 +56,16 @@ const Timeline = ({
       // If switching to GIF frames mode, ensure we have proper GIF frames for the current ad size
       if (mode === TimelineMode.GifFrames) {
         // Extract the ad size ID if we're looking at a GIF frame already
-        const adSizeId = localSelectedFrameId.startsWith('gif-') 
-          ? localSelectedFrameId.split('-')[1] // Extract ad size ID from "gif-frame-X-frame-Y"
-          : localSelectedFrameId;
+        let adSizeId = localSelectedFrameId;
+        
+        // If it's a GIF frame ID (format: "gif-frame-frameX-Y")
+        if (localSelectedFrameId.startsWith('gif-frame-')) {
+          // Parse to extract the adSizeId part
+          const parts = localSelectedFrameId.split('-');
+          // The adSizeId should be after "gif-frame-"
+          adSizeId = parts.length > 2 ? parts[2] : 'frame-1';
+          console.log("Extracted adSizeId from GIF frame:", adSizeId);
+        }
           
         // Generate GIF frames for the current ad size
         const gifFrames = generateGifFramesForAdSize(adSizeId);
@@ -1065,9 +1072,16 @@ const Timeline = ({
                 frames={(() => {
                   // Get the selected ad size ID (using the "frame-X" format)
                   // This is the parent ad size for which we want to show GIF frames
-                  const selectedAdSizeId = localSelectedFrameId.startsWith('gif-') 
-                    ? localSelectedFrameId.split('-')[1] // Extract "frame-X" from "gif-frame-X-frame-Y"
-                    : localSelectedFrameId;
+                  let selectedAdSizeId = localSelectedFrameId;
+                  
+                  // If it's a GIF frame ID (format: "gif-frame-frameX-Y")
+                  if (localSelectedFrameId.startsWith('gif-frame-')) {
+                    // Parse to extract the adSizeId part
+                    const parts = localSelectedFrameId.split('-');
+                    // The adSizeId should be after "gif-frame-"
+                    selectedAdSizeId = parts.length > 2 ? parts[2] : 'frame-1';
+                    console.log("FrameCardGrid - Extracted adSizeId from GIF frame:", selectedAdSizeId);
+                  }
                   
                   // If we're in GIF frames mode but don't have a valid ad size selected yet,
                   // generate frames for this ad size
