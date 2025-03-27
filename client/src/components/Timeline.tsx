@@ -106,57 +106,80 @@ const Timeline = ({
   // Animation frame handling
   const animationFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const isAnimatingRef = useRef<boolean>(false);
   
-  // Toggle playback with animation loop
+  // Toggle playback - useEffect will handle the animation loop
   const togglePlayback = () => {
     const newIsPlaying = !isPlaying;
+    console.log(`Toggling playback to: ${newIsPlaying}`);
     onPlayPauseToggle(newIsPlaying);
-    
-    if (newIsPlaying) {
-      // Start animation frame loop
+  };
+  
+  // Animation loop is now defined inside the useEffect
+  
+  // Handle animation playback when isPlaying changes
+  useEffect(() => {
+    const startAnimationLoop = () => {
+      if (isAnimatingRef.current) return; // Don't start if already running
+      
+      console.log("Starting animation loop");
+      isAnimatingRef.current = true;
       lastTimeRef.current = performance.now();
-      startAnimationLoop();
-    } else {
-      // Stop animation frame loop
+      
+      // Define the animation loop function
+      const animate = (now: number) => {
+        if (!isAnimatingRef.current) return; // Stop if no longer animating
+        
+        // Calculate time difference
+        const deltaTime = (now - lastTimeRef.current) / 1000; // convert to seconds
+        lastTimeRef.current = now;
+        
+        // Update current time
+        const newTime = currentTime + deltaTime;
+        
+        // Loop back to start if we've reached the end
+        if (newTime >= duration) {
+          onTimeUpdate(0);
+        } else {
+          onTimeUpdate(newTime);
+        }
+        
+        // Continue the loop
+        animationFrameRef.current = requestAnimationFrame(animate);
+      };
+      
+      // Start the loop
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+    
+    const stopAnimationLoop = () => {
+      if (!isAnimatingRef.current) return; // Don't stop if not running
+      
+      console.log("Stopping animation loop");
+      isAnimatingRef.current = false;
+      
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
-    }
-  };
-  
-  // Animation loop function
-  const startAnimationLoop = () => {
-    const animate = (now: number) => {
-      // Calculate time difference
-      const deltaTime = (now - lastTimeRef.current) / 1000; // convert to seconds
-      lastTimeRef.current = now;
-      
-      // Update current time
-      const newTime = currentTime + deltaTime;
-      // Loop back to start if we've reached the end
-      if (newTime >= duration) {
-        onTimeUpdate(0);
-      } else {
-        onTimeUpdate(newTime);
-      }
-      
-      // Continue the loop
-      animationFrameRef.current = requestAnimationFrame(animate);
     };
     
-    // Start the loop
-    animationFrameRef.current = requestAnimationFrame(animate);
-  };
-  
-  // Clean up animation frame on unmount
-  useEffect(() => {
+    // Start or stop based on isPlaying state
+    if (isPlaying) {
+      startAnimationLoop();
+    } else {
+      stopAnimationLoop();
+    }
+
+    // Clean up on unmount
     return () => {
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
+      isAnimatingRef.current = false;
     };
-  }, []);
+  }, [isPlaying, currentTime, onTimeUpdate, duration]);
   
   return (
     <div className="h-full bg-[#111111] flex flex-col">
