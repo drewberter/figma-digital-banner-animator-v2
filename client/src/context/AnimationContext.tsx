@@ -279,16 +279,30 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
         
         // Sync layer visibility across all frames with the same number
         // This ensures all frame #1 in different ad sizes show/hide the same layers
+        console.log("AnimationContext - Before sync: GIF frames with synced visibility for layer:", layerId);
+        
         const updatedGifFrames = syncGifFramesByNumber(mockGifFrames, frameId, layerId);
+        console.log("AnimationContext - After sync: GIF frames with synced visibility, count:", updatedGifFrames.length);
         
         // Update all frames in the mock data array
         updatedGifFrames.forEach((frame, index) => {
           mockGifFrames[index] = frame;
+          console.log("AnimationContext - Updated GIF frame:", frame.id, 
+                      "hiddenLayers:", frame.hiddenLayers,
+                      "includes layer:", frame.hiddenLayers.includes(layerId));
         });
         
-        // DO NOT update the parent ad size's layer visibility
-        // Just update the current visible layers for UI purposes
-        setLayers(prev => [...prev]);
+        // Trigger a complete re-render of the UI by forcing an update
+        // This ensures that all components using the GIF frames data get refreshed
+        setLayers(prevLayers => {
+          console.log("AnimationContext - Forcing UI refresh with updated layer data");
+          // Find the layer that was toggled and return a new array with a timestamp to force update
+          return prevLayers.map(layer => 
+            layer.id === layerId 
+              ? { ...layer, lastToggled: new Date().getTime() } 
+              : layer
+          );
+        });
       } else {
         console.error("GIF frame not found:", frameId);
       }

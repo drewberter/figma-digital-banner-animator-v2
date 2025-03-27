@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Eye, EyeOff, Copy, Trash2, Edit, Clock } from 'lucide-react';
-import { AnimationFrame, AnimationLayer } from '../types/animation';
+import { Plus, Eye, EyeOff, Copy, Trash2, Edit, Clock, Link } from 'lucide-react';
+import { AnimationFrame, AnimationLayer, GifFrame } from '../types/animation';
 import { v4 as uuidv4 } from 'uuid';
+import { syncGifFramesByNumber } from '../utils/linkingUtils';
 
 interface FrameCardGridProps {
   frames: Record<string, AnimationFrame>;
@@ -147,6 +148,17 @@ const FrameCard = ({
   const [showDelayInput, setShowDelayInput] = useState(false);
   const [delay, setDelay] = useState(frame.delay || 0);
 
+  // Extract frame number for GIF frames
+  const getFrameNumber = (frameId: string): string | null => {
+    if (!frameId.startsWith('gif-frame-')) return null;
+    
+    const parts = frameId.split('-');
+    return parts[parts.length - 1];
+  };
+  
+  // Extract and display frame number for UI
+  const frameNumber = getFrameNumber(frame.id);
+  
   return (
     <div 
       className={`bg-neutral-900 rounded-md overflow-hidden border-2 ${
@@ -206,6 +218,14 @@ const FrameCard = ({
         <div className="absolute top-2 right-2 bg-black bg-opacity-50 rounded-full px-2 py-0.5 text-xs text-white">
           {layers.filter(l => l.visible).length}/{layers.length} visible
         </div>
+        
+        {/* Frame number badge for GIF frames - indicates which frames sync together */}
+        {frameNumber && (
+          <div className="absolute top-2 left-2 bg-[#4A7CFF] bg-opacity-70 rounded-full px-2 py-0.5 text-xs text-white flex items-center">
+            <Link size={10} className="mr-1" />
+            <span>Frame {frameNumber}</span>
+          </div>
+        )}
       </div>
 
       {/* Card controls */}
@@ -287,6 +307,14 @@ const FrameCard = ({
         {/* Layer visibility list */}
         {isLayerListOpen && (
           <div className="mt-2 bg-neutral-800 rounded-md max-h-[150px] overflow-y-auto">
+            {/* Syncing indicator for GIF frames */}
+            {frame.id.startsWith('gif-frame-') && frameNumber && (
+              <div className="p-2 text-xs text-[#4A7CFF] bg-[#1A2A4A] flex items-center">
+                <Link size={12} className="mr-1.5 text-[#4A7CFF]" />
+                <span>All frames with the same number sync layer visibility by default</span>
+              </div>
+            )}
+            
             {layers.map(layer => {
               // For display purposes only: get override indicator
               // In a full implementation, we would fetch this from the GifFrame's overrides property
@@ -315,7 +343,16 @@ const FrameCard = ({
                       className={`p-1 rounded ${layer.visible ? 'text-green-400' : 'text-neutral-500'}`}
                       onClick={() => {
                         console.log("FrameCard - onClick toggle visibility for layer:", layer.id, "current visible state:", layer.visible);
-                        onToggleLayerVisibility(layer.id);
+                        
+                        // Add enhanced logging and explicit frame-number-based syncing
+                        if (frame.id.startsWith('gif-frame-')) {
+                          console.log("FrameCard - This is a GIF frame, will need frame-number syncing");
+                          // Call the visibility toggle handler which will handle GIF frame syncing
+                          onToggleLayerVisibility(layer.id);
+                        } else {
+                          // Regular frame, just toggle visibility
+                          onToggleLayerVisibility(layer.id);
+                        }
                       }}
                       title={layer.visible ? 'Hide layer' : 'Show layer'}
                     >
