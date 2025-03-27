@@ -16,6 +16,7 @@ function App() {
   const [selectedFrameId, setSelectedFrameId] = useState('frame-1');
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [timelineDuration, setTimelineDuration] = useState(5); // Default 5 seconds
   
   // Track auto-save state for notifications
   const [saving, setSaving] = useState(false);
@@ -73,6 +74,11 @@ function App() {
   
   // Handle play/pause toggle
   const handlePlayPauseToggle = (playing: boolean) => {
+    // Reset to beginning if we're at the end of the timeline and trying to play
+    if (playing && currentTime >= timelineDuration) {
+      setCurrentTime(0);
+    }
+    
     setIsPlaying(playing);
     
     // If we're starting playback, set up the animation loop
@@ -80,24 +86,32 @@ function App() {
       const startTime = performance.now();
       const initialTime = currentTime;
       
+      // Use a ref to track the animation frame ID
+      let animationFrameId: number;
+      
       const animationFrame = (now: number) => {
-        if (!playing) return;
-        
         const elapsed = (now - startTime) / 1000; // Convert to seconds
         const newTime = initialTime + elapsed;
         
         // If we reach the end of the timeline, stop playing
-        if (newTime >= 5) { // Using same duration as timeline (5 seconds)
-          setCurrentTime(5);
+        if (newTime >= timelineDuration) {
+          setCurrentTime(timelineDuration);
           setIsPlaying(false);
           return;
         }
         
         setCurrentTime(newTime);
-        requestAnimationFrame(animationFrame);
+        animationFrameId = requestAnimationFrame(animationFrame);
       };
       
-      requestAnimationFrame(animationFrame);
+      animationFrameId = requestAnimationFrame(animationFrame);
+      
+      // Cancel animation frame when isPlaying changes to false
+      return () => {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+      };
     }
   };
 
@@ -124,6 +138,7 @@ function App() {
                 isPlaying={isPlaying}
                 currentTime={currentTime}
                 selectedFrameId={selectedFrameId}
+                onDurationChange={setTimelineDuration}
               />
             </div>
             

@@ -10,6 +10,7 @@ interface TimelineProps {
   isPlaying: boolean;
   currentTime: number;
   selectedFrameId?: string;
+  onDurationChange?: (duration: number) => void;
 }
 
 const Timeline = ({
@@ -17,12 +18,23 @@ const Timeline = ({
   onPlayPauseToggle,
   isPlaying,
   currentTime,
-  selectedFrameId = 'frame-1' // Default to frame-1 if no frame ID is provided
+  selectedFrameId = 'frame-1', // Default to frame-1 if no frame ID is provided
+  onDurationChange
 }: TimelineProps) => {
   // Create a forceUpdate function for timeline component
   const [, forceUpdate] = useReducer(x => x + 1, 0);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
-  const duration = 5; // Fixed duration for now
+  
+  // Duration state
+  const [duration, setDuration] = useState(5); // Default duration of 5 seconds
+  
+  // When duration changes externally, update the callback
+  useEffect(() => {
+    if (onDurationChange) {
+      onDurationChange(duration);
+    }
+  }, [duration, onDurationChange]);
+  const [showDurationInput, setShowDurationInput] = useState(false);
   
   const [isDragging, setIsDragging] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -370,7 +382,41 @@ const Timeline = ({
             <Clock size={14} className="mr-1" />
             <span className="font-mono">{currentTime.toFixed(1)}</span>
             <span className="mx-1">/</span>
-            <span className="font-mono">{duration.toFixed(1)}</span>
+            
+            {/* Duration display/edit control */}
+            {showDurationInput ? (
+              <input
+                type="number"
+                className="w-12 bg-neutral-800 text-white font-mono text-sm rounded px-1 py-0.5 border border-neutral-700"
+                value={duration}
+                min={1}
+                max={30}
+                step={1}
+                autoFocus
+                onChange={(e) => {
+                  const newDuration = Math.max(1, Math.min(30, Number(e.target.value)));
+                  setDuration(newDuration);
+                  // Call the parent component's onDurationChange callback if provided
+                  if (onDurationChange) {
+                    onDurationChange(newDuration);
+                  }
+                }}
+                onBlur={() => setShowDurationInput(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setShowDurationInput(false);
+                  }
+                }}
+              />
+            ) : (
+              <span 
+                className="font-mono cursor-pointer hover:text-white hover:underline" 
+                onClick={() => setShowDurationInput(true)}
+                title="Click to change duration"
+              >
+                {duration.toFixed(1)}s
+              </span>
+            )}
           </div>
         </div>
         
