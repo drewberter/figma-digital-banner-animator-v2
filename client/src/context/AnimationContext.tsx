@@ -295,13 +295,82 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
         layersByFrame[frameId] = mockLayers[frameId];
       });
       
-      // Pass this layer data to the sync function for better layer matching
-      const updatedGifFrames = syncGifFramesByNumber(
+      // Get source layer name for better cross-ad-size matching
+      let sourceLayerName: string | undefined;
+      if (mockLayers[adSizeId]) {
+        const sourceLayer = mockLayers[adSizeId].find(layer => layer.id === layerId);
+        if (sourceLayer) {
+          sourceLayerName = sourceLayer.name;
+          console.log(`AnimationContext - Source layer name: ${sourceLayerName}`);
+        }
+      }
+      
+      // ENHANCED CROSS-AD-SIZE SYNCING:
+      // First update all GIF frames with the same number in this ad size
+      let updatedGifFrames = syncGifFramesByNumber(
         mockGifFrames, 
         frameId, 
         layerId,
         layersByFrame
       );
+      
+      // Now try to sync across all ad sizes by looking for frames with the same number
+      if (sourceLayerName) {
+        console.log(`AnimationContext - Now syncing across all ad sizes for frame number: ${frameNumber} and layer name: ${sourceLayerName}`);
+        
+        // Find all frames with the same frame number across all ad sizes
+        const framesWithSameNumber = findFramesWithSameNumber(updatedGifFrames, frameNumber);
+        console.log(`AnimationContext - Found ${framesWithSameNumber.length} frames with number ${frameNumber} across all ad sizes`);
+        
+        // For each ad size, find the equivalent layer and sync its visibility
+        Object.keys(mockLayers).forEach(targetAdSizeId => {
+          // Skip the source ad size as we already processed it
+          if (targetAdSizeId === adSizeId) return;
+          
+          // Find the target layer with the same name in this ad size
+          const targetLayer = mockLayers[targetAdSizeId]?.find(layer => layer.name === sourceLayerName);
+          if (!targetLayer) {
+            console.log(`AnimationContext - No matching layer with name ${sourceLayerName} found in ad size ${targetAdSizeId}`);
+            return;
+          }
+          
+          // Find GIF frames for this ad size with the same frame number
+          const targetFramesForAdSize = framesWithSameNumber.filter(f => {
+            const parsed = parseGifFrameId(f.id);
+            return parsed.isValid && parsed.adSizeId === targetAdSizeId;
+          });
+          
+          if (targetFramesForAdSize.length === 0) {
+            console.log(`AnimationContext - No frames with number ${frameNumber} found for ad size ${targetAdSizeId}`);
+            return;
+          }
+          
+          // For each matching frame, sync the layer visibility
+          targetFramesForAdSize.forEach(targetFrame => {
+            console.log(`AnimationContext - Cross-ad-size sync: For ${sourceLayerName}, syncing from ${frameId} to ${targetFrame.id}`);
+            
+            // Get current hidden state of source layer
+            const isHiddenInSource = updatedGifFrame.hiddenLayers.includes(layerId);
+            
+            // Make sure hiddenLayers is initialized in target frame
+            if (!targetFrame.hiddenLayers) {
+              targetFrame.hiddenLayers = [];
+            }
+            
+            // Update target frame's hidden layers accordingly
+            const isHiddenInTarget = targetFrame.hiddenLayers.includes(targetLayer.id);
+            if (isHiddenInSource && !isHiddenInTarget) {
+              // Source is hidden but target is visible - hide the target layer
+              targetFrame.hiddenLayers.push(targetLayer.id);
+              console.log(`AnimationContext - Cross-ad-size sync: Hiding layer ${targetLayer.id} in frame ${targetFrame.id}`);
+            } else if (!isHiddenInSource && isHiddenInTarget) {
+              // Source is visible but target is hidden - show the target layer
+              targetFrame.hiddenLayers = targetFrame.hiddenLayers.filter(id => id !== targetLayer.id);
+              console.log(`AnimationContext - Cross-ad-size sync: Showing layer ${targetLayer.id} in frame ${targetFrame.id}`);
+            }
+          });
+        });
+      }
       
       // Debug output
       console.log(`AnimationContext - After sync: ${updatedGifFrames.length} GIF frames updated`);
@@ -348,12 +417,24 @@ export const AnimationProvider = ({ children }: { children: ReactNode }) => {
       // This ensures that all components using the GIF frames data get refreshed
       setLayers(prevLayers => {
         console.log("AnimationContext - Forcing UI refresh with updated layer data");
-        // Find the layer that was toggled and return a new array with a timestamp to force update
-        return prevLayers.map(layer => 
-          layer.id === layerId 
-            ? { ...layer, lastToggled: new Date().getTime() } 
-            : layer
-        );
+        
+        // If we have the layer name, update all layers with the same name
+        const timestamp = new Date().getTime();
+        
+        return prevLayers.map(layer => {
+          // Update the source layer first
+          if (layer.id === layerId) {
+            return { ...layer, lastToggled: timestamp };
+          }
+          
+          // Update all layers with the same name as the source layer
+          if (sourceLayerName && layer.name === sourceLayerName) {
+            console.log(`AnimationContext - Also updating layer ${layer.id} with name ${layer.name} for UI refresh`);
+            return { ...layer, lastToggled: timestamp };
+          }
+          
+          return layer;
+        });
       });
     } else {
       // Regular frame - update the layers directly
