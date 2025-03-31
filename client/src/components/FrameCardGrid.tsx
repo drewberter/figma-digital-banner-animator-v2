@@ -530,14 +530,19 @@ const FrameCard = ({
               onClick={(e) => {
                 e.stopPropagation();
                 
-                // Additional debug for child layer visibility in expanded containers
+                // Get layer hierarchy info
                 const isChild = !!layer.parentId;
                 const parentIsExpanded = isChild && layer.parentId && (expandedLayerGroups[layer.parentId] || false);
-                console.log(`🔍 FrameCardGrid: HIDING layer ${layer.name} (${layer.id}) - isChild=${isChild}, parentExpanded=${parentIsExpanded}`);
                 
-                // Enhanced debug logging for layer visibility toggle
-                console.log(`FrameCardGrid: Toggle visibility for layer ${layer.id} in frame ${frameId} (current: visible)`);
-                debugLog('VisibilityToggle', `Attempting to toggle ${layer.name} (${layer.id}) in frame ${frameId}`);
+                // Only allow toggle if layer is directly visible or parent is expanded
+                if (!isChild || (isChild && parentIsExpanded)) {
+                    console.log(`FrameCardGrid: Toggle visibility for layer ${layer.id} in frame ${frameId}`);
+                    
+                    // Call the visibility toggle callback
+                    if (onToggleLayerVisibility) {
+                        onToggleLayerVisibility(frameId, layer.id);
+                    }
+                }
                 
                 // Log parent-child relationships for nested layers
                 if (layer.parentId) {
