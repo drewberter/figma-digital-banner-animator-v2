@@ -26,7 +26,7 @@ const FrameEditDialog = ({
   frame,
   isEditing,
   availableLayers = [],
-  timelineMode = TimelineMode.Animation
+  timelineMode = 'animation'
 }: FrameEditDialogProps) => {
   const [name, setName] = useState('');
   const [headlineText, setHeadlineText] = useState('');
@@ -83,12 +83,12 @@ const FrameEditDialog = ({
       <div className="bg-[#111111] rounded-lg w-[400px] max-h-[90vh] flex flex-col overflow-hidden">
         <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
           <h2 className="text-lg font-medium text-white flex items-center">
-            {timelineMode === TimelineMode.GifFrames ? (
+            {timelineMode === 'gifFrames' ? (
               <Layers size={18} className="mr-2 text-neutral-400" />
             ) : null}
             {isEditing 
-              ? (timelineMode === TimelineMode.GifFrames ? 'Edit Frame Layers' : 'Edit Frame Content')
-              : (timelineMode === TimelineMode.GifFrames ? 'Add New Frame Layers' : 'Add New Frame Content')
+              ? (timelineMode === 'gifFrames' ? 'Edit Frame Layers' : 'Edit Frame Content')
+              : (timelineMode === 'gifFrames' ? 'Add New Frame Layers' : 'Add New Frame Content')
             }
           </h2>
           <button 
@@ -101,7 +101,7 @@ const FrameEditDialog = ({
         
         <form onSubmit={handleSubmit} className="p-5 space-y-5 flex-1 overflow-y-auto">
           {/* Only show frame name input in Animation mode */}
-          {timelineMode === TimelineMode.Animation && (
+          {timelineMode === 'animation' && (
             <div>
               <label htmlFor="name" className="block text-sm text-neutral-300 mb-2">
                 Frame Name
@@ -117,7 +117,7 @@ const FrameEditDialog = ({
             </div>
           )}
           
-          {timelineMode === TimelineMode.Animation && (
+          {timelineMode === 'animation' && (
             <>
               <div>
                 <label htmlFor="headlineText" className="block text-sm text-neutral-300 mb-2">
@@ -189,24 +189,24 @@ const FrameEditDialog = ({
           
           {/* Layer Visibility Controls */}
           {availableLayers.length > 0 && (
-            <div className={timelineMode === TimelineMode.GifFrames ? "mt-3" : ""}>
+            <div className={timelineMode === 'gifFrames' ? "mt-3" : ""}>
               <label className="block text-sm text-neutral-300 mb-2 flex items-center">
-                {timelineMode === TimelineMode.GifFrames && <Eye size={16} className="mr-2 text-neutral-400" />}
+                {timelineMode === 'gifFrames' && <Eye size={16} className="mr-2 text-neutral-400" />}
                 Layer Visibility
               </label>
-              {timelineMode === TimelineMode.GifFrames && (
+              {timelineMode === 'gifFrames' && (
                 <p className="text-xs text-neutral-500 mb-3">
                   Select which layers should be visible in this frame. This helps you create variations without duplicating layers.
                 </p>
               )}
-              <div className={`bg-[#191919] rounded border ${timelineMode === TimelineMode.GifFrames ? "border-neutral-600" : "border-neutral-700"} p-1 ${timelineMode === TimelineMode.GifFrames ? "max-h-[200px]" : "max-h-[150px]"} overflow-y-auto`}>
+              <div className={`bg-[#191919] rounded border ${timelineMode === 'gifFrames' ? "border-neutral-600" : "border-neutral-700"} p-1 ${timelineMode === 'gifFrames' ? "max-h-[200px]" : "max-h-[150px]"} overflow-y-auto`}>
                 {availableLayers.map(layer => (
                   <div 
                     key={layer.id}
-                    className={`flex items-center justify-between p-2 hover:bg-[#222] rounded ${timelineMode === TimelineMode.GifFrames ? "mb-1" : ""}`}
+                    className={`flex items-center justify-between p-2 hover:bg-[#222] rounded ${timelineMode === 'gifFrames' ? "mb-1" : ""}`}
                   >
                     <div className="text-sm text-neutral-300 flex items-center">
-                      {timelineMode === TimelineMode.GifFrames && (
+                      {timelineMode === 'gifFrames' && (
                         <span className="w-2 h-2 rounded-full bg-neutral-500 mr-2 flex-shrink-0"></span>
                       )}
                       {layer.name}
@@ -254,8 +254,8 @@ const FrameEditDialog = ({
               className="px-4 py-2 rounded bg-[#4A7CFF] hover:bg-[#3A6CEE] text-white"
             >
               {isEditing 
-                ? (timelineMode === TimelineMode.GifFrames ? 'Update Layer Visibility' : 'Update Frame')
-                : (timelineMode === TimelineMode.GifFrames ? 'Create Frame with Layers' : 'Add Frame')
+                ? (timelineMode === 'gifFrames' ? 'Update Layer Visibility' : 'Update Frame')
+                : (timelineMode === 'gifFrames' ? 'Create Frame with Layers' : 'Add Frame')
               }
             </button>
           </div>

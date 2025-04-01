@@ -64,6 +64,7 @@ export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type AnimationProject = typeof animationProjects.$inferSelect;
 
 // Animation types schema
+// Updated animation types to match client-side definitions
 export const animationTypes = [
   'None',
   'Fade',
@@ -72,14 +73,37 @@ export const animationTypes = [
   'Rotate',
   'Bounce',
   'Pulse',
+  'Wipe In',
+  'Wipe Out',
+  'Fade In',
+  'Fade Out',
+  'Slide Up',
+  'Slide Down',
+  'Slide Left',
+  'Slide Right',
+  'Scale Up',
+  'Scale Down',
+  'Scale Fade',
+  'Rotate Scale',
+  'Puff In Center',
+  'Puff Out Center',
+  'Circle In',
+  'Circle Out',
+  'Circle In Top',
+  'Circle In Bottom',
+  'Circle In Left',
+  'Circle In Right',
+  'Flicker 3',
   'Custom'
 ];
 
+// Updated easing types to match client-side definitions
 export const easingTypes = [
   'Linear',
   'Ease In',
   'Ease Out',
   'Ease In Out',
+  'Ease Out Back', 
   'Bounce',
   'Custom'
 ];
@@ -100,6 +124,7 @@ export const animationSchema = z.object({
     x: z.number(),
     y: z.number()
   }).optional(),
+  variant: z.string().optional(),
   customData: z.record(z.any()).optional()
 });
 

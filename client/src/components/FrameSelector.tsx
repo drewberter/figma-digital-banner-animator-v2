@@ -22,7 +22,7 @@ const FrameSelector = ({
   onFrameDelete,
   onFrameSelect,
   selectedFrameId,
-  timelineMode = TimelineMode.Animation
+  timelineMode = 'animation'
 }: FrameSelectorProps) => {
   const [isHovered, setIsHovered] = useState<string | null>(null);
   const [isAddingFrame, setIsAddingFrame] = useState(false);
@@ -101,7 +101,7 @@ const FrameSelector = ({
                 {frame.name}
               </div>
               
-              {timelineMode === TimelineMode.Animation ? (
+              {timelineMode === 'animation' ? (
                 <div className="text-xs text-neutral-400 mt-1 truncate">
                   {frame.headlineText || 'No headline text'}
                 </div>
@@ -149,7 +149,7 @@ const FrameSelector = ({
           onClick={handleAddFrame}
         >
           <PlusCircle size={24} className="text-neutral-500 mb-2" />
-          {timelineMode === TimelineMode.Animation ? (
+          {timelineMode === 'animation' ? (
             <>
               <div className="text-sm text-neutral-400">Add content frames to create banner variations</div>
               <div className="text-xs text-neutral-500 mt-1">Each frame can have different headline text</div>

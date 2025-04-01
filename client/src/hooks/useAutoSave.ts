@@ -28,20 +28,47 @@ export function useAutoSave({
   const debounceTimer = useRef<number | null>(null);
   const previousData = useRef<string>('');
   
+  // Flag to track programmatic storage updates to prevent recursive cycles
+  const isInternalUpdate = useRef(false);
+
   // Save function
   const saveData = () => {
     try {
       // Only save if data has changed
       const serialized = JSON.stringify(data);
       if (serialized !== previousData.current) {
-        localStorage.setItem(key, serialized);
+        // Set the flag before setting localStorage
+        isInternalUpdate.current = true;
+        
+        // Add a timestamp to help identify the storage event source
+        const dataWithTimestamp = {
+          ...data,
+          _timestamp: new Date().getTime(),
+          _source: 'internal'
+        };
+        
+        // Save with timestamp
+        localStorage.setItem(key, JSON.stringify(dataWithTimestamp));
         previousData.current = serialized;
+        
+        // Trigger callback
         onSave?.(key, data);
-        console.log(`Autosaved animation state for: ${key}`);
+        
+        // Reset the flag after a short delay to allow the storage event to process
+        setTimeout(() => {
+          isInternalUpdate.current = false;
+        }, 50);
+        
+        // Only log occasionally to reduce console spam
+        if (Math.random() < 0.1) { // Only log ~10% of saves
+          console.log(`Autosaved animation state for: ${key}`);
+        }
       }
     } catch (error) {
       console.error('Error saving data:', error);
       onError?.(error);
+      // Reset flag in case of error
+      isInternalUpdate.current = false;
     }
   };
 

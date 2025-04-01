@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect, useReducer } from 'react';
+import React, { useState, useRef, useEffect, useReducer, useCallback } from 'react';
 import { Play, Pause, SkipBack, Clock, LogIn, LogOut, Eye, EyeOff, Layers, Zap, Plus } from 'lucide-react';
 import { mockLayers, mockFrames, mockGifFrames, generateGifFramesForAdSize } from '../mock/animationData';
 import FrameEditDialog from './FrameEditDialog';
 import FrameCardGrid from './FrameCardGrid';
+import AnimationTypeMenu from './AnimationTypeMenu';
 import { 
   Animation, 
   AnimationType, 
@@ -15,7 +16,64 @@ import {
 } from '../types/animation';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import * as Tabs from '@radix-ui/react-tabs';
-import { autoLinkLayers, syncLinkedLayerAnimations, unlinkLayer, parseGifFrameId } from '../utils/linkingUtils';
+import { useAnimationContext } from '../context/AnimationContext';
+import { autoLinkLayers, syncLinkedLayerAnimations, unlinkLayer, linkLayer, parseGifFrameId } from '../utils/linkingUtils';
+import { toggleLayerVisibilityOverride } from '../utils/directLayerLinking-fixed';
+
+// Helper function to safely check timeline mode
+function isTimelineMode(mode: TimelineMode, value: 'animation' | 'gifFrames'): boolean {
+  return mode === value;
+}
+
+// Helper function to safely sync layer animations
+function safeSyncLayerAnimations(mockLayers: Record<string, AnimationLayer[]>, layerId: string): void {
+  try {
+    const updatedLayers = syncLinkedLayerAnimations(mockLayers, layerId);
+    
+    // Update if valid result
+    if (updatedLayers && typeof updatedLayers === 'object') {
+      Object.keys(updatedLayers).forEach(frameId => {
+        mockLayers[frameId] = updatedLayers[frameId];
+      });
+    } else {
+      console.warn('syncLinkedLayerAnimations returned invalid value:', updatedLayers);
+    }
+  } catch (error) {
+    console.error('Error syncing layer animations:', error);
+  }
+}
+
+// Normalize Frames Button Component
+const NormalizeFramesButton = () => {
+  const { normalizeFrameCounts } = useAnimationContext();
+  
+  const handleNormalizeClick = useCallback(() => {
+    console.log("Manually triggering frame count normalization");
+    try {
+      if (normalizeFrameCounts) {
+        normalizeFrameCounts();
+        console.log("Successfully called normalizeFrameCounts function");
+      } else {
+        console.error("normalizeFrameCounts function not available in context");
+        alert("Error: Frame normalization function is not available");
+      }
+    } catch (error) {
+      console.error("Error in normalizeFrameCounts:", error);
+      alert(`Error normalizing frames: ${error}`);
+    }
+  }, [normalizeFrameCounts]);
+  
+  return (
+    <button 
+      className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-md flex items-center text-sm font-medium"
+      onClick={handleNormalizeClick}
+      title="Normalize frame counts across ad sizes - ensures all ad sizes have the same number of frames"
+    >
+      <Layers size={16} className="mr-1" />
+      Normalize Frames
+    </button>
+  );
+};
 
 interface TimelineProps {
   onTimeUpdate: (time: number) => void;
@@ -40,7 +98,7 @@ const Timeline = ({
   onDurationChange,
   onLinkLayers,
   onUnlinkLayer,
-  timelineMode = TimelineMode.Animation, // Default to Animation mode
+  timelineMode = 'animation', // Default to Animation mode
   onTimelineModeChange,
   onFrameSelect
 }: TimelineProps) => {
@@ -49,13 +107,16 @@ const Timeline = ({
   const [localSelectedFrameId, setSelectedFrameId] = useState<string>(selectedFrameId);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   
+  // Access the animation context to get the toggleLayerLock function
+  const { toggleLayerLock } = useAnimationContext();
+  
   // Handle mode changes
   const handleTimelineModeChange = (mode: TimelineMode) => {
     if (onTimelineModeChange) {
       onTimelineModeChange(mode);
       
       // If switching to GIF frames mode, ensure we have proper GIF frames for the current ad size
-      if (mode === TimelineMode.GifFrames) {
+      if (mode === 'gifFrames') {
         // Extract the ad size ID if we're looking at a GIF frame already
         let adSizeId = localSelectedFrameId;
         
@@ -148,7 +209,7 @@ const Timeline = ({
     
     try {
       // Add extra debugging for GIF Frames mode
-      if (timelineMode === TimelineMode.GifFrames) {
+      if (isTimelineMode(timelineMode, 'gifFrames')) {
         console.log(`⚡ Timeline: Unlinking in GIF Frames mode with selected frame: ${localSelectedFrameId}`);
         // If we're in a GIF frame, log the parsed frame info
         if (localSelectedFrameId && localSelectedFrameId.startsWith('gif-frame-')) {
@@ -203,11 +264,10 @@ const Timeline = ({
         console.log("⚡ Timeline: This is normal in GIF Frames mode, continuing with local unlink only");
       }
       
-      // Show a success message
-      alert(`Successfully unlinked layer ${layerId}`);
+      // Log success but don't show alert to avoid UI confusion
+      console.log(`Successfully unlinked layer ${layerId}`);
     } catch (error) {
       console.error("⚡ Timeline: ERROR unlinking layer:", error);
-      alert(`Error unlinking layer: ${error}`);
     }
     
     console.log("⚡ Timeline: Forcing update after unlinking layer", layerId);
@@ -218,8 +278,38 @@ const Timeline = ({
   const handleToggleLayerVisibility = (layerId: string) => {
     // Use the handleToggleLayerVisibilityInFrame function with the current selected frame
     if (localSelectedFrameId) {
-      console.log("Toggling visibility for layer", layerId, "in frame", localSelectedFrameId);
+      console.log("[LayerSync][DEBUG] VisibilityToggle", "Attempting to toggle layer", layerId, "in frame", localSelectedFrameId);
+      
+      // Find the layer to see if it's a child of a group
+      if (timelineMode === 'gifFrames') {
+        const gifFrameIndex = mockGifFrames.findIndex(frame => frame.id === localSelectedFrameId);
+        if (gifFrameIndex >= 0) {
+          const gifFrame = mockGifFrames[gifFrameIndex];
+          if (gifFrame.layers) {
+            const findLayer = (layers: AnimationLayer[], id: string): AnimationLayer | null => {
+              for (const layer of layers) {
+                if (layer.id === id) return layer;
+                if (layer.children) {
+                  const found = findLayer(layer.children, id);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
+            
+            const layer = findLayer(gifFrame.layers, layerId);
+            if (layer) {
+              console.log("[LayerSync][DEBUG] VisibilityToggle", `Attempting to toggle ${layer.name} (${layerId}) in frame ${localSelectedFrameId}`);
+              if (layer.parentId) {
+                console.log("[LayerSync][DEBUG] VisibilityToggle", `Layer ${layer.name} is a child of parent ID: ${layer.parentId}`);
+              }
+            }
+          }
+        }
+      }
+      
       handleToggleLayerVisibilityInFrame(localSelectedFrameId, layerId);
+      console.log("[LayerSync][DEBUG] VisibilityToggle", "Callback executed for layer visibility toggle");
     } else {
       console.error("No frame selected for layer visibility toggle");
     }
@@ -227,28 +317,59 @@ const Timeline = ({
 
   // Handle toggling layer visibility in a specific frame
   const handleToggleLayerVisibilityInFrame = (frameId: string, layerId: string) => {
-    console.log("Toggling visibility for layer", layerId, "in frame", frameId);
+    console.log("[VisibilityToggle] Toggling visibility for layer", layerId, "in frame", frameId);
+    
+    // Add additional debugging to help diagnose layers
+    try {
+      if (frameId && layerId) {
+        // If we're in animation mode, find the layer to get its name
+        const frame = mockLayers[frameId] || [];
+        const findLayerInTree = (layers: AnimationLayer[]): AnimationLayer | null => {
+          for (const layer of layers) {
+            if (layer.id === layerId) return layer;
+            if (layer.children?.length) {
+              const found = findLayerInTree(layer.children);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        
+        const targetLayer = findLayerInTree(frame);
+        if (targetLayer) {
+          console.log(`[VisibilityToggle] Found layer "${targetLayer.name}" (${layerId}) with current visibility:`, targetLayer.visible);
+        } else {
+          console.log(`[VisibilityToggle] Could not find layer ${layerId} in frame ${frameId}`);
+        }
+      }
+    } catch (err) {
+      console.error("[VisibilityToggle] Error in debug code:", err);
+    }
     
     // If this is a GIF frame, we need to handle it differently
     if (frameId.startsWith('gif-frame-')) {
       // Extract the parent ad size ID
       let adSizeId = '';
+      let frameNumber = '';
       const parts = frameId.split('-');
       
       if (parts.length >= 4) {
         if (parts[2] === 'frame') {
           // Format is gif-frame-frame-X-Y, so adSizeId is "frame-X"
           adSizeId = `${parts[2]}-${parts[3]}`;
+          frameNumber = parts.length >= 5 ? parts[4] : '1';
         } else {
           // Format is gif-frame-X-Y
           adSizeId = parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
+          frameNumber = parts.length >= 4 ? parts[3] : '1';
         }
       } else if (parts.length === 4) {
         // Old format: gif-frame-1-1
         adSizeId = `frame-${parts[2]}`;
+        frameNumber = parts[3];
       }
       
-      console.log("Toggling visibility in GIF frame. Using parent ad size:", adSizeId);
+      console.log("Toggling visibility in GIF frame. Using parent ad size:", adSizeId, "frame number:", frameNumber);
       
       // Find the GIF frame
       let gifFrameIndex = mockGifFrames.findIndex(frame => frame.id === frameId);
@@ -279,6 +400,8 @@ const Timeline = ({
           hiddenLayers: [],
           visibleLayerCount: mockLayers[adSizeId]?.length || 0,
           frameIndex: frameIndex - 1,
+          frameNumber: frameIndex.toString(), // Add required frameNumber property
+          layers: mockLayers[adSizeId] || [], // Add required layers property
           overrides: {
             layerVisibility: {}
           },
@@ -294,14 +417,20 @@ const Timeline = ({
       
       // Check if we already have an override for this layer
       const isLayerOverridden = gifFrame.overrides?.layerVisibility?.[layerId]?.overridden || false;
-      const isLayerHidden = gifFrame.hiddenLayers.includes(layerId);
+      
+      // Initialize hiddenLayers if not present or empty
+      const hiddenLayers = gifFrame.hiddenLayers || [];
+      const isLayerHidden = Array.isArray(hiddenLayers) ? hiddenLayers.includes(layerId) : false;
       
       // Create new copies of the data structures (for reactivity)
-      const newHiddenLayers = [...gifFrame.hiddenLayers];
+      const newHiddenLayers = Array.isArray(hiddenLayers) ? [...hiddenLayers] : [];
+      
+      // Initialize overrides if not present
+      const overrides = gifFrame.overrides || { layerVisibility: {} };
       const newOverrides = { 
-        ...gifFrame.overrides,
+        ...overrides,
         layerVisibility: {
-          ...gifFrame.overrides.layerVisibility
+          ...(overrides.layerVisibility || {})
         }
       };
       
@@ -317,8 +446,7 @@ const Timeline = ({
       
       // Update the override status
       newOverrides.layerVisibility[layerId] = {
-        overridden: isLayerOverridden, // Keep the current override status
-        hidden: !isLayerHidden         // Toggle the hidden status
+        overridden: isLayerOverridden // Keep the current override status
       };
       
       // Create a new GIF frame object with updated properties to ensure reactivity
@@ -332,12 +460,92 @@ const Timeline = ({
       const totalLayers = mockLayers[adSizeId]?.length || 0;
       updatedGifFrame.visibleLayerCount = totalLayers - updatedGifFrame.hiddenLayers.length;
       
+      const newVisibilityState = !isLayerHidden;
       console.log(`Layer ${layerId} is now ${isLayerHidden ? 'visible' : 'hidden'} with override: ${isLayerOverridden}`);
       
-      // If this frame is the source of truth and the layer is not overridden,
-      // we would propagate changes to other ad sizes, but for now we'll just log this
-      if (gifFrame.sourceOfTruth && !isLayerOverridden) {
-        console.log("This frame is source of truth - changes would be propagated to linked frames");
+      // Find the current layer to get its name
+      const currentAdSizeLayers = mockLayers[adSizeId] || [];
+      const currentLayer = currentAdSizeLayers.find(l => l.id === layerId);
+      
+      if (currentLayer) {
+        const layerName = currentLayer.name;
+        console.log(`Found layer with name: ${layerName} - will sync across all ad sizes if not overridden`);
+        
+        // If this layer is not overridden, propagate changes to all equivalent layers in other ad sizes
+        if (!isLayerOverridden) {
+          // Find frames with the same frame number in other ad sizes
+          console.log(`Syncing visibility (${newVisibilityState}) for layer ${layerName} across all ad sizes`);
+          
+          // First, find all ad size IDs
+          const allAdSizeIds = Object.keys(mockLayers).filter(id => id.startsWith('frame-'));
+          
+          // Then find or create GIF frames for those ad sizes with the same frame number
+          allAdSizeIds.forEach(otherAdSizeId => {
+            if (otherAdSizeId !== adSizeId) { // Skip the current ad size
+              // Find or create the corresponding GIF frame 
+              // Use consistent format: gif-frame-frame-X-Y
+              const otherGifFrameId = `gif-frame-${otherAdSizeId}-${frameNumber}`;
+              console.log(`Looking for equivalent frame: ${otherGifFrameId}`);
+              
+              // Find the equivalent layer by name
+              const otherAdSizeLayers = mockLayers[otherAdSizeId] || [];
+              const equivalentLayer = otherAdSizeLayers.find(l => l.name === layerName);
+              
+              if (equivalentLayer) {
+                console.log(`Found equivalent layer ${equivalentLayer.name} (${equivalentLayer.id}) in ad size ${otherAdSizeId}`);
+                
+                // Find or create the equivalent GIF frame
+                let otherGifFrameIndex = mockGifFrames.findIndex(f => f.id === otherGifFrameId);
+                
+                if (otherGifFrameIndex === -1) {
+                  // The frame doesn't exist yet, create it first
+                  console.log(`Creating new GIF frame for ad size ${otherAdSizeId}`);
+                  const newOtherGifFrame: GifFrame = {
+                    id: otherGifFrameId,
+                    name: `Frame ${frameNumber}`,
+                    selected: false,
+                    delay: 1,
+                    adSizeId: otherAdSizeId,
+                    hiddenLayers: [],
+                    visibleLayerCount: otherAdSizeLayers.length,
+                    frameIndex: parseInt(frameNumber) - 1,
+                    frameNumber: frameNumber,
+                    layers: [...otherAdSizeLayers],
+                    overrides: { layerVisibility: {} },
+                    sourceOfTruth: false
+                  };
+                  
+                  mockGifFrames.push(newOtherGifFrame);
+                  otherGifFrameIndex = mockGifFrames.length - 1;
+                }
+                
+                // Update the equivalent layer visibility
+                const otherGifFrame = mockGifFrames[otherGifFrameIndex];
+                const otherHiddenLayers = [...(otherGifFrame.hiddenLayers || [])];
+                const isOtherLayerHidden = otherHiddenLayers.includes(equivalentLayer.id);
+                
+                // Make visibility match
+                if (newVisibilityState && isOtherLayerHidden) {
+                  // Should be visible, remove from hidden
+                  const idx = otherHiddenLayers.indexOf(equivalentLayer.id);
+                  if (idx !== -1) otherHiddenLayers.splice(idx, 1);
+                  console.log(`Making layer ${equivalentLayer.name} visible in ${otherAdSizeId}`);
+                } else if (!newVisibilityState && !isOtherLayerHidden) {
+                  // Should be hidden, add to hidden
+                  otherHiddenLayers.push(equivalentLayer.id);
+                  console.log(`Making layer ${equivalentLayer.name} hidden in ${otherAdSizeId}`);
+                }
+                
+                // Update the frame
+                mockGifFrames[otherGifFrameIndex] = {
+                  ...otherGifFrame,
+                  hiddenLayers: otherHiddenLayers,
+                  visibleLayerCount: otherAdSizeLayers.length - otherHiddenLayers.length
+                };
+              }
+            }
+          });
+        }
       }
       
       // Replace the frame in the array
@@ -373,8 +581,127 @@ const Timeline = ({
     forceUpdate();
   };
   
-  // Get the layers for the current frame
-  const frameLayers = mockLayers[localSelectedFrameId] || [];
+  // Handle toggling a layer's override status in a specific frame
+  const handleToggleLayerOverrideInFrame = (frameId: string, layerId: string) => {
+    console.log("Toggling override for layer", layerId, "in frame", frameId);
+    
+    // Import these from linkSyncManager to provide better debugging
+    const { 
+      parseGifFrameId, 
+      linkRegistry, 
+      debugLog,
+      errorLog 
+    } = require('../utils/linkSyncManager');
+    
+    // If this is a GIF frame, we need to handle it differently
+    if (frameId.startsWith('gif-frame-')) {
+      // Extract the parent ad size ID and frame number
+      const { adSizeId, frameNumber } = parseGifFrameId(frameId);
+      
+      if (!adSizeId) {
+        errorLog('OverrideToggle', `Invalid frame ID format: ${frameId}`);
+        return;
+      }
+      
+      console.log("Toggling override in GIF frame. Using parent ad size:", adSizeId);
+      
+      // Find the GIF frames for this ad size
+      const gifFrames = generateGifFramesForAdSize(adSizeId);
+      
+      // First, check if the layer has any linked layers
+      const frame = mockGifFrames.find(frame => frame.id === frameId);
+      if (!frame) {
+        errorLog('OverrideToggle', `Frame not found: ${frameId}`);
+        return;
+      }
+      
+      const layer = frame.layers.find(l => l.id === layerId);
+      if (!layer) {
+        errorLog('OverrideToggle', `Layer not found: ${layerId} in frame ${frameId}`);
+        return;
+      }
+      
+      // Check if this layer has any layers to link with across ad sizes
+      const hasLinkedLayers = mockFrames.filter(f => f.id !== adSizeId)
+        .some(f => mockLayers[f.id]?.some(l => l.name === layer.name));
+      
+      if (!hasLinkedLayers) {
+        errorLog('OverrideToggle', `Layer ${layer.name} (${layerId}) has no linked layers in other ad sizes`);
+      }
+      
+      if (gifFrames && gifFrames.length > 0) {
+        // Use the utility function to handle the toggle logic
+        const updatedGifFrames = toggleLayerVisibilityOverride(gifFrames, frameId, layerId);
+        
+        // If we got a different array back, it means the update was successful
+        if (updatedGifFrames !== gifFrames) {
+          // Replace the mock GIF frames with the updated ones
+          // In a real app, this would update through context/state management
+          const targetIndex = mockGifFrames.findIndex(frame => frame.id === frameId);
+          if (targetIndex >= 0) {
+            // Find the updated frame
+            const updatedFrame = updatedGifFrames.find(frame => frame.id === frameId);
+            if (updatedFrame) {
+              mockGifFrames[targetIndex] = updatedFrame;
+              
+              // Log the state of the override
+              if (updatedFrame.overrides?.layerVisibility?.[layerId]) {
+                const isOverridden = updatedFrame.overrides.layerVisibility[layerId].overridden;
+                debugLog('OverrideToggle', `Layer ${layer.name} (${layerId}) override in frame ${frameId} is now: ${isOverridden ? 'ENABLED' : 'DISABLED'}`);
+              } else {
+                errorLog('OverrideToggle', `Failed to update override for layer ${layer.name} (${layerId})`);
+              }
+            }
+          }
+        } else {
+          errorLog('OverrideToggle', `No changes made to layer ${layer.name} (${layerId}) override status`);
+        }
+        
+        // Force a re-render
+        forceUpdate();
+      }
+    }
+  };
+  
+  // Get the layers for the current frame, including handling expanded containers
+  // First, get all layers for the current frame
+  const allFrameLayers = mockLayers[localSelectedFrameId] || [];
+  
+  // Create a helper function to process layers hierarchy
+  const processLayersForTimeline = (layers: AnimationLayer[]): AnimationLayer[] => {
+    // Create a new array to hold our processed layers
+    const processedLayers: AnimationLayer[] = [];
+    
+    // Process each layer
+    layers.forEach(layer => {
+      // If this layer is a container (has children)
+      if ((layer.isGroup || layer.isFrame) && layer.children && layer.children.length > 0) {
+        // Check if the container is expanded
+        if (layer.isExpanded) {
+          // Container is expanded, so we show its children instead of the container itself
+          console.log(`Timeline: Container ${layer.name} (${layer.id}) is expanded, showing children`);
+          
+          // Process children recursively to handle nested containers
+          const processedChildren = processLayersForTimeline(layer.children);
+          
+          // Add the processed children instead of the container itself
+          processedLayers.push(...processedChildren);
+        } else {
+          // Container is collapsed, so we show the container itself
+          console.log(`Timeline: Container ${layer.name} (${layer.id}) is collapsed, showing container`);
+          processedLayers.push(layer);
+        }
+      } else {
+        // This is a regular layer (not a container), add it directly
+        processedLayers.push(layer);
+      }
+    });
+    
+    return processedLayers;
+  };
+  
+  // Process layers to respect container hierarchy
+  const frameLayers = processLayersForTimeline(allFrameLayers);
   
   // Reference objects for drag state and positioning
   const dragState = useRef({
@@ -398,6 +725,40 @@ const Timeline = ({
     
     return () => clearTimeout(timer);
   }, [localSelectedFrameId]);
+  
+  // Add another effect that watches for changes in the layer structure
+  useEffect(() => {
+    // Get the current layers again
+    const allFrameLayers = mockLayers[localSelectedFrameId] || [];
+    
+    // Look for any layer with isExpanded changed and force an update
+    let hasExpandedLayers = false;
+    
+    // Helper function to check for expanded layers recursively
+    const checkForExpandedLayers = (layers: AnimationLayer[]) => {
+      for (const layer of layers) {
+        if ((layer.isGroup || layer.isFrame) && layer.isExpanded) {
+          hasExpandedLayers = true;
+          break;
+        }
+        
+        // Check children recursively
+        if (layer.children && layer.children.length > 0) {
+          checkForExpandedLayers(layer.children);
+          if (hasExpandedLayers) break; // Exit early if we found one
+        }
+      }
+    };
+    
+    // Check if any layers are expanded
+    checkForExpandedLayers(allFrameLayers);
+    
+    // If we have expanded layers, make sure we re-process the layer hierarchy
+    if (hasExpandedLayers) {
+      console.log("Timeline: Found expanded containers, reprocessing layer hierarchy");
+      forceUpdate();
+    }
+  }, [mockLayers[localSelectedFrameId]]);
   
   // Calculate time marker positions
   const timeMarkers = [];
@@ -527,13 +888,17 @@ const Timeline = ({
         let newDuration = originalDuration - timeDelta;
         
         // Enforce minimum duration and keep within bounds
-        if (newDuration < 0.1) {
-          newDuration = 0.1;
-          newStartTime = originalStartTime + originalDuration - 0.1;
+        // Use a more generous minimum (0.5s) to make animations more visible
+        if (newDuration < 0.5) {
+          newDuration = 0.5;
+          newStartTime = originalStartTime + originalDuration - 0.5;
         }
         
         // Clamp to ensure animation stays within bounds
         newStartTime = Math.max(0, newStartTime);
+        
+        // Log the changes to help debug issues
+        console.log(`Resizing animation from left: startTime ${originalStartTime}s -> ${newStartTime}s, duration ${originalDuration}s -> ${newDuration}s`);
         
         updatedLayers[layerIndex].animations[dragState.current.animationIndex].startTime = newStartTime;
         updatedLayers[layerIndex].animations[dragState.current.animationIndex].duration = newDuration;
@@ -541,9 +906,14 @@ const Timeline = ({
         // Resize from right edge (change duration only)
         let newDuration = originalDuration + timeDelta;
         
-        // Enforce minimum duration and keep within bounds
-        newDuration = Math.max(0.1, Math.min(duration - originalStartTime, newDuration));
+        // Enforce minimum duration (0.2s) and keep within bounds of timeline
+        // Use a more generous minimum to make animations more visible
+        newDuration = Math.max(0.5, Math.min(duration - originalStartTime, newDuration));
         
+        // Log the duration change to help debug issues
+        console.log(`Resizing animation duration: ${originalDuration}s -> ${newDuration}s`);
+        
+        // Update the animation duration
         updatedLayers[layerIndex].animations[dragState.current.animationIndex].duration = newDuration;
       }
       
@@ -563,13 +933,21 @@ const Timeline = ({
       
       // After dragging completes, sync changes to linked layers
       if (dragState.current.layerId) {
-        // Sync changes to any linked layers
-        const updatedLayers = syncLinkedLayerAnimations(mockLayers, dragState.current.layerId);
-        
-        // Update all frames with synced changes
-        Object.keys(updatedLayers).forEach(frameId => {
-          mockLayers[frameId] = updatedLayers[frameId];
-        });
+        try {
+          // Sync changes to any linked layers
+          const updatedLayers = syncLinkedLayerAnimations(mockLayers, dragState.current.layerId);
+          
+          // Update all frames with synced changes if updatedLayers is valid
+          if (updatedLayers && typeof updatedLayers === 'object') {
+            Object.keys(updatedLayers).forEach(frameId => {
+              mockLayers[frameId] = updatedLayers[frameId];
+            });
+          } else {
+            console.warn('syncLinkedLayerAnimations returned invalid value:', updatedLayers);
+          }
+        } catch (error) {
+          console.error('Error syncing layer animations:', error);
+        }
         
         // Force re-render
         forceUpdate();
@@ -590,25 +968,39 @@ const Timeline = ({
       ? 0 // Entrance animations start at beginning
       : 3; // Exit animations start later (adjust as needed)
     
-    // Create a new animation with unique ID
+    // Create a new animation with unique ID and required properties
     const newAnimation: Animation = {
       id: `anim-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, // Generate unique ID
-      type,
+      type: type.toString(), // Convert enum value to string for consistency
       mode,
       startTime: defaultStartTime,
-      duration: 1, // 1 second duration by default
+      duration: 1.5, // Use 1.5 seconds duration by default for better visibility
       easing: EasingType.EaseOut, // Default easing
+      delay: 0, // Add required delay property
     };
+    
+    // Log animation creation to debug duration issues
+    console.log(`Created new ${mode} animation of type ${type} with duration: ${newAnimation.duration}s`);
     
     // Add the animation to the layer
     layer.animations.push(newAnimation);
     
     // Sync to linked layers if this layer is linked
     if (layer.linkedLayer) {
-      const updatedLayers = syncLinkedLayerAnimations(mockLayers, layerId);
-      Object.keys(updatedLayers).forEach(frameId => {
-        mockLayers[frameId] = updatedLayers[frameId];
-      });
+      try {
+        const updatedLayers = syncLinkedLayerAnimations(mockLayers, layerId);
+        
+        // Update if valid result
+        if (updatedLayers && typeof updatedLayers === 'object') {
+          Object.keys(updatedLayers).forEach(frameId => {
+            mockLayers[frameId] = updatedLayers[frameId];
+          });
+        } else {
+          console.warn('syncLinkedLayerAnimations returned invalid value:', updatedLayers);
+        }
+      } catch (error) {
+        console.error('Error syncing layer animations:', error);
+      }
     }
     
     // Force a re-render
@@ -620,35 +1012,65 @@ const Timeline = ({
     const layer = frameLayers.find(l => l.id === layerId);
     if (!layer) return;
     
+    // Get animations array safely and check bounds
+    const animations = safeGetAnimations(layer);
+    if (animIndex < 0 || animIndex >= animations.length) {
+      console.warn(`Animation index ${animIndex} out of bounds for layer ${layerId}`);
+      return;
+    }
+    
+    // Log the animation being deleted
+    console.log(`[DELETE ANIMATION] Layer: ${layer.name}, Animation: ${animations[animIndex].type}, Index: ${animIndex}`);
+    
     // Remove the animation
-    layer.animations.splice(animIndex, 1);
+    animations.splice(animIndex, 1);
     
     // Sync to linked layers if this layer is linked
     if (layer.linkedLayer) {
-      const updatedLayers = syncLinkedLayerAnimations(mockLayers, layerId);
-      Object.keys(updatedLayers).forEach(frameId => {
-        mockLayers[frameId] = updatedLayers[frameId];
-      });
+      safeSyncLayerAnimations(mockLayers, layerId);
     }
     
     // Force a re-render
     forceUpdate();
   };
 
+  // Utility function to safely get animation arrays with null checks
+  const safeGetAnimations = (layer: AnimationLayer | undefined): Animation[] => {
+    if (!layer || !layer.animations) {
+      console.warn('Layer is undefined or missing animations array:', layer);
+      return [];
+    }
+    
+    // Initialize animations array if it doesn't exist
+    if (!Array.isArray(layer.animations)) {
+      console.warn('Layer animations is not an array, initializing:', layer.id);
+      layer.animations = [];
+    }
+    
+    return layer.animations;
+  };
+  
   // Handle changing an animation's type
   const handleChangeAnimationType = (layerId: string, animIndex: number, type: AnimationType) => {
     const layer = frameLayers.find(l => l.id === layerId);
     if (!layer) return;
     
-    // Update the animation type
-    layer.animations[animIndex].type = type;
+    // Get animations array safely and check bounds
+    const animations = safeGetAnimations(layer);
+    if (animIndex < 0 || animIndex >= animations.length) {
+      console.warn(`Animation index ${animIndex} out of bounds for layer ${layerId}`);
+      return;
+    }
+    
+    // Update the animation type, ensuring it's a string
+    animations[animIndex].type = type.toString();
+    
+    // Log the type change for debugging
+    console.log(`Changed animation type to "${type}" (${typeof type}) for layer ${layerId}`);
     
     // Sync to linked layers if this layer is linked
     if (layer.linkedLayer) {
-      const updatedLayers = syncLinkedLayerAnimations(mockLayers, layerId);
-      Object.keys(updatedLayers).forEach(frameId => {
-        mockLayers[frameId] = updatedLayers[frameId];
-      });
+      safeSyncLayerAnimations(mockLayers, layerId);
     }
     
     // Force a re-render
@@ -660,8 +1082,17 @@ const Timeline = ({
     const layer = frameLayers.find(l => l.id === layerId);
     if (!layer) return;
     
-    const animation = layer.animations[animIndex];
-    if (!animation) return;
+    // Get animations array safely and check bounds
+    const animations = safeGetAnimations(layer);
+    if (animIndex < 0 || animIndex >= animations.length) {
+      console.warn(`Animation index ${animIndex} out of bounds for layer ${layerId}`);
+      return;
+    }
+    
+    const animation = animations[animIndex];
+    
+    // Log detailed debugging information
+    console.log(`[TOGGLE ANIMATION] Layer: ${layer.name}, Animation: ${animation.type}, Index: ${animIndex}`);
     
     // Toggle between entrance and exit
     const currentMode = animation.mode || AnimationMode.Entrance;
@@ -677,12 +1108,11 @@ const Timeline = ({
       animation.startTime = Math.max(0, Math.min(duration - animation.duration, 3));
     }
     
+    console.log(`[TOGGLE ANIMATION] Changed mode from ${currentMode} to ${newMode}`);
+    
     // Sync to linked layers if this layer is linked
     if (layer.linkedLayer) {
-      const updatedLayers = syncLinkedLayerAnimations(mockLayers, layerId);
-      Object.keys(updatedLayers).forEach(frameId => {
-        mockLayers[frameId] = updatedLayers[frameId];
-      });
+      safeSyncLayerAnimations(mockLayers, layerId);
     }
     
     // Force a re-render
@@ -764,7 +1194,7 @@ const Timeline = ({
     console.log("handleAddBlankFrame called with timelineMode:", timelineMode);
     
     // Different behavior based on the timeline mode
-    if (timelineMode === TimelineMode.Animation) {
+    if (isTimelineMode(timelineMode, 'animation')) {
       // In Animation mode, add a new ad size
       const frameCount = Object.keys(mockLayers).length;
       const newFrameNumber = frameCount + 1;
@@ -776,7 +1206,7 @@ const Timeline = ({
         headlineText: `Frame ${newFrameNumber} Headline`,
         description: `Description for frame ${newFrameNumber}`
       });
-    } else if (timelineMode === TimelineMode.GifFrames) {
+    } else if (isTimelineMode(timelineMode, 'gifFrames')) {
       // In GIF Frames mode, add a new GIF frame to the current ad size
       console.log("Adding new GIF frame. Current selection:", localSelectedFrameId);
       
@@ -864,6 +1294,8 @@ const Timeline = ({
         hiddenLayers: [], // All layers visible by default
         visibleLayerCount: layers.length,
         frameIndex: currentGifFrames.length,
+        frameNumber: newGifFrameNumber.toString(), // Add required frameNumber property 
+        layers: layers, // Add required layers property
         overrides: {
           layerVisibility: {} // No overrides initially
         },
@@ -963,6 +1395,8 @@ const Timeline = ({
         name: `GIF Frame ${newGifFrameNumber}`,
         selected: false,
         frameIndex: existingGifFrames.length,
+        frameNumber: newGifFrameNumber.toString(), // Add required frameNumber property
+        layers: sourceClone.layers || [], // Ensure layers are included
         // Ensure overrides are properly included (though they should be in the deep clone)
         overrides: sourceClone.overrides || {
           layerVisibility: {}
@@ -1077,7 +1511,7 @@ const Timeline = ({
           
           // Also switch back to Animation mode if no more frames
           if (onTimelineModeChange) {
-            onTimelineModeChange(TimelineMode.Animation);
+            onTimelineModeChange('animation');
           }
         }
       }
@@ -1121,6 +1555,129 @@ const Timeline = ({
     // Animation start time (default to 0 if undefined)
     const startTime = animation.startTime || 0;
     
+    // Extended debug logging for animation properties
+    console.log(`[ANIMATION DEBUG] Rendering animation block:`, {
+      layerName: layer.name,
+      layerId: layer.id,
+      animIndex,
+      animationType: animation.type,
+      animationTypeDataType: typeof animation.type,
+      hasAnimations: !!(layer.animations && layer.animations.length),
+      animationCount: layer.animations?.length || 0
+    });
+    
+    // Get animation type name from the type value
+    const getAnimationName = (type: string | AnimationType | undefined): string => {
+      // Safety check for undefined/null types
+      if (type === undefined || type === null) {
+        console.log(`[ANIMATION NAME ERROR] Animation type is ${type}, using default`);
+        // Provide a default animation type based on the mode
+        return animation.mode === AnimationMode.Exit ? 'Fade Out' : 'Fade In';
+      }
+      
+      // First check against the AnimationType enum values
+      const enumMap: Record<string, string> = {
+        [AnimationType.FadeIn]: 'Fade In',
+        [AnimationType.FadeOut]: 'Fade Out',
+        [AnimationType.SlideIn]: 'Slide In',
+        [AnimationType.SlideOut]: 'Slide Out',
+        [AnimationType.ScaleUp]: 'Scale Up',
+        [AnimationType.ScaleDown]: 'Scale Down',
+        [AnimationType.Rotate]: 'Rotate',
+        [AnimationType.Custom]: 'Custom'
+      };
+      
+      // Debug the enum values vs. the passed type
+      console.log(`[ANIMATION NAME DEBUG] Testing type "${type}" against enum values:`, {
+        typeValue: type,
+        typeDataType: typeof type,
+        enumMapKeys: Object.keys(enumMap),
+        directMatchExists: !!enumMap[String(type)]
+      });
+      
+      // Return the mapped enum value if it exists - using String() for safety
+      const typeStr = String(type);
+      
+      // Direct lookup by string
+      if (enumMap[typeStr]) {
+        console.log(`Animation type "${typeStr}" mapped to "${enumMap[typeStr]}"`);
+        return enumMap[typeStr];
+      }
+      
+      // Try case-insensitive matching against enum values
+      const typeLower = typeStr.toLowerCase();
+      for (const [enumKey, displayName] of Object.entries(enumMap)) {
+        if (String(enumKey).toLowerCase() === typeLower) {
+          console.log(`Animation type "${typeStr}" matched to enum key "${enumKey}" -> "${displayName}"`);
+          return displayName;
+        }
+      }
+      
+      // Default preset animation names based on type
+      const typeMap: Record<string, string> = {
+        'fade': 'Fade',
+        'fadein': 'Fade In',
+        'fadeout': 'Fade Out',
+        'slide': 'Slide',
+        'slidein': 'Slide In',
+        'slideout': 'Slide Out',
+        'scale': 'Scale',
+        'scaleup': 'Scale Up',
+        'scaledown': 'Scale Down',
+        'rotate': 'Rotate',
+        'blur': 'Blur',
+        'bounce': 'Bounce',
+        'flip': 'Flip',
+        'swing': 'Swing',
+        'pulse': 'Pulse',
+        'shake': 'Shake',
+        'tada': 'Tada',
+        'jello': 'Jello',
+        'heartbeat': 'Heartbeat',
+        'zoom': 'Zoom',
+        'fill': 'Fill-Opacity',
+        'stroke': 'Stroke',
+        'path': 'Path',
+        'morph': 'Morph',
+        'glow': 'Glow',
+        'color': 'Color',
+      };
+      
+      // Convert to string and ensure it exists
+      const typeString = String(type).toLowerCase();
+      
+      // Check for predefined types (case insensitive)
+      if (typeString && typeMap[typeString]) {
+        return typeMap[typeString];
+      }
+      
+      // Check for custom types with directions
+      if (typeString && typeString.includes('-')) {
+        const parts = typeString.split('-');
+        if (parts.length >= 2 && typeMap[parts[0]]) {
+          // Format nicely (e.g., "slide-left" -> "Slide Left")
+          return `${typeMap[parts[0]]} ${parts.slice(1).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')}`;
+        }
+      }
+      
+      // Log the unrecognized animation type for debugging
+      console.log(`Animation type not found in known maps: "${type}"`);
+      
+      // Handle custom/unknown types by capitalizing
+      if (typeString) {
+        // Try to make it presentable by splitting camelCase
+        return typeString
+          // Insert space before capital letters
+          .replace(/([A-Z])/g, ' $1')
+          // Capitalize first letter
+          .replace(/^./, str => str.toUpperCase())
+          // Trim in case there were leading spaces
+          .trim();
+      }
+      
+      return "Unknown";
+    };
+    
     // For entrance animations, use blue color
     // For exit animations, use red color
     const isExit = animation.mode === AnimationMode.Exit;
@@ -1130,6 +1687,12 @@ const Timeline = ({
     // Apply opacity if the animation is overridden in a linked layer
     const isOverridden = animation.isOverridden;
     const blockOpacity = isOverridden ? 'opacity-40' : '';
+    
+    // Get nicely formatted animation name
+    const animationName = getAnimationName(animation.type);
+    
+    // Check if the block will be too small to show text (<65px width)
+    const isSmallBlock = timeToPosition(animation.duration) < 65;
     
     return (
       <div 
@@ -1141,6 +1704,7 @@ const Timeline = ({
           top: '8px'
         }}
         onMouseDown={(e) => handleAnimationDragStart(e, layer.id, animIndex, 'move')}
+        title={`${animationName}${isExit ? ' (Exit)' : ''}${isOverridden ? ' (Overridden)' : ''} - Duration: ${animation.duration}s, Delay: ${animation.delay || 0}s`}
       >
         {/* Left resize handle */}
         <div 
@@ -1149,9 +1713,16 @@ const Timeline = ({
         />
         
         {/* Animation label */}
-        <div className="flex-1 px-1 whitespace-nowrap overflow-hidden">
-          {animation.type}
-          {animation.mode === AnimationMode.Exit && <span className="ml-1 text-xs">(exit)</span>}
+        <div className="flex-1 px-1 whitespace-nowrap overflow-hidden text-center">
+          {isSmallBlock ? (
+            // If block is too small, show just the first letter
+            <span className="font-bold">{animationName.charAt(0)}</span>
+          ) : (
+            <>
+              <span className="font-medium">{animationName}</span>
+              {isExit && <span className="ml-1 text-xs">(exit)</span>}
+            </>
+          )}
         </div>
         
         {/* Right resize handle */}
@@ -1164,17 +1735,44 @@ const Timeline = ({
   };
   
   return (
-    <div className="flex flex-col h-full bg-black text-white border-t border-neutral-800">
+    <div className="flex flex-col h-full bg-black text-white border-t border-neutral-800 relative">
+      {/* Resize handle for preview area */}
+      <div 
+        className="absolute top-0 left-0 right-0 h-[6px] -mt-[3px] z-10 bg-blue-500 opacity-30 hover:opacity-70 cursor-ns-resize flex items-center justify-center overflow-visible group"
+        onMouseDown={(e) => {
+          // Create a custom event to notify the parent/App component about resize start
+          const event = new CustomEvent('preview-resize-start', { 
+            detail: { clientY: e.clientY }
+          });
+          window.dispatchEvent(event);
+          
+          // Stop propagation to prevent other click handlers
+          e.stopPropagation();
+        }}
+      >
+        {/* Visual dots to indicate draggable area */}
+        <div className="w-16 h-4 flex justify-between items-center">
+          <div className="w-1 h-1 bg-white rounded-full" />
+          <div className="w-1 h-1 bg-white rounded-full" />
+          <div className="w-1 h-1 bg-white rounded-full" />
+        </div>
+        
+        {/* Tooltip that appears on hover */}
+        <div className="absolute -top-6 bg-neutral-900 text-xs text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
+          Drag to resize preview
+        </div>
+      </div>
+
       {/* Timeline Controls */}
       <div className="flex justify-between items-center p-2 border-b border-neutral-800">
         {/* Mode Toggle */}
         <div className="flex space-x-2">
-          <Tabs.Root defaultValue="animation" onValueChange={(value) => handleTimelineModeChange(value === 'animation' ? TimelineMode.Animation : TimelineMode.GifFrames)}>
+          <Tabs.Root defaultValue="animation" onValueChange={(value) => handleTimelineModeChange(value === 'animation' ? 'animation' : 'gifFrames')}>
             <Tabs.List className="flex p-1 bg-neutral-800 rounded-md" aria-label="Timeline Mode">
               <Tabs.Trigger
                 value="animation"
                 className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-                          ${timelineMode === TimelineMode.Animation ? 'bg-blue-600 text-white' : 'text-neutral-300 hover:text-white'}`}
+                          ${timelineMode === 'animation' ? 'bg-blue-600 text-white' : 'text-neutral-300 hover:text-white'}`}
               >
                 <Zap className="w-4 h-4 mr-1.5" />
                 Animation
@@ -1182,7 +1780,7 @@ const Timeline = ({
               <Tabs.Trigger
                 value="frameStyle"
                 className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-                          ${timelineMode === TimelineMode.GifFrames ? 'bg-blue-600 text-white' : 'text-neutral-300 hover:text-white'}`}
+                          ${timelineMode === 'gifFrames' ? 'bg-blue-600 text-white' : 'text-neutral-300 hover:text-white'}`}
               >
                 <Layers className="w-4 h-4 mr-1.5" />
                 GIF Frames
@@ -1193,7 +1791,7 @@ const Timeline = ({
         
         {/* Action Buttons based on mode */}
         <div className="flex space-x-2">
-          {timelineMode === TimelineMode.Animation ? (
+          {timelineMode === 'animation' ? (
             // Animation mode controls
             <>
               {/* Playback controls */}
@@ -1261,6 +1859,9 @@ const Timeline = ({
                 {isPlaying ? <Pause size={16} className="mr-1" /> : <Play size={16} className="mr-1" />}
                 {isPlaying ? "Pause" : "Play"}
               </button>
+              {/* Normalize Frames button */}
+              <NormalizeFramesButton />
+              
             </div>
           )}
         </div>
@@ -1269,7 +1870,7 @@ const Timeline = ({
       {/* Timeline content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Layer track names - only show in Animation mode */}
-        {timelineMode === TimelineMode.Animation && (
+        {timelineMode === 'animation' && (
           <div className="w-48 border-r border-neutral-800 flex flex-col">
             <div className="h-8 border-b border-neutral-800 bg-neutral-900 px-2 text-xs text-neutral-500 flex items-end">
               Layers
@@ -1310,25 +1911,45 @@ const Timeline = ({
                           });
                         }
                         
-                        // Use try/catch to catch any errors during the unlink process
+                        // Use try/catch to catch any errors during the linking/unlinking process
                         try {
                           // We need to check the current mode and handle appropriately
-                          if (timelineMode === TimelineMode.GifFrames) {
+                          if (timelineMode === 'gifFrames' as TimelineMode) {
                             // In GIF Frames mode, show the dialog but don't perform the action
                             console.log(`🔗 In GIF Frames mode - showing dialog only`);
-                            alert(`Layer unlinking is not available in GIF Frames mode.\nPlease switch to Animation mode to unlink layers.`);
-                            // No actual unlinking happens in GIF Frames mode
+                            alert(`Layer linking/unlinking is not available in GIF Frames mode.\nPlease switch to Animation mode to link or unlink layers.`);
+                            // No actual linking/unlinking happens in GIF Frames mode
                           } else {
-                            // In Animation mode, proceed with the unlinking without alert
-                            console.log(`🔗 Unlinking layer ${layer.id} in Animation mode`);
-                            // Call the handler
-                            handleUnlinkLayer(layer.id);
+                            // In Animation mode, proceed with the toggling without alert
+                            if (layer.linkedLayer) {
+                              // If already linked, unlink it
+                              console.log(`🔗 Unlinking layer ${layer.id} in Animation mode`);
+                              handleUnlinkLayer(layer.id);
+                            } else {
+                              // If not linked, link it
+                              console.log(`🔗 Linking layer ${layer.id} in Animation mode`);
+                              
+                              // Use the new linkLayer function to specifically link this layer by name
+                              const updatedLayers = linkLayer(mockLayers, layer.id);
+                              
+                              // Update the layers in mockLayers
+                              Object.keys(updatedLayers).forEach(frameId => {
+                                mockLayers[frameId] = [...updatedLayers[frameId]];
+                              });
+                              
+                              // Still call the parent onLinkLayers handler to handle UI updates
+                              if (onLinkLayers) {
+                                onLinkLayers();
+                              } else {
+                                console.warn("🔗 onLinkLayers handler is not defined");
+                              }
+                            }
                           }
-                          console.log("🔗 Unlink handler completed successfully");
+                          console.log("🔗 Link/unlink handler completed successfully");
                         } catch (error) {
                           console.error("🔗 ERROR in link icon click handler:", error);
                           // Keep error alert in case something goes wrong
-                          alert(`Error unlinking layer: ${error}`);
+                          alert(`Error toggling layer link status: ${error}`);
                         }
                       }}
                     >
@@ -1356,7 +1977,7 @@ const Timeline = ({
                     </span>
 
                     {/* Only in GIF Frames mode - show visibility toggle */}
-                    {timelineMode === TimelineMode.GifFrames && (
+                    {isTimelineMode(timelineMode, 'gifFrames') && (
                       <span 
                         className={`flex items-center ${layer.visible 
                           ? 'text-green-400 hover:text-green-300' 
@@ -1381,7 +2002,7 @@ const Timeline = ({
                 </div>
                 
                 {/* Right side icons based on mode */}
-                {timelineMode === TimelineMode.Animation ? (
+                {timelineMode === 'animation' ? (
                   // Animation mode - show layer sync status
                   layer.linkedLayer && (
                     <div className="flex space-x-1">
@@ -1414,7 +2035,7 @@ const Timeline = ({
         {/* Timeline area */}
         <div className="flex-1 flex flex-col relative">
           {/* Only show time markers in Animation mode */}
-          {timelineMode === TimelineMode.Animation && (
+          {timelineMode === 'animation' && (
             <div className="h-8 flex items-end border-b border-neutral-800 relative">
               {timeMarkers.map(({ time, isMajor }) => (
                 <div 
@@ -1436,7 +2057,7 @@ const Timeline = ({
           )}
           
           {/* Playhead - only show in Animation mode */}
-          {timelineMode === TimelineMode.Animation && (
+          {timelineMode === 'animation' && (
             <div 
               className="absolute top-0 bottom-0 w-0.5 bg-[#4A7CFF] z-10"
               style={{ left: `${timeToPosition(currentTime)}px` }}
@@ -1453,10 +2074,10 @@ const Timeline = ({
           <div 
             className="flex-1 bg-neutral-900 rounded cursor-pointer relative overflow-auto"
             style={{ minWidth: '400px', maxWidth: '100%' }}
-            onClick={timelineMode === TimelineMode.Animation ? handleTimelineClick : undefined}
+            onClick={timelineMode === 'animation' ? handleTimelineClick : undefined}
             ref={timelineRef}
           >
-            {timelineMode === TimelineMode.Animation ? (
+            {timelineMode === 'animation' ? (
               // Animation Mode - Show animation tracks
               frameLayers.map((layer) => (
                 <ContextMenu.Root key={layer.id}>
@@ -1502,16 +2123,10 @@ const Timeline = ({
                                   <span>▶</span>
                                 </ContextMenu.SubTrigger>
                                 <ContextMenu.Portal>
-                                  <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
-                                    {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
-                                      <ContextMenu.Item 
-                                        key={type}
-                                        className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                                        onClick={() => handleChangeAnimationType(layer.id, animIndex, type)}
-                                      >
-                                        {type}
-                                      </ContextMenu.Item>
-                                    ))}
+                                  <ContextMenu.SubContent className="p-0 min-w-[260px] border-none shadow-none bg-transparent z-50">
+                                    <AnimationTypeMenu 
+                                      onSelect={(type) => handleChangeAnimationType(layer.id, animIndex, type)}
+                                    />
                                   </ContextMenu.SubContent>
                                 </ContextMenu.Portal>
                               </ContextMenu.Sub>
@@ -1545,16 +2160,11 @@ const Timeline = ({
                           <span>▶</span>
                         </ContextMenu.SubTrigger>
                         <ContextMenu.Portal>
-                          <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
-                            {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
-                              <ContextMenu.Item 
-                                key={type}
-                                className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                                onClick={() => handleAddAnimationToLayer(layer.id, type, AnimationMode.Entrance)}
-                              >
-                                {type}
-                              </ContextMenu.Item>
-                            ))}
+                          <ContextMenu.SubContent className="p-0 min-w-[260px] border-none shadow-none bg-transparent z-50">
+                            <AnimationTypeMenu 
+                              onSelect={(type) => handleAddAnimationToLayer(layer.id, type, AnimationMode.Entrance)}
+                              mode={AnimationMode.Entrance}
+                            />
                           </ContextMenu.SubContent>
                         </ContextMenu.Portal>
                       </ContextMenu.Sub>
@@ -1568,16 +2178,11 @@ const Timeline = ({
                           <span>▶</span>
                         </ContextMenu.SubTrigger>
                         <ContextMenu.Portal>
-                          <ContextMenu.SubContent className="min-w-[160px] bg-neutral-800 border border-neutral-700 rounded-md shadow-lg overflow-hidden z-50">
-                            {Object.values(AnimationType).filter(type => type !== AnimationType.None).map((type) => (
-                              <ContextMenu.Item 
-                                key={type}
-                                className="text-sm text-white px-3 py-2 hover:bg-blue-600 cursor-pointer focus:outline-none focus:bg-blue-600"
-                                onClick={() => handleAddAnimationToLayer(layer.id, type, AnimationMode.Exit)}
-                              >
-                                {type}
-                              </ContextMenu.Item>
-                            ))}
+                          <ContextMenu.SubContent className="p-0 min-w-[260px] border-none shadow-none bg-transparent z-50">
+                            <AnimationTypeMenu 
+                              onSelect={(type) => handleAddAnimationToLayer(layer.id, type, AnimationMode.Exit)}
+                              mode={AnimationMode.Exit}
+                            />
                           </ContextMenu.SubContent>
                         </ContextMenu.Portal>
                       </ContextMenu.Sub>
@@ -1653,6 +2258,17 @@ const Timeline = ({
                 onDelayChange={(frameId, delay) => {
                   console.log(`Setting delay for frame ${frameId} to ${delay}s`);
                   // This would update the frame's delay in a real implementation 
+                }}
+                onToggleLayerOverride={(layerId) => {
+                  // Call the handler with the current selected frame and layerId
+                  if (localSelectedFrameId && localSelectedFrameId.startsWith('gif-frame-')) {
+                    handleToggleLayerOverrideInFrame(localSelectedFrameId, layerId);
+                  }
+                }}
+                onToggleLayerLock={(layerId) => {
+                  console.log(`[Timeline] Handling layer lock toggle for ${layerId}`);
+                  // Using the toggleLayerLock function from the animation context
+                  toggleLayerLock(layerId);
                 }}
               />
             )}

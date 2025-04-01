@@ -1,20 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Download, ChevronUp, ChevronDown, Play, Pause } from 'lucide-react';
-import { exportGif, exportHtml, exportMp4, exportWebm } from '../utils/exportUtils';
+import { AdPlatform, exportGif, exportHtml, exportMp4, exportWebm } from '../utils/exportUtils';
 import { AnimationFrame, AnimationLayer } from '../types/animation';
 import FrameSelector from './FrameSelector';
 import FrameEditDialog from './FrameEditDialog';
+import { useAnimationContext } from '../context/AnimationContext';
 
 interface ExportModalProps {
   onClose: () => void;
-  frames: AnimationFrame[];
-  currentFrame: AnimationFrame | null;
-  layers: AnimationLayer[];
 }
 
 type ExportType = 'gif' | 'html' | 'mp4' | 'webm';
 
-const ExportModal = ({ onClose, frames, currentFrame, layers }: ExportModalProps) => {
+const ExportModal = ({ onClose }: ExportModalProps) => {
+  // Get frames, currentFrame, and layers from context
+  const { frames, currentFrame, layers } = useAnimationContext();
   const [exportType, setExportType] = useState<ExportType>('gif');
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const [fps, setFps] = useState(30);
@@ -24,6 +24,28 @@ const ExportModal = ({ onClose, frames, currentFrame, layers }: ExportModalProps
   const [videoFormat, setVideoFormat] = useState<'h264' | 'vp9'>('h264'); // Codec selection
   const [transparent, setTransparent] = useState(false); // For WebM transparency
   const [specialGifFormat, setSpecialGifFormat] = useState(false); // Special client GIF format
+  
+  // HTML5 Export Advanced Options
+  const [generatePreviewPage, setGeneratePreviewPage] = useState(true);
+  const [previewPageLayout, setPreviewPageLayout] = useState<'masonry' | 'grid' | 'list'>('masonry');
+  const [useDarkMode, setUseDarkMode] = useState(false);
+  const [addBorder, setAddBorder] = useState(false);
+  const [borderColor, setBorderColor] = useState('#000000');
+  const [addPreloaderAnimation, setAddPreloaderAnimation] = useState(false);
+  const [infiniteLoop, setInfiniteLoop] = useState(false);
+  const [addBackupJpg, setAddBackupJpg] = useState(false);
+  const [renderRetina, setRenderRetina] = useState(false);
+  const [maxFileSizeTarget, setMaxFileSizeTarget] = useState(150);
+  const [uploadToNetlify, setUploadToNetlify] = useState(false);
+  const [customHtml, setCustomHtml] = useState('');
+  const [customCss, setCustomCss] = useState('');
+  const [minifyCode, setMinifyCode] = useState(true);
+  const [injectCustomCode, setInjectCustomCode] = useState(false);
+  const [includeZipFiles, setIncludeZipFiles] = useState(true);
+  const [usePTagsInsteadOfSvg, setUsePTagsInsteadOfSvg] = useState(false);
+  const [bannerLink, setBannerLink] = useState('https://example.com');
+  const [compressionSpeed, setCompressionSpeed] = useState<'faster' | 'balanced' | 'smaller'>('faster');
+  const [adPlatform, setAdPlatform] = useState<AdPlatform>('standard-css');
   
   // Advanced GIF options
   const [showAdvancedGifOptions, setShowAdvancedGifOptions] = useState(false);
@@ -241,13 +263,41 @@ const ExportModal = ({ onClose, frames, currentFrame, layers }: ExportModalProps
       const htmlOptions = {
         frames,
         ...commonOptions,
+        // Banner options
+        addBorder,
+        borderColor,
+        addPreloaderAnimation,
+        infiniteLoop,
+        addBackupJpg,
+        renderRetina,
+        maxFileSizeTarget,
+        
+        // Preview page options
+        generatePreviewPage,
+        previewPageLayout,
+        useDarkMode,
+        uploadToNetlify,
+        customHtml,
+        customCss,
+        
+        // Code output settings
+        minifyCode,
+        injectCustomCode,
+        includeZipFiles,
+        usePTagsInsteadOfSvg,
+        bannerLink,
+        compressionSpeed,
+        
+        // Ad platform options (new)
+        adPlatform,
+        
+        // Legacy options (maintaining backwards compatibility)
         includeClickTag: includeFallback,
         optimizeForAdNetworks,
-        generateFallback: includeFallback,
-        adPlatform: (optimizeForAdNetworks ? 'google' : 'generic') as 'google' | 'meta' | 'generic'
+        generateFallback: includeFallback
       };
       
-      console.log('Exporting as HTML5:', htmlOptions);
+      console.log('Exporting as HTML5 for platform:', adPlatform, htmlOptions);
       exportHtml(htmlOptions);
     }
     else if (exportType === 'mp4') {
@@ -329,15 +379,7 @@ const ExportModal = ({ onClose, frames, currentFrame, layers }: ExportModalProps
             </div>
           </div>
           
-          {/* Show frame dimensions information */}
-          <div>
-            <label className="block text-sm text-neutral-300 mb-2">Frame Size</label>
-            <div className="w-full bg-[#191919] text-neutral-200 rounded px-3 py-2 text-sm border border-neutral-700">
-              {currentFrame 
-                ? `Original Figma frame: ${currentFrame.width}×${currentFrame.height}`
-                : "Using original Figma frame dimensions"}
-            </div>
-          </div>
+          {/* Frame Size information removed as Ad size will dictate export dimensions */}
           
           {/* Add GIF Preview for gif export type */}
           {exportType === 'gif' && (
@@ -454,16 +496,7 @@ const ExportModal = ({ onClose, frames, currentFrame, layers }: ExportModalProps
                 </div>
               </div>
               
-              {/* Frame Content Selector for creating multi-frame banners */}
-              <FrameSelector 
-                frames={gifFrames}
-                layers={layers}
-                onFrameAdd={handleAddFrame}
-                onFrameEdit={handleEditFrame}
-                onFrameDelete={handleDeleteFrame}
-                onFrameSelect={handleSelectFrame}
-                selectedFrameId={selectedGifFrameId}
-              />
+              {/* Frame Content Selector removed - GIFs will be created in the GIF Frame animator instead */}
               
               <div className="flex items-center px-3 py-3 mt-2 bg-[#1a1a1a] rounded border border-[#4A7CFF] border-opacity-30">
                 <input
@@ -610,30 +643,494 @@ const ExportModal = ({ onClose, frames, currentFrame, layers }: ExportModalProps
           
           {exportType === 'html' && (
             <>
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="includeFallback"
-                  checked={includeFallback}
-                  onChange={(e) => setIncludeFallback(e.target.checked)}
-                  className="mr-3"
-                />
-                <label htmlFor="includeFallback" className="text-sm text-neutral-300">
-                  Include static fallback image
-                </label>
+              {/* Preview Page Options */}
+              <div className="border-b border-neutral-800 pb-4 mb-4">
+                <h3 className="text-white text-sm font-medium mb-3">Preview Page Options</h3>
+                
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <div className="relative inline-block w-10 mr-2 align-middle">
+                      <input 
+                        type="checkbox" 
+                        id="generatePreviewPage" 
+                        checked={generatePreviewPage}
+                        onChange={(e) => setGeneratePreviewPage(e.target.checked)}
+                        className="opacity-0 w-0 h-0 absolute"
+                      />
+                      <label 
+                        htmlFor="generatePreviewPage"
+                        className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${generatePreviewPage ? 'bg-[#4A7CFF]' : ''}`}
+                      >
+                        <span 
+                          className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${generatePreviewPage ? 'translate-x-4' : 'translate-x-0'}`}
+                        />
+                      </label>
+                    </div>
+                    <label htmlFor="generatePreviewPage" className="text-sm text-neutral-300">
+                      Generate Preview Page
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <div className="relative inline-block w-10 mr-2 align-middle">
+                      <input 
+                        type="checkbox" 
+                        id="useDarkMode" 
+                        checked={useDarkMode}
+                        onChange={(e) => setUseDarkMode(e.target.checked)}
+                        className="opacity-0 w-0 h-0 absolute"
+                      />
+                      <label 
+                        htmlFor="useDarkMode"
+                        className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${useDarkMode ? 'bg-[#4A7CFF]' : ''}`}
+                      >
+                        <span 
+                          className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${useDarkMode ? 'translate-x-4' : 'translate-x-0'}`}
+                        />
+                      </label>
+                    </div>
+                    <label htmlFor="useDarkMode" className="text-sm text-neutral-300">
+                      Use Dark Mode
+                    </label>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <label className="block text-sm text-neutral-300 mb-1">Preview Page Layout</label>
+                    <select 
+                      value={previewPageLayout}
+                      onChange={(e) => setPreviewPageLayout(e.target.value as 'masonry' | 'grid' | 'list')}
+                      className="w-full bg-[#1a1a1a] text-neutral-300 border border-neutral-700 rounded p-2 text-sm"
+                    >
+                      <option value="masonry">Masonry Grid</option>
+                      <option value="grid">Standard Grid</option>
+                      <option value="list">List View</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-neutral-300 mb-1">Banner Labels</label>
+                    <select 
+                      className="w-full bg-[#1a1a1a] text-neutral-300 border border-neutral-700 rounded p-2 text-sm"
+                    >
+                      <option value="dimensions">Frame Dimensions</option>
+                      <option value="name">Frame Name</option>
+                      <option value="both">Both</option>
+                      <option value="none">None</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="flex items-center mb-3">
+                  <input
+                    type="checkbox"
+                    id="uploadToNetlify"
+                    checked={uploadToNetlify}
+                    onChange={(e) => setUploadToNetlify(e.target.checked)}
+                    className="mr-3"
+                  />
+                  <label htmlFor="uploadToNetlify" className="text-sm text-neutral-300">
+                    Upload Preview Page URL to Netlify
+                  </label>
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-neutral-300 mb-1">Custom HTML (inserted after &lt;/body&gt; tag)</label>
+                  <textarea
+                    value={customHtml}
+                    onChange={(e) => setCustomHtml(e.target.value)}
+                    rows={4}
+                    className="w-full bg-[#1a1a1a] text-neutral-300 border border-neutral-700 rounded p-2 text-sm font-mono"
+                    placeholder="<!-- Insert custom HTML here -->"
+                  />
+                </div>
+                
+                <div className="mt-3">
+                  <label className="block text-sm text-neutral-300 mb-1">Custom CSS (no &lt;style&gt;&lt;/style&gt; tags required)</label>
+                  <textarea
+                    value={customCss}
+                    onChange={(e) => setCustomCss(e.target.value)}
+                    rows={4}
+                    className="w-full bg-[#1a1a1a] text-neutral-300 border border-neutral-700 rounded p-2 text-sm font-mono"
+                    placeholder="/* Insert custom CSS here */"
+                  />
+                </div>
               </div>
               
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="optimizeForAdNetworks"
-                  checked={optimizeForAdNetworks}
-                  onChange={(e) => setOptimizeForAdNetworks(e.target.checked)}
-                  className="mr-3"
-                />
-                <label htmlFor="optimizeForAdNetworks" className="text-sm text-neutral-300">
-                  Optimize for ad networks (Google, Meta)
-                </label>
+              {/* Banner Options */}
+              <div className="border-b border-neutral-800 pb-4 mb-4">
+                <h3 className="text-white text-sm font-medium mb-3">Banner Options</h3>
+                
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <div className="relative inline-block w-10 mr-2 align-middle">
+                      <input 
+                        type="checkbox" 
+                        id="addBorder" 
+                        checked={addBorder}
+                        onChange={(e) => setAddBorder(e.target.checked)}
+                        className="opacity-0 w-0 h-0 absolute"
+                      />
+                      <label 
+                        htmlFor="addBorder"
+                        className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${addBorder ? 'bg-[#4A7CFF]' : ''}`}
+                      >
+                        <span 
+                          className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${addBorder ? 'translate-x-4' : 'translate-x-0'}`}
+                        />
+                      </label>
+                    </div>
+                    <label htmlFor="addBorder" className="text-sm text-neutral-300">
+                      Add 1px border
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input 
+                      type="color" 
+                      value={borderColor}
+                      onChange={(e) => setBorderColor(e.target.value)}
+                      disabled={!addBorder}
+                      className="w-8 h-8 p-0 rounded border-none bg-transparent"
+                    />
+                    <input 
+                      type="text" 
+                      value={borderColor}
+                      onChange={(e) => setBorderColor(e.target.value)}
+                      disabled={!addBorder}
+                      placeholder="eg. #000000"
+                      className="w-32 ml-2 bg-[#1a1a1a] text-neutral-300 border border-neutral-700 rounded p-1 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex items-center mb-3">
+                  <div className="relative inline-block w-10 mr-2 align-middle">
+                    <input 
+                      type="checkbox" 
+                      id="addPreloaderAnimation" 
+                      checked={addPreloaderAnimation}
+                      onChange={(e) => setAddPreloaderAnimation(e.target.checked)}
+                      className="opacity-0 w-0 h-0 absolute"
+                    />
+                    <label 
+                      htmlFor="addPreloaderAnimation"
+                      className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${addPreloaderAnimation ? 'bg-[#4A7CFF]' : ''}`}
+                    >
+                      <span 
+                        className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${addPreloaderAnimation ? 'translate-x-4' : 'translate-x-0'}`}
+                      />
+                    </label>
+                  </div>
+                  <label htmlFor="addPreloaderAnimation" className="text-sm text-neutral-300">
+                    Add preloader animation to all banners
+                  </label>
+                </div>
+                
+                <div className="flex items-center mb-3">
+                  <div className="relative inline-block w-10 mr-2 align-middle">
+                    <input 
+                      type="checkbox" 
+                      id="infiniteLoop" 
+                      checked={infiniteLoop}
+                      onChange={(e) => setInfiniteLoop(e.target.checked)}
+                      className="opacity-0 w-0 h-0 absolute"
+                    />
+                    <label 
+                      htmlFor="infiniteLoop"
+                      className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${infiniteLoop ? 'bg-[#4A7CFF]' : ''}`}
+                    >
+                      <span 
+                        className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${infiniteLoop ? 'translate-x-4' : 'translate-x-0'}`}
+                      />
+                    </label>
+                  </div>
+                  <label htmlFor="infiniteLoop" className="text-sm text-neutral-300">
+                    Infinitely loop all banners
+                  </label>
+                </div>
+                
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <div className="relative inline-block w-10 mr-2 align-middle">
+                      <input 
+                        type="checkbox" 
+                        id="addBackupJpg" 
+                        checked={addBackupJpg}
+                        onChange={(e) => setAddBackupJpg(e.target.checked)}
+                        className="opacity-0 w-0 h-0 absolute"
+                      />
+                      <label 
+                        htmlFor="addBackupJpg"
+                        className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${addBackupJpg ? 'bg-[#4A7CFF]' : ''}`}
+                      >
+                        <span 
+                          className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${addBackupJpg ? 'translate-x-4' : 'translate-x-0'}`}
+                        />
+                      </label>
+                    </div>
+                    <label htmlFor="addBackupJpg" className="text-sm text-neutral-300">
+                      Add "backup.jpg"
+                    </label>
+                  </div>
+                  
+                  <input 
+                    type="number" 
+                    value={maxFileSizeTarget}
+                    onChange={(e) => setMaxFileSizeTarget(Number(e.target.value))}
+                    min={50}
+                    max={500}
+                    className="w-20 bg-[#1a1a1a] text-neutral-300 border border-neutral-700 rounded p-1 text-xs text-center"
+                  />
+                  <span className="text-sm text-neutral-300 ml-2">KB Size Target</span>
+                </div>
+                
+                <div className="flex items-center mb-3">
+                  <div className="relative inline-block w-10 mr-2 align-middle">
+                    <input 
+                      type="checkbox" 
+                      id="renderRetina" 
+                      checked={renderRetina}
+                      onChange={(e) => setRenderRetina(e.target.checked)}
+                      className="opacity-0 w-0 h-0 absolute"
+                    />
+                    <label 
+                      htmlFor="renderRetina"
+                      className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${renderRetina ? 'bg-[#4A7CFF]' : ''}`}
+                    >
+                      <span 
+                        className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${renderRetina ? 'translate-x-4' : 'translate-x-0'}`}
+                      />
+                    </label>
+                  </div>
+                  <label htmlFor="renderRetina" className="text-sm text-neutral-300">
+                    Render banner images @2x retina
+                  </label>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <label className="text-sm text-neutral-300 mr-2">
+                      Maximum file size target for each banner
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input 
+                      type="number" 
+                      value={maxFileSizeTarget}
+                      onChange={(e) => setMaxFileSizeTarget(Number(e.target.value))}
+                      min={50}
+                      max={500}
+                      className="w-20 bg-[#1a1a1a] text-neutral-300 border border-neutral-700 rounded p-1 text-xs text-center"
+                    />
+                    <span className="text-sm text-neutral-300 ml-2 mr-2">KB Size Target</span>
+                    
+                    <select 
+                      value={compressionSpeed}
+                      onChange={(e) => setCompressionSpeed(e.target.value as any)}
+                      className="bg-[#1a1a1a] text-neutral-300 border border-neutral-700 rounded p-1 text-xs"
+                    >
+                      <option value="faster">Faster (Default)</option>
+                      <option value="balanced">Balanced</option>
+                      <option value="smaller">Smaller Size</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Code Output Settings */}
+              <div>
+                <h3 className="text-white text-sm font-medium mb-3">Code Output Settings</h3>
+                
+                <div className="mb-3">
+                  <label className="block text-sm text-neutral-300 mb-2">Export Format & Platform</label>
+                  <div className="flex items-center">
+                    <span className="inline-block w-6 h-6 mr-2 text-center text-[#E44D26]">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                        <path d="M3 2h18l-1.8 18-7.1 2-7.1-2z"/>
+                        <path d="M17.2 8H7.4l.3 3h9.2l-.8 8-4 1.2-4-1.2-.3-3h3l.2 1.5 2.1.5 2.1-.5.2-2.5H7.9l-.8-8z" fill="#FFFFFF"/>
+                      </svg>
+                    </span>
+                    <select 
+                      value={adPlatform}
+                      onChange={(e) => setAdPlatform(e.target.value as AdPlatform)}
+                      className="flex-1 bg-[#1a1a1a] text-neutral-300 border border-neutral-700 rounded p-2 text-sm"
+                    >
+                      {/* Non-Platform Specific */}
+                      <optgroup label="Non-Platform Specific">
+                        <option value="standard-css">HTML/JS (CSS @keyframes)</option>
+                        <option value="standard-gsap">HTML/JS (GSAP/Greensock)</option>
+                      </optgroup>
+                      
+                      {/* Platforms with clickTag */}
+                      <optgroup label="Platforms (with clickTag)">
+                        <option value="adform">AdForm</option>
+                        <option value="adform-mraid">AdForm Mobile (MRAID)</option>
+                        <option value="adition">Adition</option>
+                        <option value="adroll">AdRoll</option>
+                        <option value="adobe-ad-cloud">Adobe Ad Cloud</option>
+                        <option value="appnexus">AppNexus</option>
+                        <option value="basis">Basis</option>
+                        <option value="bidtheatre">BidTheatre</option>
+                        <option value="delta-projects">Delta Projects</option>
+                        <option value="doubleclick-dcm">DoubleClick (DCM)</option>
+                        <option value="doubleclick-studio">DoubleClick Studio</option>
+                        <option value="dv360">DV360</option>
+                        <option value="flashtalking">FlashTalking</option>
+                        <option value="google-ads">Google Ads</option>
+                        <option value="google-display-network">Google Display Network</option>
+                        <option value="iab">IAB</option>
+                        <option value="jivox-gsap">Jivox Dynamic Creative (GSAP)</option>
+                        <option value="jivox-css">Jivox Dynamic Creative (CSS)</option>
+                        <option value="responsive-display-ad">Responsive Display Ad</option>
+                        <option value="6sense">6sense Dynamic Creative</option>
+                        <option value="sizmek">Sizmek</option>
+                        <option value="stackadapt">StackAdapt</option>
+                        <option value="terminus">Terminus</option>
+                        <option value="trade-desk">The Trade Desk</option>
+                        <option value="ussd-sms">USSD (Tap to SMS)</option>
+                        <option value="ussd-call">USSD (Tap to Call)</option>
+                        <option value="yandex">Yandex</option>
+                      </optgroup>
+                      
+                      {/* Other */}
+                      <optgroup label="Other">
+                        <option value="scalable">Scaleable HTML/JS (CSS @keyframes)</option>
+                        <option value="responsive">Responsive HTML/JS (CSS @keyframes)</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="mb-3">
+                  <label className="block text-sm text-neutral-300 mb-1">&lt;a&gt; tag banner link (eg. https://example.com)</label>
+                  <input 
+                    type="text" 
+                    value={bannerLink}
+                    onChange={(e) => setBannerLink(e.target.value)}
+                    placeholder="https://example.com"
+                    className="w-full bg-[#1a1a1a] text-neutral-300 border border-neutral-700 rounded p-2 text-sm"
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <div className="relative inline-block w-10 mr-2 align-middle">
+                      <input 
+                        type="checkbox" 
+                        id="minifyCode" 
+                        checked={minifyCode}
+                        onChange={(e) => setMinifyCode(e.target.checked)}
+                        className="opacity-0 w-0 h-0 absolute"
+                      />
+                      <label 
+                        htmlFor="minifyCode"
+                        className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${minifyCode ? 'bg-[#4A7CFF]' : ''}`}
+                      >
+                        <span 
+                          className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${minifyCode ? 'translate-x-4' : 'translate-x-0'}`}
+                        />
+                      </label>
+                    </div>
+                    <label htmlFor="minifyCode" className="text-sm text-neutral-300">
+                      Minified Code
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <div className="relative inline-block w-10 mr-2 align-middle">
+                      <input 
+                        type="checkbox" 
+                        id="injectCustomCode" 
+                        checked={injectCustomCode}
+                        onChange={(e) => setInjectCustomCode(e.target.checked)}
+                        className="opacity-0 w-0 h-0 absolute"
+                      />
+                      <label 
+                        htmlFor="injectCustomCode"
+                        className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${injectCustomCode ? 'bg-[#4A7CFF]' : ''}`}
+                      >
+                        <span 
+                          className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${injectCustomCode ? 'translate-x-4' : 'translate-x-0'}`}
+                        />
+                      </label>
+                    </div>
+                    <label htmlFor="injectCustomCode" className="text-sm text-neutral-300">
+                      Inject Custom Code
+                    </label>
+                  </div>
+                </div>
+                
+                <div className="flex items-center mb-3">
+                  <div className="relative inline-block w-10 mr-2 align-middle">
+                    <input 
+                      type="checkbox" 
+                      id="includeZipFiles" 
+                      checked={includeZipFiles}
+                      onChange={(e) => setIncludeZipFiles(e.target.checked)}
+                      className="opacity-0 w-0 h-0 absolute"
+                    />
+                    <label 
+                      htmlFor="includeZipFiles"
+                      className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${includeZipFiles ? 'bg-[#4A7CFF]' : ''}`}
+                    >
+                      <span 
+                        className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${includeZipFiles ? 'translate-x-4' : 'translate-x-0'}`}
+                      />
+                    </label>
+                  </div>
+                  <label htmlFor="includeZipFiles" className="text-sm text-neutral-300">
+                    Include individual .zip files for each banner
+                  </label>
+                </div>
+                
+                <div className="flex items-center">
+                  <div className="relative inline-block w-10 mr-2 align-middle">
+                    <input 
+                      type="checkbox" 
+                      id="usePTagsInsteadOfSvg" 
+                      checked={usePTagsInsteadOfSvg}
+                      onChange={(e) => setUsePTagsInsteadOfSvg(e.target.checked)}
+                      className="opacity-0 w-0 h-0 absolute"
+                    />
+                    <label 
+                      htmlFor="usePTagsInsteadOfSvg"
+                      className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${usePTagsInsteadOfSvg ? 'bg-[#4A7CFF]' : ''}`}
+                    >
+                      <span 
+                        className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${usePTagsInsteadOfSvg ? 'translate-x-4' : 'translate-x-0'}`}
+                      />
+                    </label>
+                  </div>
+                  <label htmlFor="usePTagsInsteadOfSvg" className="text-sm text-neutral-300">
+                    Export text as &lt;p&gt; tags instead of &lt;svg&gt; (BETA)
+                  </label>
+                </div>
+                
+                <div className="flex items-center mt-3">
+                  <div className="relative inline-block w-10 mr-2 align-middle">
+                    <input 
+                      type="checkbox" 
+                      id="includeFallback" 
+                      checked={includeFallback}
+                      onChange={(e) => setIncludeFallback(e.target.checked)}
+                      className="opacity-0 w-0 h-0 absolute"
+                    />
+                    <label 
+                      htmlFor="includeFallback"
+                      className={`block overflow-hidden h-6 rounded-full bg-neutral-700 cursor-pointer transition-colors duration-200 ${includeFallback ? 'bg-[#4A7CFF]' : ''}`}
+                    >
+                      <span 
+                        className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform duration-200 ${includeFallback ? 'translate-x-4' : 'translate-x-0'}`}
+                      />
+                    </label>
+                  </div>
+                  <label htmlFor="includeFallback" className="text-sm text-neutral-300">
+                    Add "backup.jpg" to individual zip files
+                  </label>
+                </div>
               </div>
             </>
           )}

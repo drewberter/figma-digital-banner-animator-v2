@@ -1,11 +1,10 @@
-import { Save, Download, Play, Upload, Settings, HelpCircle } from 'lucide-react';
+import { Download, Settings, HelpCircle } from 'lucide-react';
 
 interface ToolbarProps {
   onExport: () => void;
-  onPreview: () => void;
 }
 
-const Toolbar = ({ onExport, onPreview }: ToolbarProps) => {
+const Toolbar = ({ onExport }: ToolbarProps) => {
   return (
     <div className="h-12 bg-[#0A0A0A] border-b border-neutral-800 px-4 flex items-center justify-between">
       <div className="flex items-center">
@@ -14,21 +13,9 @@ const Toolbar = ({ onExport, onPreview }: ToolbarProps) => {
         </div>
         
         <div className="flex space-x-1">
-          <button 
-            className="px-3 py-1.5 rounded text-sm text-neutral-300 hover:bg-neutral-800 flex items-center"
-            title="Save Project"
-          >
-            <Save size={16} className="mr-2" />
-            Save
-          </button>
+          {/* Save button removed - saving happens automatically with useAutoSave */}
           
-          <button 
-            className="px-3 py-1.5 rounded text-sm text-neutral-300 hover:bg-neutral-800 flex items-center"
-            title="Load Project"
-          >
-            <Upload size={16} className="mr-2" />
-            Load
-          </button>
+          {/* Load button removed - loading happens automatically when selecting an artboard */}
           
           <button 
             className="px-3 py-1.5 rounded text-sm text-neutral-300 hover:bg-neutral-800 flex items-center"
@@ -42,14 +29,7 @@ const Toolbar = ({ onExport, onPreview }: ToolbarProps) => {
       </div>
       
       <div className="flex space-x-1">
-        <button 
-          className="px-3 py-1.5 rounded text-sm text-neutral-300 hover:bg-neutral-800 flex items-center"
-          onClick={onPreview}
-          title="Preview Animation"
-        >
-          <Play size={16} className="mr-2" />
-          Preview
-        </button>
+        {/* Preview button removed */}
         
         <button 
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-neutral-800"

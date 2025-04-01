@@ -1,0 +1,28 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Page not found</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="/img/favicon.ico">
+    <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/ErrorPages/HttpError.css">
+</head>
+<body>
+<div id="main" class="container">
+    <div class="body">
+        <img src="/ErrorPages/404.svg" alt="Not Found" class="error-icon">
+        <h1 class="text">Page not found</h1>
+        <div class="secondary-text"></div>
+        <a class="button" role="button" onclick="goToHomepage()" href="#">Go back to Home Page</a>
+    </div>
+</div>
+<script>
+    function goToHomepage() {
+        window.location = '/';
+    }
+</script>
+</body>
+</html>

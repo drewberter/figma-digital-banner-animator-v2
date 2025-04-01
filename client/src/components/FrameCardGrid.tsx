@@ -6,6 +6,7 @@ import { parseGifFrameId } from '../utils/linkingUtils';
 import { useAnimationContext } from '../context/AnimationContext';
 import { debugLog, errorLog } from '../utils/linkSyncManager';
 import { mockFrames, mockLayers } from '../mock/animationData';
+import { isLayerOrChildrenLinked } from '../utils/layerUtils';
 
 interface FrameCardGridProps {
   frames: Record<string, AnimationFrame>;
@@ -90,15 +91,133 @@ const getLayersForFrame = (
       return [];
     }
     
+    // Extract components from frame ID
     const { adSizeId, frameNumber } = parsedFrameId;
     console.log(`FrameCardGrid: Creating layers for GIF frame ${frameId}, adSizeId: ${adSizeId}, frameNumber: ${frameNumber}`);
     
     // Get parent layers from the ad size
-    const parentLayers = layersMap[adSizeId] || [];
+    // In the current structure, frameId in "gif-frame-frame-1-1" format means:
+    // - adSizeId = "frame-1" (not just "frame")
+    // - frameNumber = 1 (as a number, not a string)
+    // So we need to properly reconstruct the correct ad size ID
+    
+    // Convert frameNumber to string before trying to use string methods
+    const frameNumberStr = String(frameNumber);
+    const correctedAdSizeId = `${adSizeId}-${frameNumberStr}`;
+    
+    // Log additional debug info
+    console.log(`FrameCardGrid: Using correctedAdSizeId: ${correctedAdSizeId}, frameNumber type: ${typeof frameNumber}`);
+    
+    // First try with the corrected ad size ID (which includes the frame number)
+    let parentLayers = layersMap[correctedAdSizeId];
+    
+    // If that fails, fall back to the parsed adSizeId
+    if (!parentLayers || parentLayers.length === 0) {
+      parentLayers = layersMap[adSizeId] || [];
+    }
+    
+    console.log(`FrameCardGrid: Using parent layers from adSizeId: ${parentLayers ? correctedAdSizeId : adSizeId}, found ${parentLayers?.length || 0} layers`);
+    
+    // Check if we have parent layers, if not, generate some placeholder ones for testing
+    if (!parentLayers || parentLayers.length === 0) {
+      console.warn(`No parent layers found for frame ${frameId} with adSizeId ${adSizeId}. Generating default layers.`);
+      
+      // Generate some default layers for this frame if none exist
+      // This ensures we always have something to show in the frame cards
+      const defaultLayers: AnimationLayer[] = [
+        {
+          id: `layer-${frameNumber}-1`,
+          name: 'Background',
+          type: 'rectangle',
+          visible: true,
+          locked: false,
+          parentId: null,
+          isLinked: false,
+          animations: [],
+          keyframes: [],
+          position: { x: 0, y: 0 },
+          dimensions: { width: 300, height: 250 },
+          style: { backgroundColor: '#3366cc' },
+          children: []
+        },
+        {
+          id: `layer-${frameNumber}-2`,
+          name: 'Headline',
+          type: 'text',
+          visible: true,
+          locked: false,
+          parentId: null,
+          isLinked: false,
+          animations: [],
+          keyframes: [],
+          position: { x: 20, y: 30 },
+          dimensions: { width: 260, height: 60 },
+          style: { fontSize: '24px', color: '#ffffff' },
+          children: []
+        },
+        {
+          id: `layer-${frameNumber}-3`,
+          name: 'Subhead',
+          type: 'text',
+          visible: true,
+          locked: false,
+          parentId: null,
+          isLinked: false,
+          animations: [],
+          keyframes: [],
+          position: { x: 20, y: 100 },
+          dimensions: { width: 260, height: 40 },
+          style: { fontSize: '16px', color: '#ffffff' },
+          children: []
+        },
+        {
+          id: `layer-${frameNumber}-4`,
+          name: 'CTA Button',
+          type: 'rectangle',
+          visible: true,
+          locked: false,
+          parentId: null,
+          isLinked: false,
+          animations: [],
+          keyframes: [],
+          position: { x: 20, y: 150 },
+          dimensions: { width: 120, height: 40 },
+          style: { backgroundColor: '#ff9900', borderRadius: '4px' },
+          children: []
+        },
+        {
+          id: `layer-${frameNumber}-5`,
+          name: 'Logo',
+          type: 'image',
+          visible: true,
+          locked: false,
+          parentId: null,
+          isLinked: false,
+          animations: [],
+          keyframes: [],
+          position: { x: 20, y: 200 },
+          dimensions: { width: 100, height: 30 },
+          style: {},
+          children: []
+        }
+      ];
+      
+      // Store these default layers in the layersMap for future reference
+      layersMap[adSizeId] = defaultLayers;
+      
+      // Use these layers for our cloning operation
+      const clonedLayers = deepCloneLayersWithStructure(defaultLayers, true);
+      
+      // Store them in the GIF frame for future use
+      gifFrame.layers = clonedLayers;
+      
+      console.log(`FrameCardGrid: Created ${clonedLayers.length} default layers for frame ${frameId}`);
+      return clonedLayers;
+    }
     
     // Create a deep clone of the parent layers to avoid reference issues
     // Pass true to indicate these layers are for a GIF frame (to prevent cross-mode linking)
-    const clonedLayers = deepCloneLayersWithStructure(parentLayers, true);
+    let clonedLayers = deepCloneLayersWithStructure(parentLayers, true);
     
     // Apply visibility based on hiddenLayers array
     if (gifFrame?.hiddenLayers && Array.isArray(gifFrame.hiddenLayers)) {
@@ -113,7 +232,13 @@ const getLayersForFrame = (
         return layer;
       };
       
+      // Apply visibility to all layers recursively
       clonedLayers = clonedLayers.map(applyVisibility);
+      
+      // Process layers to clean up links and prepare final layer set
+      const layersWithVisibility = clonedLayers.map(layer => {
+        // Create a proper layer copy
+        const updatedLayer = { ...layer };
         
         // For GIF frames, we need to modify the linked layer property to separate GIF mode from animation mode
         // Make sure we only have GIF mode links (with 'gif-link-' prefix) in GIF frames
@@ -296,7 +421,8 @@ const FrameCard = ({
     if (!frameId.startsWith('gif-frame-')) return null;
     
     const parsedId = parseGifFrameId(frameId);
-    return parsedId.isValid ? parsedId.frameNumber : null;
+    // Convert number to string since we need string for display
+    return parsedId.isValid ? String(parsedId.frameNumber) : null;
   };
   
   // Extract and display frame number for UI
@@ -309,54 +435,82 @@ const FrameCard = ({
   const toggleLayerGroupExpanded = (layerId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
+    // Determine new expanded state (toggle the current state)
+    const currentExpanded = expandedLayerGroups[layerId] || false;
+    const newExpandedState = !currentExpanded;
+    
+    console.log(`FrameCardGrid: Toggling layer ${layerId} expansion from ${currentExpanded} to ${newExpandedState}`);
+    
     // Update UI state
     setExpandedLayerGroups(prev => ({
       ...prev,
-      [layerId]: !prev[layerId]
+      [layerId]: newExpandedState
     }));
     
     // Also update the layer data structure
-    const updateLayerExpansion = (layers: AnimationLayer[]): AnimationLayer[] => {
+    const updateLayerExpansion = (layers: AnimationLayer[] | undefined): AnimationLayer[] => {
+      if (!layers) return [];
+      
       return layers.map(layer => {
+        // Create a copy to avoid direct mutation
+        const layerCopy = { ...layer };
+        
         // If this is the target layer, toggle its expanded state
-        if (layer.id === layerId) {
-          const newExpandedState = !expandedLayerGroups[layerId];
+        if (layerCopy.id === layerId) {
+          // Set the expanded state directly on the layer
+          layerCopy.isExpanded = newExpandedState;
           
-          // Also update the actual layer object for persistence
-          layer.isExpanded = newExpandedState;
-          
-          return { ...layer, isExpanded: newExpandedState };
+          console.log(`FrameCardGrid: Set isExpanded=${newExpandedState} on layer "${layerCopy.name}" (${layerCopy.id})`);
         }
         
         // Recursively update children if they exist
-        if (layer.children && layer.children.length > 0) {
-          return { 
-            ...layer, 
-            children: updateLayerExpansion(layer.children) 
-          };
+        if (layerCopy.children && layerCopy.children.length > 0) {
+          layerCopy.children = updateLayerExpansion(layerCopy.children);
         }
         
-        // For other layers, just return them unchanged
-        return layer;
+        return layerCopy;
       });
     };
     
-    // Update the layer data with the new expansion states
+    // Create updated layers with expansion state changes
     const updatedLayers = updateLayerExpansion([...layers]);
     
+    // Force the parent component to update by triggering a timeline refresh
+    if (frame.id.startsWith('gif-frame-')) {
+      // Update the actual frame.layers property to persist changes
+      const parsedId = parseGifFrameId(frame.id);
+      if (parsedId.isValid) {
+        console.log(`FrameCardGrid: Updating frame ${frame.id} layers with expansion state changes`);
+        frame.layers = updatedLayers;
+        forceTimelineRefresh();
+      }
+    }
+    
     // Log the change for debugging
-    console.log(`FrameCardGrid: Toggled layer ${layerId} expansion state`);
+    console.log(`FrameCardGrid: Toggled layer ${layerId} expansion state (${layers.length} layers affected)`);
   };
   
   // Recursive function to render layer items with hierarchy
   const renderLayerItem = (layer: AnimationLayer, frameId: string, depth: number) => {
-    const isGroup = layer.isGroup || layer.isFrame;
+    // Verify we have a valid layer
+    if (!layer) {
+      console.error('FrameCardGrid: Received null or undefined layer in renderLayerItem!');
+      return null;
+    }
+    
+    const isGroup = layer.isGroup || layer.isFrame || (layer.children && layer.children.length > 0);
     const hasChildren = layer.children && layer.children.length > 0;
     
-    // Get or initialize expanded state
-    const isExpanded = layer.isExpanded !== undefined 
-      ? layer.isExpanded 
-      : (expandedLayerGroups[layer.id] || false);
+    // Get or initialize expanded state - with additional logging
+    const expandedFromState = expandedLayerGroups[layer.id] || false;
+    const expandedFromLayer = layer.isExpanded || false; 
+    const isExpanded = expandedFromLayer || expandedFromState;
+    
+    // Log any discrepancies for debugging
+    if (expandedFromState !== expandedFromLayer && (expandedFromState || expandedFromLayer)) {
+      console.log(`FrameCardGrid: Expansion state mismatch for layer ${layer.name} (${layer.id}): 
+        State=${expandedFromState}, Layer=${expandedFromLayer}, Using=${isExpanded}`);
+    }
     
     // Calculate padding based on hierarchy depth for proper indentation
     const indentPadding = 8 + (depth * 12);
@@ -399,21 +553,16 @@ const FrameCard = ({
         
         {/* Layer controls: Link/Unlink toggle and Visibility toggle */}
         <div className="flex items-center space-x-1">
-          {/* Link/Unlink button - Enhanced to support both linkedLayer and locked properties */}
+          {/* Link/Unlink button with enhanced functionality for container layers */}
           <button
-            className={`p-1 rounded ${(layer.linkedLayer || layer.locked) ? 'bg-opacity-60 bg-blue-900 px-1 py-0.5 rounded-sm text-blue-500' : 'text-neutral-500'}`}
+            className={`p-1 rounded ${isLayerOrChildrenLinked(layer) ? 'bg-opacity-60 bg-blue-900 px-1 py-0.5 rounded-sm text-blue-500' : 'text-neutral-500'}`}
             onClick={(e) => {
               e.stopPropagation();
               
-              // Enhanced logging to show both lock properties to help debug inconsistencies
-              console.log(`FrameCardGrid: Toggle link state for layer ${layer.id}`, {
-                name: layer.name,
-                locked: layer.locked,
-                linkedLayer: !!layer.linkedLayer,
-                linkedLayerDetails: layer.linkedLayer || 'none'
-              });
+              // Enhanced logging to debug link properties
+              console.log(`Link toggle for ${layer.name}: isLinked=${layer.isLinked}, linkedLayer=${!!layer.linkedLayer}, locked=${layer.locked}`);
               
-              // Let the parent component handle state updates properly
+              // Let the parent component handle the toggle
               if (onToggleLayerLock) {
                 console.log(`FrameCardGrid: Calling onToggleLayerLock for layer ${layer.id}`);
                 
@@ -422,72 +571,16 @@ const FrameCard = ({
                   const isGifFrame = frameId.startsWith('gif-frame-');
                   const currentMode = isGifFrame ? 'gif' : 'animation';
                   
-                  // Always process the toggle regardless of whether we find matching layers
-                  // This ensures the UI is responsive and the icon actually toggles
+                  // This is critical - we're using the AnimationContext method
+                  // and making sure to pass the layer ID it expects
+                  debugLog('FrameCardGrid', `Toggling layer lock for ${layer.name} (${layer.id}) in ${currentMode} mode`);
                   
-                  // Log the current link status
-                  if (layer.linkedLayer || layer.locked) {
-                    console.log(`FrameCardGrid: Unlinking layer ${layer.name} (${layer.id}) in ${currentMode} mode`);
-                  } else {
-                    console.log(`FrameCardGrid: Linking layer ${layer.name} (${layer.id}) in ${currentMode} mode`);
-                    
-                    // Verify if there are matching layers (just for logging, not blocking toggle)
-                    let matchCount = 0;
-                    
-                    // Helper function to search for layer by name through all frames
-                    const findAllLayersWithName = (layerName: string, skipFrameId: string, mode: 'gif' | 'animation'): string[] => {
-                      const matchingLayerIds: string[] = [];
-                      const frameIds = Object.keys(mockLayers).filter(fId => {
-                        if (mode === 'gif') {
-                          return fId.startsWith('gif-frame-') && fId !== skipFrameId;
-                        } else {
-                          return !fId.startsWith('gif-frame-') && fId !== skipFrameId;
-                        }
-                      });
-                      
-                      // Function to search nested layers
-                      const searchNestedLayers = (layers: AnimationLayer[], targetName: string): string[] => {
-                        const results: string[] = [];
-                        
-                        if (!layers || !Array.isArray(layers)) return results;
-                        
-                        for (const l of layers) {
-                          // Check this layer's name
-                          if (l.name === targetName) {
-                            results.push(l.id);
-                          }
-                          
-                          // Check children recursively
-                          if (l.children && Array.isArray(l.children)) {
-                            results.push(...searchNestedLayers(l.children, targetName));
-                          }
-                        }
-                        
-                        return results;
-                      };
-                      
-                      // Search through all frames
-                      frameIds.forEach(fId => {
-                        const frameLayers = mockLayers[fId] || [];
-                        const found = searchNestedLayers(frameLayers, layerName);
-                        matchingLayerIds.push(...found);
-                      });
-                      
-                      return matchingLayerIds;
-                    };
-                    
-                    // Find all layers with the same name in other frames
-                    const matchingLayerIds = findAllLayersWithName(layer.name, frameId, currentMode);
-                    matchCount = matchingLayerIds.length;
-                    
-                    if (matchCount > 0) {
-                      console.log(`FrameCardGrid: Found ${matchCount} matching layers for "${layer.name}" in other frames:`, matchingLayerIds);
-                    } else {
-                      console.warn(`FrameCardGrid: No matching layers found for "${layer.name}" in other frames`);
-                    }
-                  }
+                  // Call the toggle function and log detailed information about what's happening
+                  console.log(`CLICKING LINK BUTTON for ${layer.name} (${layer.id})`);
+                  console.log(`Current state: isLinked=${!!layer.isLinked}, linkedLayer=${!!layer.linkedLayer}, locked=${!!layer.locked}`);
+                  console.log(`New state should be: locked=${!layer.locked}`);
                   
-                  // Call the toggle function - this updates the link status in the context
+                  // Actually call the toggleLayerLock function
                   onToggleLayerLock(layer.id);
                   
                   // Force a timeline refresh to ensure UI updates properly
@@ -504,19 +597,19 @@ const FrameCard = ({
                 console.warn(`FrameCardGrid: onToggleLayerLock is not defined for layer ${layer.id}`);
               }
             }}
-            title={(layer.linkedLayer || layer.locked) ? 'Unlink layer' : 'Link layer'}
+            title={isLayerOrChildrenLinked(layer) ? 'Unlink layer' : 'Link layer'}
           >
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
               width="14" 
               height="14" 
               viewBox="0 0 24 24" 
-              fill={(layer.linkedLayer || layer.locked) ? "#4A7CFF" : "none"} 
-              stroke={(layer.linkedLayer || layer.locked) ? "#4A7CFF" : "currentColor"} 
-              strokeWidth={(layer.linkedLayer || layer.locked) ? "3" : "2"}
+              fill={isLayerOrChildrenLinked(layer) ? "#4A7CFF" : "none"} 
+              stroke={isLayerOrChildrenLinked(layer) ? "#4A7CFF" : "currentColor"} 
+              strokeWidth={isLayerOrChildrenLinked(layer) ? "3" : "2"}
               strokeLinecap="round" 
               strokeLinejoin="round"
-              className={(layer.linkedLayer || layer.locked) ? "filter drop-shadow-sm" : ""}
+              className={isLayerOrChildrenLinked(layer) ? "filter drop-shadow-sm" : ""}
             >
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
@@ -530,11 +623,14 @@ const FrameCard = ({
               onClick={(e) => {
                 e.stopPropagation();
                 
-                // Toggle visibility only for animation frame purposes
-                console.log(`FrameCardGrid: Toggle visibility for layer ${layer.id} in frame ${frameId}`);
-                if (onToggleLayerVisibility) {
-                    onToggleLayerVisibility(frameId, layer.id);
-                }
+                // Additional debug for child layer visibility in expanded containers
+                const isChild = !!layer.parentId;
+                const parentIsExpanded = isChild && layer.parentId && (expandedLayerGroups[layer.parentId] || false);
+                console.log(`🔍 FrameCardGrid: HIDING layer ${layer.name} (${layer.id}) - isChild=${isChild}, parentExpanded=${parentIsExpanded}`);
+                
+                // Enhanced debug logging for layer visibility toggle
+                console.log(`FrameCardGrid: Toggle visibility for layer ${layer.id} in frame ${frameId} (current: visible)`);
+                debugLog('VisibilityToggle', `Attempting to toggle ${layer.name} (${layer.id}) in frame ${frameId}`);
                 
                 // Log parent-child relationships for nested layers
                 if (layer.parentId) {

@@ -5,18 +5,25 @@ import PreviewCanvas from "./components/PreviewCanvas";
 import Timeline from "./components/Timeline";
 import PropertiesPanel from "./components/PropertiesPanel";
 import ExportModal from "./components/ExportModal";
-import PresetsPanel from "./components/PresetsPanel";
+
 import AutoSaveIndicator from "./components/AutoSaveIndicator";
 import SyncDebugPanel from "./components/SyncDebugPanel";
 import { AnimationProvider, useAnimationContext } from "./context/AnimationContext";
-import { PluginProvider } from "./context/PluginContext";
 import { TimelineMode } from "./types/animation";
 import { mockGifFrames, generateGifFramesForAdSize } from "./mock/animationData";
 import { DEBUG_SYNC } from "./utils/syncLogger";
+import { Toaster } from "./components/ui/toaster";
+import { testLayerLinking, verifyContainerLinkDisplay } from "./utils/directLayerLinkingTest";
+
+// Import test utilities
+import { initializeTestUtilities } from "./utils/testInit";
+import { runLayerLinkingTests } from "./utils/layerLinkingTest";
+
+// Import animations CSS
+import "./styles/animations.css";
 
 function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [isPresetsPanelOpen, setIsPresetsPanelOpen] = useState(false);
   // This is for selecting which ad size to preview
   const [selectedAdSizeId, setSelectedAdSizeId] = useState('frame-1');
   
@@ -27,7 +34,14 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timelineDuration, setTimelineDuration] = useState(5); // Default 5 seconds
-  const [timelineMode, setTimelineMode] = useState<TimelineMode>(TimelineMode.Animation);
+  
+  // State for preview canvas height
+  const [previewHeight, setPreviewHeight] = useState(() => {
+    const savedHeight = localStorage.getItem('previewCanvasHeight');
+    return savedHeight ? parseInt(savedHeight, 10) : 350; // Default height
+  });
+  const [isResizingPreview, setIsResizingPreview] = useState(false);
+  const [timelineMode, setTimelineMode] = useState<TimelineMode>('animation');
   
   // Track auto-save state for notifications
   const [saving, setSaving] = useState(false);
@@ -62,15 +76,6 @@ function App() {
   const handleExport = () => {
     setIsExportModalOpen(true);
   };
-
-  const handlePreview = () => {
-    // Toggle preview mode
-    console.log("Toggle preview mode");
-  };
-  
-  const handleOpenPresets = () => {
-    setIsPresetsPanelOpen(true);
-  };
   
   // Handle frame selection from left sidebar (ad size selection)
   const handleFrameSelect = (frameId: string) => {
@@ -78,7 +83,7 @@ function App() {
     setSelectedAdSizeId(frameId);
     
     // If we're in GIF Frames mode, generate new GIF frames for this ad size
-    if (timelineMode === TimelineMode.GifFrames) {
+    if (timelineMode === 'gifFrames') {
       // Get the first GIF frame for this ad size
       const newGifFrames = generateGifFramesForAdSize(frameId);
       if (newGifFrames.length > 0) {
@@ -145,12 +150,14 @@ function App() {
     setTimelineMode(mode);
     
     // If switching to GIF Frames mode, initialize the frames
-    if (mode === TimelineMode.GifFrames) {
+    if (mode === 'gifFrames') {
       // Store the current selectedAdSizeId to use for GIF frames
       const currentAdSizeId = selectedAdSizeId;
       
-      // Generate GIF frames for the current ad size
+      // Generate GIF frames for the current ad size if needed
       const gifFrames = generateGifFramesForAdSize(currentAdSizeId);
+      
+      // The AnimationContext will be informed of the mode change through props
       
       // If frames were generated successfully, select the first one
       if (gifFrames.length > 0) {
@@ -163,7 +170,7 @@ function App() {
       } else {
         console.warn("App: No GIF frames were generated for ad size", currentAdSizeId);
       }
-    } else if (mode === TimelineMode.Animation) {
+    } else if (mode === 'animation') {
       // When switching back to Animation mode, select the ad size that was previously used for GIF frames
       // Extract the ad size ID from the current GIF frame ID
       if (selectedGifFrameId && selectedGifFrameId.startsWith('gif-frame-')) {
@@ -201,12 +208,53 @@ function App() {
   });
   
   // We'll get access to animation context data within the AnimationProvider wrapper
+  
+  // Initialize test utilities for global access
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Add getter for GIF frames for existing tests
+      (window as any).getGifFrames = () => {
+        // Mock frames - these would actually come from the animation context
+        return mockGifFrames;
+      };
+      console.log("Added global getGifFrames function for layer linking test utility");
+      
+      // Initialize new automated test utilities
+      try {
+        initializeTestUtilities();
+        console.log("🧪 Layer linking test utilities initialized - run in console with window.runLayerLinkingTests()");
+        
+        // Add global link testing function for easier debugging
+        (window as any).testLayerLinking = (layerName: string) => {
+          console.log(`Testing layer linking for "${layerName}"...`);
+          
+          // Generate deterministic ID using the same algorithm
+          const normalizedName = layerName.toLowerCase();
+          const layerHash = normalizedName.split('').reduce(
+            (hash, char) => char.charCodeAt(0) + ((hash << 5) - hash), 
+            0
+          );
+          const seedValue = Math.abs(layerHash % 1000);
+          const animationGroupId = `link-group-${layerHash}-${seedValue}a`;
+          const gifGroupId = `link-group-${layerHash}-${seedValue}g`;
+          
+          console.log(`Deterministic IDs for "${layerName}":`);
+          console.log(`- Animation mode: ${animationGroupId}`);
+          console.log(`- GIF frame mode: ${gifGroupId}`);
+          
+          // Additional checks can be added here...
+        };
+      } catch (error) {
+        console.error("Failed to load layer linking test utility:", error);
+      }
+    }
+  }, []);
 
   // Initialize or update frame sequence data when frames or mode changes
   // This will be updated in wrapped Timeline component
   useEffect(() => {
     // Only update in GIF Frames mode - this will now get data from mock objects instead of context
-    if (timelineMode !== TimelineMode.GifFrames) return;
+    if (timelineMode !== 'gifFrames') return;
     
     // Generate frames for the current ad size
     // Extract the parent ad size from the GIF frame ID or use the currently selected ad size
@@ -295,7 +343,7 @@ function App() {
         const elapsed = (now - startTime) / 1000; // Convert to seconds
         
         // Different playback behavior based on timeline mode
-        if (timelineMode === TimelineMode.Animation) {
+        if (timelineMode === 'animation') {
           // Standard animation mode - plays a single animation
           const newTime = initialTime + elapsed;
           
@@ -304,12 +352,26 @@ function App() {
             setCurrentTime(timelineDuration);
             setIsPlaying(false);
             animationFrameIdRef.current = null;
+            
+            // Force a rerender of the animation state to show final state
+            setTimeout(() => {
+              // Reset to beginning for next play
+              setCurrentTime(0);
+            }, 500);
+            
             return;
           }
           
+          // Update time at 60fps for smoother animation
           setCurrentTime(newTime);
+          
+          // Force update to ensure animations are applied correctly
+          if (Math.floor(newTime * 10) % 2 === 0) {
+            // Add a slight random variation to avoid React batching updates
+            setCurrentTime(prevTime => prevTime + 0.0001);
+          }
         } 
-        else if (timelineMode === TimelineMode.GifFrames) {
+        else if (timelineMode === 'gifFrames') {
           // GIF frames sequence mode - plays through all frames
           const { frameIds, frameTotalDurations, frameStartTimes } = frameSequenceData;
           
@@ -403,6 +465,50 @@ function App() {
     }
   }
   
+  // Handle preview canvas resize
+  useEffect(() => {
+    // Event handlers for preview canvas resize
+    const handlePreviewResizeStart = (e: CustomEvent<{clientY: number}>) => {
+      setIsResizingPreview(true);
+      
+      // Initial position
+      const startY = e.detail.clientY;
+      const startHeight = previewHeight;
+      
+      // Handler for mouse movement during resize
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        // Calculate new height based on mouse movement
+        // When dragging down, increase height; when dragging up, decrease height
+        const deltaY = moveEvent.clientY - startY;
+        const newHeight = Math.max(150, startHeight + deltaY); // Min height 150px
+        setPreviewHeight(newHeight);
+      };
+      
+      // Handler for releasing mouse button
+      const handleMouseUp = () => {
+        // Save the current height to localStorage
+        localStorage.setItem('previewCanvasHeight', previewHeight.toString());
+        
+        // Clean up resize state and event listeners
+        setIsResizingPreview(false);
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+      
+      // Add event listeners
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    };
+    
+    // Add resize event listeners
+    window.addEventListener('preview-resize-start', handlePreviewResizeStart as EventListener);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('preview-resize-start', handlePreviewResizeStart as EventListener);
+    };
+  }, [previewHeight, isResizingPreview]);
+
   // Clean up animation frame on unmount
   useEffect(() => {
     return () => {
@@ -412,89 +518,81 @@ function App() {
     };
   }, []);
 
-  // Create a wrapper component that connects with the context
+  // Create a wrapper component for the export modal
   const ExportModalWrapper = () => {
-    const { frames, currentFrame, layers } = useAnimationContext();
+    // We don't have access to animation context here anymore
+    // Pass minimal props and handle context access inside ExportModal
     return (
       <ExportModal 
         onClose={() => setIsExportModalOpen(false)} 
-        frames={frames}
-        currentFrame={currentFrame}
-        layers={layers}
       />
     );
   };
 
   return (
-    <PluginProvider>
-      <AnimationProvider>
-        <div className="bg-[#0A0A0A] text-white h-screen flex flex-col">
-          <Toolbar onExport={handleExport} onPreview={handlePreview} />
-          
-          <div className="flex-1 flex overflow-hidden">
-            <LeftSidebar 
-              onOpenPresets={handleOpenPresets} 
-              onSelectFrame={handleFrameSelect}
-              selectedAdSizeId={timelineMode === TimelineMode.Animation ? selectedAdSizeId : 
-                // In GIF Frames mode, extract the ad size ID from the selected GIF frame
-                (selectedGifFrameId && selectedGifFrameId.startsWith('gif-frame-') ? 
-                  (() => {
-                    const parts = selectedGifFrameId.split('-');
-                    if (parts.length >= 4) {
-                      if (parts[2] === 'frame') {
-                        return `${parts[2]}-${parts[3]}`;
-                      } else {
-                        return parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
-                      }
-                    } else if (parts.length === 4) {
-                      return `frame-${parts[2]}`;
+    <AnimationProvider initialTimelineMode={timelineMode}>
+      <div className="bg-[#0A0A0A] text-white h-screen flex flex-col">
+        <Toolbar onExport={handleExport} />
+        
+        <div className="flex-1 flex overflow-hidden">
+          <LeftSidebar 
+            onSelectFrame={handleFrameSelect}
+            selectedAdSizeId={timelineMode === 'animation' ? selectedAdSizeId : 
+              // In GIF Frames mode, extract the ad size ID from the selected GIF frame
+              (selectedGifFrameId && selectedGifFrameId.startsWith('gif-frame-') ? 
+                (() => {
+                  const parts = selectedGifFrameId.split('-');
+                  if (parts.length >= 4) {
+                    if (parts[2] === 'frame') {
+                      return `${parts[2]}-${parts[3]}`;
+                    } else {
+                      return parts[2].startsWith('frame') ? parts[2] : `frame-${parts[2]}`;
                     }
-                    return selectedAdSizeId;
-                  })() 
-                : selectedAdSizeId)
-              }
-            />
-            
-            <div className="flex-1 flex flex-col bg-neutral-900 overflow-auto">
-              <div className="min-h-[250px]">
-                <PreviewCanvas 
-                  selectedFrameId={timelineMode === TimelineMode.GifFrames ? selectedGifFrameId : selectedAdSizeId} 
-                  currentTime={currentTime}
-                  timelineMode={timelineMode}
-                />
-              </div>
-              <Timeline 
-                onTimeUpdate={handleTimeUpdate}
-                onPlayPauseToggle={handlePlayPauseToggle}
-                isPlaying={isPlaying}
+                  } else if (parts.length === 4) {
+                    return `frame-${parts[2]}`;
+                  }
+                  return selectedAdSizeId;
+                })() 
+              : selectedAdSizeId)
+            }
+          />
+          
+          <div className="flex-1 flex flex-col bg-neutral-900 overflow-auto">
+            <div className="min-h-[150px]" style={{ height: previewHeight }}>
+              <PreviewCanvas 
+                selectedFrameId={timelineMode === 'gifFrames' ? selectedGifFrameId : selectedAdSizeId} 
                 currentTime={currentTime}
-                selectedFrameId={timelineMode === TimelineMode.GifFrames ? selectedGifFrameId : selectedAdSizeId}
-                onDurationChange={setTimelineDuration}
-                onLinkLayers={handleLinkLayers}
-                onUnlinkLayer={handleUnlinkLayer}
                 timelineMode={timelineMode}
-                onTimelineModeChange={handleTimelineModeChange}
-                onFrameSelect={timelineMode === TimelineMode.GifFrames ? handleGifFrameSelect : handleFrameSelect}
               />
             </div>
-            
-            <PropertiesPanel />
+            <Timeline 
+              onTimeUpdate={handleTimeUpdate}
+              onPlayPauseToggle={handlePlayPauseToggle}
+              isPlaying={isPlaying}
+              currentTime={currentTime}
+              selectedFrameId={timelineMode === 'gifFrames' ? selectedGifFrameId : selectedAdSizeId}
+              onDurationChange={setTimelineDuration}
+              onLinkLayers={handleLinkLayers}
+              onUnlinkLayer={handleUnlinkLayer}
+              timelineMode={timelineMode}
+              onTimelineModeChange={handleTimelineModeChange}
+              onFrameSelect={timelineMode === 'gifFrames' ? handleGifFrameSelect : handleFrameSelect}
+            />
           </div>
-
-          {isExportModalOpen && <ExportModalWrapper />}
-
-          {isPresetsPanelOpen && (
-            <PresetsPanel onClose={() => setIsPresetsPanelOpen(false)} />
-          )}
-          
-          {/* Auto-save indicator */}
-          <AutoSaveIndicator saving={saving} lastSaved={lastSaved} />
-          
-          {/* Sync debugging panel - only show when DEBUG_SYNC is true */}
-          {DEBUG_SYNC && <SyncDebugPanel />}
         </div>
-      </AnimationProvider>
-    </PluginProvider>
+
+        {isExportModalOpen && <ExportModalWrapper />}
+        
+        {/* Auto-save indicator */}
+        <AutoSaveIndicator saving={saving} lastSaved={lastSaved} />
+        
+        {/* Sync debugging panel - only show when DEBUG_SYNC is true */}
+        {DEBUG_SYNC && <SyncDebugPanel />}
+        
+        {/* Toast notifications */}
+        <Toaster />
+      </div>
+    </AnimationProvider>
   );
 }
 

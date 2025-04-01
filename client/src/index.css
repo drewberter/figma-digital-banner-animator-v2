@@ -109,3 +109,8 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Custom colors for GIF Frame Mode UI */
+.bg-neutral-850 {
+  background-color: #1c1c1e;
+}

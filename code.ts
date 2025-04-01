@@ -292,15 +292,45 @@ async function handleSaveStateMessage(key: string, data: any) {
 }
 
 // Helper function to scan for frames in the current selection
-function scanForFrames() {
+async function scanForFrames() {
   const selection = figma.currentPage.selection;
   let foundFrames = false;
   
   // Look for frames in the selection
   for (const node of selection) {
     if (node.type === 'FRAME') {
+      const frameId = node.id;
+      
+      // Check if we have saved animation data for this frame
+      try {
+        const savedData = await figma.clientStorage.getAsync(`frame-${frameId}`);
+        
+        if (savedData) {
+          console.log(`Found saved animation data for frame ${frameId}, auto-loading...`);
+          
+          // Update our local state with the saved data
+          if (savedData.animationData) {
+            // We have animation data specific to this frame
+            animationData = savedData.animationData;
+          }
+          
+          // Notify the UI about the loaded state
+          figma.ui.postMessage({
+            type: MessageType.STATE_LOADED,
+            data: animationData,
+            frameId: frameId
+          });
+          
+          figma.notify(`Loaded animation settings for "${node.name}"`, { timeout: 2000 });
+        } else {
+          console.log(`No saved animation data found for frame ${frameId}`);
+        }
+      } catch (error) {
+        console.error(`Error checking for saved frame data: ${error}`);
+      }
+      
       // Register this frame
-      animationData.frames[node.id] = {
+      animationData.frames[frameId] = {
         selected: true, // First found frame is selected by default
         width: node.width,
         height: node.height
@@ -308,7 +338,7 @@ function scanForFrames() {
       
       // Set all other frames to unselected
       for (const id in animationData.frames) {
-        if (id !== node.id) {
+        if (id !== frameId) {
           animationData.frames[id].selected = false;
         }
       }
@@ -398,11 +428,41 @@ function scanLayersInFrame(frame: FrameNode) {
 // Helper function to save the plugin state
 async function savePluginState() {
   try {
+    // Save the global animation state
     await figma.clientStorage.setAsync('animationState', animationData);
+    
+    // Find the currently selected frame
+    let selectedFrameId = null;
+    for (const frameId in animationData.frames) {
+      if (animationData.frames[frameId].selected) {
+        selectedFrameId = frameId;
+        break;
+      }
+    }
+    
+    // If there's a selected frame, save its data separately for quick loading
+    if (selectedFrameId) {
+      const frameSpecificData = {
+        animationData: animationData,
+        timestamp: new Date().toISOString(),
+        frameId: selectedFrameId
+      };
+      
+      // Save with the frame ID as part of the key for quick retrieval
+      await figma.clientStorage.setAsync(`frame-${selectedFrameId}`, frameSpecificData);
+      
+      console.log(`Saved frame-specific animation data for frame ${selectedFrameId}`);
+    }
   } catch (error) {
     console.error('Error auto-saving state:', error);
   }
 }
+
+// Add selection change event listener to auto-detect frame selections
+figma.on('selectionchange', () => {
+  console.log('Selection changed, checking for frames...');
+  scanForFrames();
+});
 
 // Clean up when the plugin is closed
 figma.on('close', () => {
