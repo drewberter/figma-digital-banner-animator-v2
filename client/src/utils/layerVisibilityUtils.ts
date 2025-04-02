@@ -439,3 +439,256 @@ export function toggleLayerVisibility(
   console.log(`[toggleLayerVisibility] Updating only this frame (${frame.id})`);
   return setLayerVisibilityConsistent(frame, layerId, makeVisible, isBackgroundLayer);
 }
+
+/**
+ * Layer Visibility Management
+ * 
+ * Unified approach to layer visibility for both animation and GIF frame modes
+ */
+
+import { AnimationLayer, GifFrame, TimelineMode } from '../types/animation';
+import { findLayerById } from './layerLinkUtils';
+import { isGifModeLink, isAnimationModeLink } from './layerLinkUtils';
+
+/**
+ * Toggle layer visibility consistently across modes
+ * 
+ * @param frame The frame containing the layer
+ * @param layerId The ID of the layer to toggle
+ * @param frames All frames (for linked layer synchronization)
+ * @param mode Current timeline mode
+ * @returns Updated frames with visibility toggled
+ */
+export function toggleLayerVisibility(
+  frame: any, // Can be AnimationFrame or GifFrame
+  layerId: string,
+  frames: any[], // Array of frames
+  mode: TimelineMode
+): any[] {
+  // Find the layer in the frame
+  const layer = findLayerById(frame.layers, layerId);
+  if (!layer) {
+    console.error(`Layer ${layerId} not found in frame ${frame.id}`);
+    return frames;
+  }
+  
+  // Log operation
+  console.log(`[LayerVisibility] Toggling visibility for layer ${layer.name} (${layerId}) in frame ${frame.id}, current: ${layer.visible}`);
+  
+  // Create a fresh copy of frames to avoid reference issues
+  const updatedFrames = JSON.parse(JSON.stringify(frames));
+  
+  // Find the index of the current frame
+  const frameIndex = updatedFrames.findIndex((f: any) => f.id === frame.id);
+  if (frameIndex === -1) {
+    console.error(`Frame ${frame.id} not found in frames array`);
+    return frames;
+  }
+  
+  // Helper to toggle visibility recursively in a layer tree
+  const toggleVisibilityRecursive = (layers: AnimationLayer[], targetId: string): AnimationLayer[] => {
+    return layers.map(l => {
+      if (l.id === targetId) {
+        // Toggle visibility
+        return { ...l, visible: !l.visible };
+      }
+      
+      // Process children if needed
+      if (l.children && l.children.length > 0) {
+        return {
+          ...l,
+          children: toggleVisibilityRecursive(l.children, targetId)
+        };
+      }
+      
+      return l;
+    });
+  };
+  
+  // Update the layer's visibility in the current frame
+  updatedFrames[frameIndex].layers = toggleVisibilityRecursive(updatedFrames[frameIndex].layers, layerId);
+  
+  // GIF Frame mode - may need to sync across ad sizes for linked layers
+  if (mode === 'gifFrames' && layer.isLinked && layer.linkedLayer?.groupId) {
+    const { groupId } = layer.linkedLayer;
+    
+    // Only sync if this is a GIF mode link
+    if (isGifModeLink(groupId)) {
+      // Find all frames that might have linked layers
+      const newVisibility = !layer.visible; // Calculate the new visibility state
+      
+      // Sync to other frames
+      return syncLayerVisibilityByName(updatedFrames, layer.name, newVisibility);
+    }
+  }
+  
+  // Animation mode - sync across frames within the same ad size
+  if (mode === 'animation' && layer.isLinked && layer.linkedLayer?.groupId && !layer.linkedLayer.hasOverride) {
+    const { groupId } = layer.linkedLayer;
+    
+    // Only sync if this is an Animation mode link
+    if (isAnimationModeLink(groupId)) {
+      // Sync to all frames in the same ad size
+      return updatedFrames.map((f: any) => {
+        if (f.id === frame.id) return f; // Skip the already updated frame
+        
+        // Update the linked layer in other frames
+        f.layers = toggleVisibilityRecursive(f.layers, layerId);
+        return f;
+      });
+    }
+  }
+  
+  // Handle frame-specific visibility arrays if needed (GIF frames)
+  if (mode === 'gifFrames') {
+    const gifFrame = updatedFrames[frameIndex] as GifFrame;
+    
+    // Check if the frame has a hiddenLayers array
+    if (!gifFrame.hiddenLayers) {
+      gifFrame.hiddenLayers = [];
+    }
+    
+    // Update the hiddenLayers array to match layer.visible state
+    const isNowHidden = !layer.visible;
+    
+    if (isNowHidden && !gifFrame.hiddenLayers.includes(layerId)) {
+      // Add to hidden layers
+      gifFrame.hiddenLayers.push(layerId);
+    } else if (!isNowHidden && gifFrame.hiddenLayers.includes(layerId)) {
+      // Remove from hidden layers
+      gifFrame.hiddenLayers = gifFrame.hiddenLayers.filter(id => id !== layerId);
+    }
+  }
+  
+  return updatedFrames;
+}
+
+/**
+ * Sync layer visibility by name across frames
+ * 
+ * @param frames Array of frames
+ * @param layerName Name of the layer to sync
+ * @param visible Visibility to set
+ * @returns Updated frames with synchronized visibility
+ */
+export function syncLayerVisibilityByName(
+  frames: any[],
+  layerName: string,
+  visible: boolean
+): any[] {
+  if (!layerName) {
+    console.error(`Cannot sync layer visibility: missing layer name`);
+    return frames;
+  }
+  
+  // Create a fresh copy to avoid reference issues
+  const updatedFrames = JSON.parse(JSON.stringify(frames));
+  
+  // Helper to update layers with matching name
+  const updateLayerVisibilityByName = (layers: AnimationLayer[], name: string, visible: boolean): AnimationLayer[] => {
+    return layers.map(layer => {
+      // Update if name matches
+      if (layer.name === name) {
+        return { ...layer, visible };
+      }
+      
+      // Process children if they exist
+      if (layer.children && layer.children.length > 0) {
+        return {
+          ...layer,
+          children: updateLayerVisibilityByName(layer.children, name, visible)
+        };
+      }
+      
+      return layer;
+    });
+  };
+  
+  // Process all frames
+  return updatedFrames.map((frame: any) => {
+    // Skip if no layers
+    if (!frame.layers) return frame;
+    
+    // Update layers with matching name
+    frame.layers = updateLayerVisibilityByName(frame.layers, layerName, visible);
+    
+    // Update hiddenLayers array if this is a GIF frame
+    if (frame.hiddenLayers) {
+      // Find all layers with the matching name to update hiddenLayers
+      const findLayerIdsByName = (layers: AnimationLayer[], name: string): string[] => {
+        let ids: string[] = [];
+        
+        layers.forEach(layer => {
+          if (layer.name === name) {
+            ids.push(layer.id);
+          }
+          
+          if (layer.children && layer.children.length > 0) {
+            ids = [...ids, ...findLayerIdsByName(layer.children, name)];
+          }
+        });
+        
+        return ids;
+      };
+      
+      const layerIds = findLayerIdsByName(frame.layers, layerName);
+      
+      // Update hiddenLayers based on visibility
+      if (!visible) {
+        // Add to hidden layers if not already there
+        layerIds.forEach(id => {
+          if (!frame.hiddenLayers.includes(id)) {
+            frame.hiddenLayers.push(id);
+          }
+        });
+      } else {
+        // Remove from hidden layers
+        frame.hiddenLayers = frame.hiddenLayers.filter((id: string) => !layerIds.includes(id));
+      }
+    }
+    
+    return frame;
+  });
+}
+
+/**
+ * Ensure layer visibility and hiddenLayers array are consistent
+ * 
+ * @param frame Frame to update
+ * @returns Updated frame with consistent visibility
+ */
+export function ensureConsistentVisibility(frame: GifFrame): GifFrame {
+  if (!frame.layers) return frame;
+  
+  // Create a deep copy to avoid reference issues
+  const updatedFrame = JSON.parse(JSON.stringify(frame));
+  
+  // Initialize hiddenLayers if it doesn't exist
+  if (!updatedFrame.hiddenLayers) {
+    updatedFrame.hiddenLayers = [];
+  }
+  
+  // Helper to update layer visibility based on hiddenLayers
+  const updateLayerVisibility = (layers: AnimationLayer[]): AnimationLayer[] => {
+    return layers.map(layer => {
+      // Set visibility based on hiddenLayers
+      const isHidden = updatedFrame.hiddenLayers.includes(layer.id);
+      
+      // Process children recursively
+      if (layer.children && layer.children.length > 0) {
+        return {
+          ...layer,
+          visible: !isHidden,
+          children: updateLayerVisibility(layer.children)
+        };
+      }
+      
+      return { ...layer, visible: !isHidden };
+    });
+  };
+  
+  // Update all layers
+  updatedFrame.layers = updateLayerVisibility(updatedFrame.layers);
+  
+  return updatedFrame;
+}

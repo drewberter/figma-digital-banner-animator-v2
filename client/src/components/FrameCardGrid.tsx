@@ -7,6 +7,7 @@ import { useAnimationContext } from '../context/AnimationContext';
 import { debugLog, errorLog } from '../utils/linkSyncManager';
 import { mockFrames, mockLayers } from '../mock/animationData';
 import { isLayerOrChildrenLinked } from '../utils/layerUtils';
+import { isGifModeLink } from '../utils/layerLinkUtils';
 
 interface FrameCardGridProps {
   frames: Record<string, AnimationFrame>;
@@ -299,9 +300,9 @@ const deepCloneLayersWithStructure = (layers: AnimationLayer[], isForGifFrame: b
         const groupId = layer.linkedLayer.groupId;
         
         // A valid GIF mode link MUST start with "gif-link-" prefix
-        const isGifModeLink = groupId && groupId.startsWith('gif-link-');
+        const isValidGifModeLink = isGifModeLink(groupId);
         
-        if (!isGifModeLink) {
+        if (!isValidGifModeLink) {
           console.log(`FrameCardGrid: PURGING animation mode link for ${layer.name} (${layer.id}) in GIF frame - STRICT MODE SEPARATION`);
           
           // COMPLETELY remove animation mode linkedLayer property in GIF frame mode
@@ -309,11 +310,13 @@ const deepCloneLayersWithStructure = (layers: AnimationLayer[], isForGifFrame: b
           
           // Reset locked status - animation mode locks have NO EFFECT in GIF mode
           clonedLayer.locked = false;
+          clonedLayer.isLinked = false; // Explicitly set isLinked to false
         } else {
           console.log(`FrameCardGrid: Preserving GIF mode link for ${layer.name} (${layer.id}) in GIF frame - groupId: ${layer.linkedLayer.groupId}`);
           
           // Keep GIF-specific links as they are
           clonedLayer.locked = true; // Ensure locked status for GIF mode links
+          clonedLayer.isLinked = true; // Explicitly set isLinked to true
         }
       }
     } else {
@@ -323,6 +326,7 @@ const deepCloneLayersWithStructure = (layers: AnimationLayer[], isForGifFrame: b
         
         // Ensure the layer is marked as locked if it has a linkedLayer
         clonedLayer.locked = true;
+        clonedLayer.isLinked = true; // Explicitly set isLinked to true
         
         console.log(`FrameCardGrid: Preserving link for ${layer.name} in newly created layer array`);
       }

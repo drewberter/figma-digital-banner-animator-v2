@@ -9,26 +9,40 @@ import { AnimationLayer } from '../types/animation';
  * 
  * Enhanced to check multiple link properties:
  * - isLinked: Explicit flag
- * - locked: Lock flag that correlates with linking
  * - linkedLayer: Presence of link metadata
+ * - locked: Lock flag that correlates with linking (least reliable)
  * 
  * This function is used to determine if the link icon should be displayed
  */
 export function isLayerOrChildrenLinked(layer: AnimationLayer): boolean {
-  // For better debugging, expand the logging
+  // Avoid excessive logging by only using in development
+  const debugMode = false;
+  
+  // For better debugging, expand the logging only when debug mode is on
   const logLayerStatus = (l: AnimationLayer, isLinked: boolean) => {
-    console.log(`Layer ${l.name} (${l.id}) link status:`, {
-      isLinked: !!l.isLinked,
-      locked: !!l.locked,
-      hasLinkedLayer: !!l.linkedLayer,
-      linkedLayerProps: l.linkedLayer || 'none'
-    });
+    if (debugMode) {
+      console.log(`Layer ${l.name} (${l.id}) link status:`, {
+        isLinked: !!l.isLinked,
+        locked: !!l.locked,
+        hasLinkedLayer: !!l.linkedLayer,
+        linkedLayerProps: l.linkedLayer || 'none'
+      });
+    }
     return isLinked;
   };
 
-  // Check if this layer is linked through any of the link indicators
-  // Use explicit boolean checks to ensure proper type handling
-  if (layer.isLinked === true || layer.locked === true || layer.linkedLayer !== undefined) {
+  // Fast paths - check the most reliable indicators first
+  if (layer.isLinked === true) {
+    return logLayerStatus(layer, true);
+  }
+  
+  if (layer.linkedLayer !== undefined) {
+    return logLayerStatus(layer, true);
+  }
+  
+  // Last resort - check locked state which might indicate linking
+  // Note: This is less reliable but kept for backward compatibility
+  if (layer.locked === true) {
     return logLayerStatus(layer, true);
   }
   

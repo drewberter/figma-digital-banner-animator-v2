@@ -51,6 +51,15 @@ import {
   toggleLayerVisibilityOverride
 } from '../utils/directLayerLinking-fixed';
 
+// Add imports for our new utilities at the top of the file
+import { 
+  setLayerLinkProperties, 
+  generateLinkGroupId, 
+  findLayerById as findLayerByIdUtil,
+  isGifModeLink,
+  isAnimationModeLink
+} from '../utils/layerLinkUtils';
+
 // Helper function to safely handle hiddenInTimeline property
 function toggleHiddenProperty(layer: AnimationLayer): AnimationLayer {
   // Cast to extended type to access hiddenInTimeline
@@ -1190,41 +1199,24 @@ export const AnimationProvider = ({
     
     // Access the linkRegistry via imported variable to avoid Fast Refresh error
     const registry = linkRegistry;
-    // First, check if the layer is already locked or not
-    // We need to find the layer in both the main layers array and in the gifFrames
-    let layer = layers.find(l => l.id === layerId);
+    
+    // First, find the layer in the correct location
+    let layer: AnimationLayer | null = null;
     let foundInGifFrames = false;
     let containingFrameId: string | null = null;
     
-    // Enhanced nested layer finder that also checks children recursively
-    const findLayerByIdRecursive = (layers: AnimationLayer[], targetId: string): AnimationLayer | null => {
-      for (const l of layers) {
-        if (l.id === targetId) {
-          return l;
-        }
-        
-        // Check children if they exist
-        if (l.children && l.children.length > 0) {
-          const found = findLayerByIdRecursive(l.children, targetId);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
+    // Try to find in main layers first
+    layer = findLayerByIdUtil(layers, layerId);
     
-    // If not found directly in the main layers array, check for nested layers
-    if (!layer) {
-      layer = findLayerByIdRecursive(layers, layerId);
-    }
-    
-    // If still not found in main layers, check in gifFrames
+    // If not found, check in gifFrames
     if (!layer) {
       console.log(`[toggleLayerLock] Layer ${layerId} not found in main layers, checking GIF frames...`);
+      
       // Search in all GIF frames
       for (const frame of gifFrames) {
         if (!frame.layers) continue;
         
-        const foundLayer = findLayerByIdRecursive(frame.layers, layerId);
+        const foundLayer = findLayerByIdUtil(frame.layers, layerId);
         if (foundLayer) {
           layer = foundLayer;
           foundInGifFrames = true;
@@ -1235,13 +1227,13 @@ export const AnimationProvider = ({
       }
     }
     
-    // If we still haven't found it, check all frames in animation mode
+    // If still not found, check all frames in animation mode
     if (!layer && !foundInGifFrames && timelineMode === 'animation') {
       for (const frameId in framesLayers) {
         const frameLayers = framesLayers[frameId];
         if (!frameLayers) continue;
         
-        const foundLayer = findLayerByIdRecursive(frameLayers, layerId);
+        const foundLayer = findLayerByIdUtil(frameLayers, layerId);
         if (foundLayer) {
           layer = foundLayer;
           containingFrameId = frameId;
@@ -1257,18 +1249,18 @@ export const AnimationProvider = ({
       return;
     }
 
-    const newLockedState = !layer.locked;
+    // Determine if we're linking or unlinking
+    const isUnlinking = !!layer.linkedLayer;
+    const newLockedState = isUnlinking ? false : !layer.locked;
     
-    // Generate a SINGLE group ID for ALL linked layers if we're locking
-    // Generate a unique group ID based on the mode to ensure proper isolation
-    // GIF mode group IDs MUST start with "gif-link-" prefix for mode separation
-    const sharedGroupId = newLockedState ? 
-      (timelineMode === 'gifFrames' ? `gif-link-${uuidv4()}` : uuidv4()) : "";
+    // Generate a consistent group ID
+    const sharedGroupId = newLockedState ? generateLinkGroupId(layer.name, timelineMode) : "";
     
     // Log what we're doing with enhanced details
     console.log(`[AnimationContext] Toggling layer lock state for ${layer.name} (${layerId}):`, {
       oldState: layer.locked,
       newState: newLockedState,
+      isUnlinking,
       groupId: sharedGroupId,
       timelineMode,
       hasLinkedLayer: !!layer.linkedLayer,
@@ -1288,74 +1280,35 @@ export const AnimationProvider = ({
         prev.map(l => {
           // Update the clicked layer
           if (l.id === layerId) {
-            // Add or remove linkedLayer property based on the new locked state
-            if (newLockedState) {
-              // Use the shared groupId we created at the top of the function
-              console.log(`[toggleLayerLock] Adding linkedLayer to ${l.name} (${l.id}) with groupId ${sharedGroupId}`);
-              
-              // Also update the linkRegistry to make the link icon display correctly
-              linkRegistry.linkLayers(l.name, [l.id], timelineMode === 'gifFrames' ? 'gif' : 'animation');
-              
-              return { 
-                ...l, 
-                locked: true,
-                isLinked: true, // Add this for the UI to show the link icon
-                linkedLayer: {
-                  layerId: l.id,
-                  frameId: containingFrameId || '',
-                  name: l.name || '',
-                  hasOverride: false,
-                  groupId: sharedGroupId,
-                  syncMode: LinkSyncMode.Full, // Default to full sync in GIF frame mode
-                  isMain: true, // This is the main layer that was clicked
-                  overrides: [] // No overrides initially
-                }
-              };
-            } else {
-              // If unlocking, remove the linkedLayer property
-              const { linkedLayer, ...rest } = l;
-              console.log(`[toggleLayerLock] Removing linkedLayer from ${l.name} (${l.id})`);
-              return { ...rest, locked: false };
-            }
+            // Use our utility function to set all link properties consistently
+            return setLayerLinkProperties(
+              l, 
+              newLockedState, 
+              timelineMode, 
+              sharedGroupId, 
+              true,
+              containingFrameId || ''
+            );
           }
-          // Also update any layer with the same name (cross-ad-size linking)
+          
+          // Also update any layer with the same name
           if (l.name === layerNameToUpdate && l.id !== layerId) {
-            console.log(`[toggleLayerLock] Also updating main layer ${l.name} (${l.id}) to locked: ${newLockedState}`);
-            
-            // Use the same group ID for all linked layers
-            if (newLockedState) {
-              // Update the linkRegistry for this linked layer too
-              if (layerNameToUpdate) {
-                linkRegistry.linkLayers(layerNameToUpdate, [layerId, l.id], timelineMode === 'gifFrames' ? 'gif' : 'animation');
-              }
-              
-              return { 
-                ...l, 
-                locked: true,
-                isLinked: true, // Add this for the UI to show the link icon
-                linkedLayer: {
-                  layerId: l.id,
-                  frameId: containingFrameId || '',
-                  name: l.name || '',
-                  hasOverride: false,
-                  groupId: sharedGroupId, // Use the shared groupId for consistent linking
-                  syncMode: LinkSyncMode.Full,
-                  isMain: false, // This is not the main layer
-                  overrides: []
-                }
-              };
-            } else {
-              // If unlocking, remove the linkedLayer property
-              const { linkedLayer, ...rest } = l;
-              return { ...rest, locked: false };
-            }
+            // Use our utility function
+            return setLayerLinkProperties(
+              l, 
+              newLockedState, 
+              timelineMode, 
+              sharedGroupId, 
+              false,
+              containingFrameId || ''
+            );
           }
+          
           return l;
         })
       );
       
       // Find the source frame that contains this layer
-      // This helps us identify the frame number for cross-ad-size syncing
       const frameContainingLayer = gifFrames.find((frame: GifFrame) => 
         frame.layers && frame.layers.some(l => l.id === layerId || 
           (l.children && JSON.stringify(l.children).includes(layerId)))
@@ -1381,7 +1334,6 @@ export const AnimationProvider = ({
         const updatedFrames = JSON.parse(JSON.stringify(prev));
         
         // Filter only the frames with the same frame number but from DIFFERENT ad sizes
-        // This ensures we only link across different ad sizes, not within the same ad size
         const sourceAdSizeId = parsedFrameId?.adSizeId;
         
         // Use the link registry to find frames with the same number
@@ -1389,7 +1341,6 @@ export const AnimationProvider = ({
         
         if (frameNumber) {
           // Get frame IDs with the same frame number from the registry
-          // Pass gifFrames as first parameter to avoid type error
           const linkedFrameIds = linkRegistry.findFramesByNumber(gifFrames, String(frameNumber));
           console.log(`[toggleLayerLock] Link registry found ${linkedFrameIds.length} frames with number ${frameNumber}`);
           
@@ -1399,28 +1350,27 @@ export const AnimationProvider = ({
               // Include if in the linked frames list and not from the same ad size
               const parsed = parseGifFrameId(frame.id);
               // Need to check if the frame's ID is in the linkedFrameIds array
-              // We can't use includes directly with GifFrame objects, so we check their IDs
               const isFrameIdIncluded = linkedFrameIds.some(linkedFrame => linkedFrame.id === frame.id);
               return isFrameIdIncluded && parsed.adSizeId !== sourceAdSizeId;
             });
           }
         }
         
-        // If the registry didn't return any frames, fall back to the original filtering method
+        // If no frames found, fall back to original filtering
         if (framesWithSameNumber.length === 0 && frameNumber && sourceAdSizeId) {
           framesWithSameNumber = updatedFrames.filter((frame: GifFrame) => {
             const parsed = parseGifFrameId(frame.id);
             // Only include frames with the same frame number but from DIFFERENT ad sizes
             return parsed.isValid && 
                    parsed.frameNumber === frameNumber && 
-                   parsed.adSizeId !== sourceAdSizeId; // This is the key difference
+                   parsed.adSizeId !== sourceAdSizeId;
           });
           
-          // If we found frames this way, register them in the link registry
+          // Register frames in registry if found
           if (framesWithSameNumber.length > 0) {
             console.log(`[toggleLayerLock] Adding ${framesWithSameNumber.length} frames with number ${frameNumber} to registry`);
             
-            // Get all frames with this number (including the source frame)
+            // Get all frames with this number
             const allFramesWithNumber = [
               ...(frameContainingLayer ? [frameContainingLayer] : []),
               ...framesWithSameNumber
@@ -1432,13 +1382,7 @@ export const AnimationProvider = ({
             // Register in the link registry
             if (frameIds.length >= 2) {
               // Add to the registry
-              // Get helper for frame lookups by number
               const frameHelper = linkRegistry.gifFrameMode(true);
-              
-              // Add frame IDs to our local registry for linking
-              frameIds.forEach(id => {
-                console.log(`Adding frame ${id} to link registry`);
-              });
             }
           }
         }
@@ -1447,20 +1391,29 @@ export const AnimationProvider = ({
         
         // Find the layers across these frames with the same name
         if (layer.name) {
-          // Recursive function to find layers with a given name
-          const findAndUpdateLayersByName = (layers: AnimationLayer[], name: string, locked: boolean): AnimationLayer[] => {
+          // Recursive function to find and update layers
+          const updateLayersWithLinking = (layers: AnimationLayer[], name: string): AnimationLayer[] => {
             return layers.map(l => {
-              // If this layer has the target name, update its lock state
+              // If this layer has the target name, update its link state
               if (l.name === name) {
-                console.log(`[toggleLayerLock] Found matching layer ${l.name} (${l.id}), updating locked state to ${locked}`);
-                return { ...l, locked };
+                console.log(`[toggleLayerLock] Found matching layer ${l.name} (${l.id}), updating link state to ${newLockedState}`);
+                
+                // Use our utility function to update consistently
+                return setLayerLinkProperties(
+                  l, 
+                  newLockedState, 
+                  timelineMode, 
+                  sharedGroupId, 
+                  false,
+                  containingFrameId || ''
+                );
               }
               
-              // If this layer has children, process them too
+              // Process children recursively
               if (l.children && Array.isArray(l.children)) {
                 return {
                   ...l,
-                  children: findAndUpdateLayersByName(l.children, name, locked)
+                  children: updateLayersWithLinking(l.children, name)
                 };
               }
               
@@ -1472,77 +1425,20 @@ export const AnimationProvider = ({
           framesWithSameNumber.forEach((frame: GifFrame) => {
             const frameIndex = updatedFrames.findIndex((f: GifFrame) => f.id === frame.id);
             if (frameIndex !== -1 && updatedFrames[frameIndex].layers) {
-              // Use the same groupId we created earlier for consistent linking
-              // This ensures all layers share the same groupId
-              
-              // Enhanced version that adds linkedLayer property properly
-              const updateLayersWithLinking = (layers: AnimationLayer[], name: string, locked: boolean): AnimationLayer[] => {
-                return layers.map(l => {
-                  // If this layer has the target name, update its lock state
-                  if (l.name === name) {
-                    console.log(`[toggleLayerLock] Found matching layer ${l.name} (${l.id}), updating locked state to ${locked}`);
-                    
-                    // If we're locking, add/update linkedLayer property to support animation context
-                    if (locked && sharedGroupId) {
-                      // Create or update the linkedLayer property
-                      const linkedLayer: LinkedLayerInfo = {
-                        layerId: l.id,
-                        frameId: frame.id,
-                        name: l.name || '',
-                        hasOverride: false,
-                        groupId: sharedGroupId,
-                        syncMode: LinkSyncMode.Full, // Default to full sync in GIF frame mode
-                        isMain: false, // Not the main layer in GIF frame mode
-                        overrides: [] // No overrides initially
-                      };
-                      
-                      console.log(`[toggleLayerLock] Adding linkedLayer to ${l.name} (${l.id}) with shared groupId ${sharedGroupId}`);
-                      return { ...l, locked: true, linkedLayer };
-                    } 
-                    else if (!locked) {
-                      // If unlocking, remove the linkedLayer property
-                      const { linkedLayer, ...rest } = l;
-                      return { ...rest, locked: false };
-                    }
-                    return { ...l, locked };
-                  }
-                  
-                  // If this layer has children, process them too
-                  if (l.children && Array.isArray(l.children)) {
-                    return {
-                      ...l,
-                      children: updateLayersWithLinking(l.children, name, locked)
-                    };
-                  }
-                  
-                  return l;
-                });
-              };
-              
-              // Use the enhanced update function
+              // Use our recursive update function
               updatedFrames[frameIndex].layers = updateLayersWithLinking(
                 updatedFrames[frameIndex].layers, 
-                layer.name, 
-                newLockedState
+                layer.name
               );
-              console.log(`[toggleLayerLock] Updated lock state for layer ${layer.name} in frame ${frame.id}`);
+              console.log(`[toggleLayerLock] Updated link state for layer ${layer.name} in frame ${frame.id}`);
             }
           });
         }
         
         return updatedFrames;
       });
-      
-      // Force a refresh to ensure UI updates
-      forceTimelineRefresh();
-      
-      // Increment visibility counter to force re-renders
-      incrementVisibilityCounter();
-      
     } else {
       // In regular animation mode, we need to use the linkedLayer property
-      
-      // Find if this layer is part of a link group
       const targetLayer = layers.find(l => l.id === layerId);
       if (!targetLayer) return;
       
@@ -1558,36 +1454,26 @@ export const AnimationProvider = ({
         if (layersWithSameName.length > 0) {
           console.log(`[toggleLayerLock] Animation mode: Found ${layersWithSameName.length} layers with name ${targetLayer.name} to link`);
           
-          // Create a new link group
-          const groupId = uuidv4();
+          // Register in linkRegistry first
+          const allLayerIds = [layerId, ...layersWithSameName.map(l => l.id)];
+          linkRegistry.linkLayers(targetLayer.name, allLayerIds, 'animation', layerId);
           
-          // Update all layers in this group
+          // Update all layers
           setLayers(prev => 
             prev.map(layer => {
               // If this layer has the same name as the target, link it
               if (layer.name === targetLayer.name) {
                 const isMain = layer.id === layerId; // First clicked layer is main
                 
-                // Create linkedLayer property
-                const linkedLayer: LinkedLayerInfo = {
-                  layerId: layer.id,
-                  frameId: '', // Animation mode doesn't have frameId
-                  name: layer.name || '',
-                  hasOverride: false,
-                  groupId,
-                  syncMode: LinkSyncMode.Full, // Default to full sync
-                  isMain, // First layer in the group is the main one
-                  overrides: [] // No overrides initially
-                };
-                
-                console.log(`[toggleLayerLock] Animation mode: Linking layer ${layer.name} (${layer.id}), isMain: ${isMain}`);
-                
-                return { 
-                  ...layer, 
-                  locked: true, // Mark as locked
-                  isLinked: true, // Add this for the UI to show the link icon
-                  linkedLayer // Add link info
-                };
+                // Use our utility function
+                return setLayerLinkProperties(
+                  layer,
+                  true,
+                  timelineMode,
+                  sharedGroupId,
+                  isMain,
+                  ''
+                );
               }
               return layer;
             })
@@ -1596,55 +1482,47 @@ export const AnimationProvider = ({
           // If no other layers to link, just toggle the locked state
           setLayers(prev => 
             prev.map(layer => 
-              layer.id === layerId ? { ...layer, locked: newLockedState } : layer
+              layer.id === layerId 
+                ? setLayerLinkProperties(layer, true, timelineMode, sharedGroupId, true, '')
+                : layer
             )
           );
         }
       } else {
-        // If we're unlocking, check if it's part of a link group
+        // If we're unlinking, check if it's part of a link group
         if (targetLayer.linkedLayer) {
           const { groupId } = targetLayer.linkedLayer;
           
           console.log(`[toggleLayerLock] Animation mode: Unlinking group ${groupId}`);
           
-          // Also update the linkRegistry to reflect the unlinking
-          // Use the utility function to convert from timelineMode to registryMode
+          // Find all layers in this group
           const registryMode = getRegistryMode(timelineMode);
           const layersToUnlink: string[] = [];
           
-          // First collect all the layer IDs to be unlinked from this group
+          // Collect layer IDs to unlink
           layers.forEach(layer => {
             if (layer.linkedLayer && layer.linkedLayer.groupId === groupId) {
               layersToUnlink.push(layer.id);
-              
-              // Remove this layer from the registry
               console.log(`[toggleLayerLock] Removing layer ${layer.name} (${layer.id}) from link registry in ${registryMode} mode`);
             }
           });
           
-          // Log the unlinking operation
           console.log(`[toggleLayerLock] Unlinking ${layersToUnlink.length} layers from group ${groupId} in ${registryMode} mode`);
           
-          // Update the linkRegistry - unlink each layer
-          // Create a Record for animation mode
+          // Prepare data for registry update
           const layersRecord: Record<string, AnimationLayer[]> = { animation: layers };
           
+          // Unlink each layer
           layersToUnlink.forEach(id => {
-            // Use registry mode directly now that our helper function returns the compatible format
             linkRegistry.unlinkLayer(layersRecord, id, registryMode);
           });
           
-          // Remove link relationships for all layers in the UI state
+          // Update UI state
           setLayers(prev => 
             prev.map(layer => {
               if (layer.linkedLayer && layer.linkedLayer.groupId === groupId) {
-                // Remove linkedLayer property and unlock
-                const { linkedLayer, ...restLayer } = layer;
-                console.log(`[toggleLayerLock] Animation mode: Unlinking layer ${layer.name} (${layer.id})`);
-                return { 
-                  ...restLayer, 
-                  locked: false // Unlock it
-                };
+                // Use our utility function
+                return setLayerLinkProperties(layer, false, timelineMode, '', false, '');
               }
               return layer;
             })
@@ -1653,13 +1531,21 @@ export const AnimationProvider = ({
           // If not part of a link group, just toggle the locked state
           setLayers(prev => 
             prev.map(layer => 
-              layer.id === layerId ? { ...layer, locked: newLockedState } : layer
+              layer.id === layerId 
+                ? setLayerLinkProperties(layer, false, timelineMode, '', false, '')
+                : layer
             )
           );
         }
       }
     }
-  }, [layers, timelineMode, forceTimelineRefresh, incrementVisibilityCounter, uuidv4]);
+    
+    // Force a refresh to ensure UI updates
+    forceTimelineRefresh();
+    
+    // Increment visibility counter to force re-renders
+    incrementVisibilityCounter();
+  }, [layers, gifFrames, timelineMode, framesLayers, forceTimelineRefresh, incrementVisibilityCounter, parseGifFrameId, getRegistryMode, buildDirectLinkTable]);
   
   // Toggle layer expanded state
   const toggleLayerExpanded = useCallback((frameId: string, layerId: string) => {
@@ -2719,6 +2605,27 @@ export const AnimationProvider = ({
       };
     }
   }, [layers, frames, adSizes, gifFrames, linkRegistry, selectedLayerId]);
+
+  // Add import for validation tools
+  import { exposeValidationTools } from '../utils/linkValidation';
+
+  // ... other existing imports ...
+
+  // In useEffect for exposing testing tools, add call to expose validation tools
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Expose existing test functions
+      (window as any).getGifFrames = () => {
+        console.log('[LayerSync] Providing GIF frames for testing utility');
+        return gifFrames;
+      };
+
+      // Expose our new layer link validation tools
+      exposeValidationTools();
+        
+      console.log('Testing utilities exposed to window object. Try window.checkLayerLinking(window.getGifFrames(), "gifFrames")');
+    }
+  }, [gifFrames]);
 
   return (
     <AnimationContext.Provider value={contextValue}>
